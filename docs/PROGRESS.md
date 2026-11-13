@@ -9,7 +9,7 @@
 |---|---|---|---|---|
 | 0 | Bootstrap repo, cấu hình, hạ tầng | ✅ Xong | 13/11/2026 | 56 test pass · `/api/health` ok · Neo4j 5.26.32 · READ_ACCESS chặn ghi ✅ · build TS 0 lỗi |
 | 1 | Tải dump, lọc bài (A1) | ✅ Xong | 14/11/2026 | **2.441 bài** trong `documents.jsonl` · QID 97,3% · `person` 1.061/`battle` 202/`place` 150/`dynasty` 16 · RAM peak 1,16 GB |
-| 2 | Làm sạch, tách câu, hyperlink (A2/A3/A5) | 🟡 Code xong, chưa chạy | — | `clean_text.py` + `split_sentences.py` + 18 test pass — chờ Phase 1 xong mới chạy pipeline |
+| 2 | Làm sạch, tách câu, hyperlink (A2/A3/A5) | 🟡 Code xong + đã sửa lỗi, chưa chạy | — | `clean_text.py` + `split_sentences.py` · 0 bài còn ký tự wiki trong mẫu 50 bài · 94,6% câu thân bài kết thúc dấu câu — chờ duyệt để chạy pipeline |
 | 3 | Parse infobox, chuẩn hóa ngày (A4) | ⬜ Chưa bắt đầu | — | — |
 | 4 | Nhãn bạc NER từ hyperlink (B2.1) | ⬜ Chưa bắt đầu | — | — |
 | 5 | Huấn luyện + suy luận NER (B1/B2) | ⬜ Chưa bắt đầu | — | — |
@@ -31,7 +31,7 @@ Ký hiệu: ⬜ chưa · 🟡 đang làm · ✅ xong (đạt Gate) · ⚠️ xon
 
 Chi tiết ở `docs/09-ke-hoach-thuc-thien.md` → mục "Phase 2".
 
-> Phase 1 đã xong (13/11/2026) — báo cáo: `reports/phase_01_report.md`.
+> Phase 1 đã xong (14/11/2026) — báo cáo: `reports/phase_01_report.md`.
 
 Kết quả Phase 1 đã chốt:
 - `data/interim/documents.jsonl` — **2.441 bài** (khoảng mục tiêu 2.000–5.000).
