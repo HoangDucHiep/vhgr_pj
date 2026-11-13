@@ -1,0 +1,733 @@
+{
+  "_meta": {
+    "phase": 3,
+    "name": "Parse infobox + chuẩn hóa ngày (A4)",
+    "ngay_do": "2026-11-14",
+    "dump_version": "viwiki-20261101",
+    "seed": 42,
+    "nguon": [
+      "python scripts/stats_infobox.py --json-out /tmp/phase3_stats_raw.json",
+      "python -m src.preprocess.parse_infobox --config configs/default.yaml",
+      "python -m src.preprocess.extract_lead_dates --config configs/default.yaml",
+      "pytest -q tests/ (268 tests)"
+    ],
+    "mo_ta": "Mọi con so truy duoc ve nguon. Confidence 0,97 cho triple suy truc tiep tu truong infobox; 0,95 cho moc sinh suy tu tham so phu cua template 'X va tuoi'; 0,85 cho triple tu doan dan (method='rule'). Corpus 2.441 bai (1.764 bai co infobox, 1.061 bai person)."
+  },
+  "corpus": {
+    "documents": 2441,
+    "documents_with_infobox": 1764,
+    "documents_person": 1061,
+    "infobox_triples": 10394,
+    "lead_triples": 736,
+    "infobox_entities": 1764
+  },
+  "gate": {
+    "gate_1_parse_rate_person": {
+      "expected_min": 0.95,
+      "actual": 1.0,
+      "parsed": 1061,
+      "total": 1061,
+      "pass": true,
+      "note": "146/1061 bai co template infobox rong (khong co truong nao) — van la parse thanh cong vi nhan dien duoc khoi template"
+    },
+    "gate_2_date_or_family_coverage": {
+      "expected_min": 0.9,
+      "actual": 0.9236569274269557,
+      "covered": 980,
+      "total": 1061,
+      "pass": true
+    },
+    "gate_3_date_normalization": {
+      "expected_min": 0.95,
+      "actual": 1.0,
+      "correct": 30,
+      "total": 30,
+      "pass": true,
+      "fixture": "tests/fixtures/dates.jsonl"
+    },
+    "gate_4_triple_invariants": {
+      "expected_min": 1.0,
+      "actual": 1.0,
+      "method_infobox_ratio": 1.0,
+      "confidence_ge_095_ratio": 1.0,
+      "total": 10394,
+      "pass": true
+    },
+    "gate_5_relations_in_catalog": {
+      "expected_max": 0,
+      "actual": 0,
+      "outside": [],
+      "subject_type_violations": 0,
+      "pass": true
+    }
+  },
+  "coverage_thang_so_sanh": {
+    "chi_infobox": 0.6729500471253534,
+    "chi_infobox_so_bai": 714,
+    "infobox_plus_lead": 0.9236569274269557,
+    "infobox_plus_lead_so_bai": 980,
+    "co_ngay": 0.9048067860508954,
+    "co_gia_dinh": 0.4231856738925542,
+    "tong_bai_person": 1061,
+    "note": "Thang so sanh 3 muc: infobox don -> them doan dan -> ket qua. Doan dan bo sung +266 bai (+25,1 diem phan tram) chay tu 67,3% len 92,4%."
+  },
+  "parse_rate_by_infobox_type": {
+    "Thông tin đơn vị hành chính Việt Nam": {
+      "so_bai": 10,
+      "loai_node": "place"
+    },
+    "Infobox former country": {
+      "so_bai": 8,
+      "loai_node": "place"
+    },
+    "Thông tin nhân vật phong kiến": {
+      "so_bai": 451,
+      "loai_node": "person"
+    },
+    "Thông tin nhân vật hoàng gia": {
+      "so_bai": 347,
+      "loai_node": "person"
+    },
+    "Thông tin nhà văn": {
+      "so_bai": 30,
+      "loai_node": "person"
+    },
+    "Thông tin đảng phái chính trị": {
+      "so_bai": 7,
+      "loai_node": "event"
+    },
+    "Infobox national military": {
+      "so_bai": 1,
+      "loai_node": "event"
+    },
+    "Thông tin chiến tranh": {
+      "so_bai": 147,
+      "loai_node": "event"
+    },
+    "Infobox settlement": {
+      "so_bai": 2,
+      "loai_node": "place"
+    },
+    "Infobox ethnic group": {
+      "so_bai": 1,
+      "loai_node": "event"
+    },
+    "Thông tin nhân vật": {
+      "so_bai": 216,
+      "loai_node": "person"
+    },
+    "Infobox military conflict": {
+      "so_bai": 55,
+      "loai_node": "event"
+    },
+    "Infobox book": {
+      "so_bai": 3,
+      "loai_node": "event"
+    },
+    "Infobox political party": {
+      "so_bai": 3,
+      "loai_node": "event"
+    },
+    "Infobox country": {
+      "so_bai": 4,
+      "loai_node": "place"
+    },
+    "Infobox famine": {
+      "so_bai": 1,
+      "loai_node": "event"
+    },
+    "Infobox Former Country": {
+      "so_bai": 23,
+      "loai_node": "place"
+    },
+    "Infobox royalty": {
+      "so_bai": 3,
+      "loai_node": "person"
+    },
+    "Infobox document": {
+      "so_bai": 2,
+      "loai_node": "event"
+    },
+    "Infobox Chinese": {
+      "so_bai": 6,
+      "loai_node": "place"
+    },
+    "infobox officeholder 1": {
+      "so_bai": 2,
+      "loai_node": "person"
+    },
+    "Infobox Military Unit": {
+      "so_bai": 6,
+      "loai_node": "event"
+    },
+    "Thông tin hiệp ước": {
+      "so_bai": 1,
+      "loai_node": "event"
+    },
+    "Thông tin di tích lịch sử": {
+      "so_bai": 1,
+      "loai_node": "place"
+    },
+    "Infobox museum": {
+      "so_bai": 2,
+      "loai_node": "place"
+    },
+    "Infobox summit meeting": {
+      "so_bai": 1,
+      "loai_node": "event"
+    },
+    "Thông tin viên chức": {
+      "so_bai": 31,
+      "loai_node": "person"
+    },
+    "Infobox Writer": {
+      "so_bai": 14,
+      "loai_node": "person"
+    },
+    "Infobox di tích lịch sử": {
+      "so_bai": 3,
+      "loai_node": "place"
+    },
+    "Infobox order": {
+      "so_bai": 1,
+      "loai_node": "event"
+    },
+    "Thông tin chùa": {
+      "so_bai": 13,
+      "loai_node": "place"
+    },
+    "Thông tin tu sĩ Phật giáo": {
+      "so_bai": 10,
+      "loai_node": "person"
+    },
+    "Thông tin đền Việt Nam": {
+      "so_bai": 31,
+      "loai_node": "place"
+    },
+    "Thông tin xung đột dân sự": {
+      "so_bai": 3,
+      "loai_node": "event"
+    },
+    "Infobox officeholder 1": {
+      "so_bai": 6,
+      "loai_node": "person"
+    },
+    "Thông tin khu vực bảo tồn": {
+      "so_bai": 1,
+      "loai_node": "place"
+    },
+    "Thông tin nhân khẩu quốc gia": {
+      "so_bai": 1,
+      "loai_node": "dynasty"
+    },
+    "Infobox ancient site": {
+      "so_bai": 1,
+      "loai_node": "place"
+    },
+    "Thông tin nhạc sĩ": {
+      "so_bai": 15,
+      "loai_node": "person"
+    },
+    "Thông tin nghệ sĩ": {
+      "so_bai": 16,
+      "loai_node": "person"
+    },
+    "Thông tin cảng biển": {
+      "so_bai": 1,
+      "loai_node": "place"
+    },
+    "Infobox former monarchy": {
+      "so_bai": 1,
+      "loai_node": "dynasty"
+    },
+    "Thông tin công trình xây dựng": {
+      "so_bai": 6,
+      "loai_node": "place"
+    },
+    "thông tin nhân vật phong kiến": {
+      "so_bai": 5,
+      "loai_node": "person"
+    },
+    "Infobox religious building": {
+      "so_bai": 5,
+      "loai_node": "place"
+    },
+    "Infobox civilian attack": {
+      "so_bai": 5,
+      "loai_node": "event"
+    },
+    "Infobox civil conflict": {
+      "so_bai": 2,
+      "loai_node": "event"
+    },
+    "Thông tin trường học": {
+      "so_bai": 4,
+      "loai_node": "place"
+    },
+    "Infobox Military Structure": {
+      "so_bai": 3,
+      "loai_node": "place"
+    },
+    "Thông tin chức sắc Kitô giáo Chi tiết": {
+      "so_bai": 5,
+      "loai_node": "person"
+    },
+    "Infobox church": {
+      "so_bai": 1,
+      "loai_node": "event"
+    },
+    "Infobox zoo": {
+      "so_bai": 1,
+      "loai_node": "place"
+    },
+    "Infobox World Heritage Site": {
+      "so_bai": 1,
+      "loai_node": "place"
+    },
+    "Infobox cơ quan Việt Nam": {
+      "so_bai": 1,
+      "loai_node": "event"
+    },
+    "Thông tin thánh": {
+      "so_bai": 92,
+      "loai_node": "place"
+    },
+    "Infobox Former Subdivision": {
+      "so_bai": 3,
+      "loai_node": "place"
+    },
+    "Infobox person": {
+      "so_bai": 2,
+      "loai_node": "person"
+    },
+    "Thông tin sân bay": {
+      "so_bai": 1,
+      "loai_node": "place"
+    },
+    "Thông tin công viên": {
+      "so_bai": 1,
+      "loai_node": "place"
+    },
+    "Infobox UNESCO World Heritage Site": {
+      "so_bai": 3,
+      "loai_node": "place"
+    },
+    "thông tin viên chức": {
+      "so_bai": 2,
+      "loai_node": "person"
+    },
+    "Thông tin Thánh": {
+      "so_bai": 1,
+      "loai_node": "place"
+    },
+    "Infobox Airport": {
+      "so_bai": 1,
+      "loai_node": "place"
+    },
+    "thông tin nhân vật": {
+      "so_bai": 4,
+      "loai_node": "person"
+    },
+    "Thông tin công ty": {
+      "so_bai": 1,
+      "loai_node": "place"
+    },
+    "Thông tin giáo phận": {
+      "so_bai": 1,
+      "loai_node": "place"
+    },
+    "Infobox official post": {
+      "so_bai": 1,
+      "loai_node": "event"
+    },
+    "thông tin nghệ sĩ": {
+      "so_bai": 1,
+      "loai_node": "person"
+    },
+    "Thông tin quân nhân": {
+      "so_bai": 1,
+      "loai_node": "event"
+    },
+    "Infobox Mandir": {
+      "so_bai": 4,
+      "loai_node": "place"
+    },
+    "Infobox holiday": {
+      "so_bai": 1,
+      "loai_node": "event"
+    },
+    "infobox weapon": {
+      "so_bai": 2,
+      "loai_node": "event"
+    },
+    "Infobox government agency": {
+      "so_bai": 4,
+      "loai_node": "event"
+    },
+    "Thông tin thiên tai": {
+      "so_bai": 1,
+      "loai_node": "event"
+    },
+    "Infobox writer": {
+      "so_bai": 2,
+      "loai_node": "person"
+    },
+    "Thông tin khu dân cư": {
+      "so_bai": 1,
+      "loai_node": "place"
+    },
+    "Thông tin đơn vị quân sự": {
+      "so_bai": 3,
+      "loai_node": "event"
+    },
+    "thông tin nhà văn": {
+      "so_bai": 1,
+      "loai_node": "person"
+    },
+    "Infobox government cabinet": {
+      "so_bai": 1,
+      "loai_node": "event"
+    },
+    "Thông tin bài hát": {
+      "so_bai": 1,
+      "loai_node": "event"
+    },
+    "Thông tin viên chức 1": {
+      "so_bai": 2,
+      "loai_node": "person"
+    },
+    "Thông tin nhân vật Tam Quốc": {
+      "so_bai": 1,
+      "loai_node": "person"
+    },
+    "Infobox military unit": {
+      "so_bai": 7,
+      "loai_node": "event"
+    },
+    "Thông tin tháp Chăm": {
+      "so_bai": 1,
+      "loai_node": "place"
+    },
+    "Infobox Saint": {
+      "so_bai": 2,
+      "loai_node": "person"
+    },
+    "Infobox terrorist attack": {
+      "so_bai": 6,
+      "loai_node": "event"
+    },
+    "Thông tin sự kiện thời sự": {
+      "so_bai": 3,
+      "loai_node": "event"
+    },
+    "Thông tin nhiệm kỳ chính phủ": {
+      "so_bai": 2,
+      "loai_node": "event"
+    },
+    "Thông tin tổ chức phi lợi nhuận": {
+      "so_bai": 1,
+      "loai_node": "place"
+    },
+    "Infobox artist": {
+      "so_bai": 2,
+      "loai_node": "person"
+    },
+    "Thông tin hệ chữ viết": {
+      "so_bai": 1,
+      "loai_node": "place"
+    },
+    "Infobox Military Conflict": {
+      "so_bai": 5,
+      "loai_node": "event"
+    },
+    "Infobox UN resolution": {
+      "so_bai": 2,
+      "loai_node": "event"
+    },
+    "Thông tin đơn vị quân sự Việt Nam": {
+      "so_bai": 2,
+      "loai_node": "event"
+    },
+    "Infobox military structure": {
+      "so_bai": 2,
+      "loai_node": "place"
+    },
+    "Thông tin sự kiện": {
+      "so_bai": 3,
+      "loai_node": "event"
+    },
+    "Infobox event": {
+      "so_bai": 5,
+      "loai_node": "event"
+    },
+    "Thông tin ngày lễ": {
+      "so_bai": 3,
+      "loai_node": "event"
+    },
+    "Infobox organization": {
+      "so_bai": 3,
+      "loai_node": "event"
+    },
+    "Infobox Historic Site": {
+      "so_bai": 1,
+      "loai_node": "place"
+    },
+    "Thông tin sách": {
+      "so_bai": 1,
+      "loai_node": "event"
+    },
+    "Infobox football biography": {
+      "so_bai": 1,
+      "loai_node": "person"
+    },
+    "Infobox former political post": {
+      "so_bai": 1,
+      "loai_node": "person"
+    },
+    "Thông tin nhân vật hư cấu": {
+      "so_bai": 1,
+      "loai_node": "person"
+    },
+    "Thông tin tiểu sử bóng đá": {
+      "so_bai": 1,
+      "loai_node": "person"
+    },
+    "infobox military conflict": {
+      "so_bai": 1,
+      "loai_node": "event"
+    },
+    "Thông tin về tổ chức": {
+      "so_bai": 1,
+      "loai_node": "article"
+    },
+    "Infobox artifact": {
+      "so_bai": 1,
+      "loai_node": "event"
+    },
+    "Thông tin sách series": {
+      "so_bai": 1,
+      "loai_node": "event"
+    },
+    "Infobox Person": {
+      "so_bai": 1,
+      "loai_node": "person"
+    },
+    "Infobox officeholder": {
+      "so_bai": 10,
+      "loai_node": "person"
+    },
+    "Infobox Officeholder": {
+      "so_bai": 20,
+      "loai_node": "person"
+    },
+    "Infobox military installation": {
+      "so_bai": 1,
+      "loai_node": "place"
+    },
+    "Infobox weapon": {
+      "so_bai": 1,
+      "loai_node": "event"
+    },
+    "Infobox building": {
+      "so_bai": 2,
+      "loai_node": "place"
+    },
+    "Infobox award": {
+      "so_bai": 1,
+      "loai_node": "event"
+    },
+    "Infobox Hurricane": {
+      "so_bai": 1,
+      "loai_node": "event"
+    },
+    "Infobox diplomatic mission": {
+      "so_bai": 1,
+      "loai_node": "place"
+    },
+    "Infobox university": {
+      "so_bai": 1,
+      "loai_node": "place"
+    },
+    "Infobox military operation": {
+      "so_bai": 1,
+      "loai_node": "event"
+    },
+    "Infobox Political Party": {
+      "so_bai": 1,
+      "loai_node": "event"
+    },
+    "Thông tin báo chí": {
+      "so_bai": 1,
+      "loai_node": "place"
+    },
+    "Infobox coin": {
+      "so_bai": 2,
+      "loai_node": "event"
+    },
+    "Thông tin phim": {
+      "so_bai": 1,
+      "loai_node": "event"
+    }
+  },
+  "relation_distribution": {
+    "chi_huy_tran": 1760,
+    "sinh_tai": 1435,
+    "cha_cua": 1097,
+    "giu_chuc_vu": 1020,
+    "sinh_nam": 985,
+    "mat_tai": 952,
+    "thuoc_trieu_dai": 639,
+    "mat_nam": 635,
+    "dien_ra_tai": 522,
+    "ke_vi": 455,
+    "tham_gia_tran": 353,
+    "me_cua": 295,
+    "vo_cua": 159,
+    "chong_cua": 68,
+    "lap_ra": 19
+  },
+  "subject_type_distribution": {
+    "person": 9871,
+    "event": 523
+  },
+  "object_type_distribution": {
+    "place": 2924,
+    "event": 2122,
+    "person": 2069,
+    "year": 1620,
+    "title": 1020,
+    "dynasty": 639
+  },
+  "confidence_distribution": {
+    "0.95": 287,
+    "0.97": 10107
+  },
+  "infobox_type_distribution": {
+    "thong tin nhan vat phong kien": 456,
+    "thong tin nhan vat hoang gia": 347,
+    "thong tin nhan vat": 220,
+    "thong tin chien tranh": 147,
+    "thong tin thanh": 93,
+    "infobox military conflict": 61,
+    "thong tin vien chuc": 33,
+    "infobox former country": 31,
+    "thong tin nha van": 31,
+    "thong tin den viet nam": 31,
+    "infobox officeholder": 30,
+    "thong tin nghe si": 17,
+    "infobox writer": 16,
+    "thong tin nhac si": 15,
+    "infobox military unit": 13,
+    "thong tin chua": 13,
+    "thong tin don vi hanh chinh viet nam": 10,
+    "thong tin tu si phat giao": 10,
+    "infobox officeholder 1": 8,
+    "thong tin dang phai chinh tri": 7,
+    "infobox chinese": 6,
+    "thong tin cong trinh xay dung": 6,
+    "infobox terrorist attack": 6,
+    "infobox religious building": 5,
+    "infobox civilian attack": 5,
+    "infobox military structure": 5,
+    "thong tin chuc sac kito giao chi tiet": 5,
+    "infobox event": 5,
+    "infobox political party": 4,
+    "infobox country": 4,
+    "thong tin truong hoc": 4,
+    "infobox mandir": 4,
+    "infobox government agency": 4,
+    "infobox book": 3,
+    "infobox royalty": 3,
+    "infobox di tich lich su": 3,
+    "thong tin xung dot dan su": 3,
+    "infobox former subdivision": 3,
+    "infobox person": 3,
+    "infobox unesco world heritage site": 3,
+    "infobox weapon": 3,
+    "thong tin don vi quan su": 3,
+    "thong tin su kien thoi su": 3,
+    "thong tin su kien": 3,
+    "thong tin ngay le": 3,
+    "infobox organization": 3,
+    "infobox settlement": 2,
+    "infobox document": 2,
+    "infobox museum": 2,
+    "infobox civil conflict": 2,
+    "thong tin vien chuc 1": 2,
+    "infobox saint": 2,
+    "thong tin nhiem ky chinh phu": 2,
+    "infobox artist": 2,
+    "infobox un resolution": 2,
+    "thong tin don vi quan su viet nam": 2,
+    "infobox building": 2,
+    "infobox coin": 2,
+    "infobox national military": 1,
+    "infobox ethnic group": 1,
+    "infobox famine": 1,
+    "thong tin hiep uoc": 1,
+    "thong tin di tich lich su": 1,
+    "infobox summit meeting": 1,
+    "infobox order": 1,
+    "thong tin khu vuc bao ton": 1,
+    "thong tin nhan khau quoc gia": 1,
+    "infobox ancient site": 1,
+    "thong tin cang bien": 1,
+    "infobox former monarchy": 1,
+    "infobox church": 1,
+    "infobox zoo": 1,
+    "infobox world heritage site": 1,
+    "infobox co quan viet nam": 1,
+    "thong tin san bay": 1,
+    "thong tin cong vien": 1,
+    "infobox airport": 1,
+    "thong tin cong ty": 1,
+    "thong tin giao phan": 1,
+    "infobox official post": 1,
+    "thong tin quan nhan": 1,
+    "infobox holiday": 1,
+    "thong tin thien tai": 1,
+    "thong tin khu dan cu": 1,
+    "infobox government cabinet": 1,
+    "thong tin bai hat": 1,
+    "thong tin nhan vat tam quoc": 1,
+    "thong tin thap cham": 1,
+    "thong tin to chuc phi loi nhuan": 1,
+    "thong tin he chu viet": 1,
+    "infobox historic site": 1,
+    "thong tin sach": 1,
+    "infobox football biography": 1,
+    "infobox former political post": 1,
+    "thong tin nhan vat hu cau": 1,
+    "thong tin tieu su bong da": 1,
+    "thong tin ve to chuc": 1,
+    "infobox artifact": 1,
+    "thong tin sach series": 1,
+    "infobox military installation": 1,
+    "infobox award": 1,
+    "infobox hurricane": 1,
+    "infobox diplomatic mission": 1,
+    "infobox university": 1,
+    "infobox military operation": 1,
+    "thong tin bao chi": 1,
+    "thong tin phim": 1
+  },
+  "entity": {
+    "co_nam_sinh_hoac_mat": 880,
+    "tong_entity_person": 1205,
+    "ty_le": 0.7302904564315352,
+    "phan_bo_loai": {
+      "place": 248,
+      "person": 1205,
+      "event": 309,
+      "dynasty": 2
+    }
+  },
+  "misc": {
+    "pytest_passed": 268,
+    "pytest_failed": 0,
+    "so_bai_co_infobox_rong": 146,
+    "so_bai_co_infobox_rong_note": "146/1061 bai person co template {{Thong tin nhan vat phong kien}} rong — khong co truong nao de trich; doi doan dan la fallback chinh",
+    "so_triple_thieu_bang_chung_bi_loai": 9,
+    "so_triple_thieu_bang_chung_note": "9 triple bi loai do schema (vd 'combatant1' la to chuc 'Hoa Ky' → khong gan nham person)"
+  }
+}

@@ -80,6 +80,25 @@ dùng để dựng biểu đồ / slide mà không phải chép tay số từ ma
 
 **Triple thiếu bằng chứng → loại khỏi KG.** Không có ngoại lệ.
 
+## Artifact Phase 3 — infobox (đường sạch)
+
+Ba artifact sinh ở Phase 3, **tách riêng theo nguồn** để tầng online chỉ đọc artifact:
+
+| Artifact | `method` | `confidence` | Ý nghĩa |
+|---|---|---|---|
+| `data/interim/infobox_triples.jsonl` | `infobox` | ≥ 0,95 | Trường infobox trực tiếp — **đường sạch** để đo NER/RE |
+| `data/interim/lead_triples.jsonl` | `rule` | 0,85 | Fallback từ đoạn dẫn, chỉ cho bài `person` |
+| `data/interim/infobox_entities.jsonl` | — | — | Node + `props` (birth_year, death_year, reign_start/end, temple_name, posthumous_name, gender, aliases) |
+
+Quy tắc bắt buộc:
+
+- `infobox_triples.jsonl` **chỉ** chứa `method="infobox"` và `confidence ≥ 0.95` — tuyệt đối không trộn fallback.
+- `lead_triples.jsonl` **chỉ** chứa `method="rule"` và `confidence=0.85`.
+- `evidence_sentence` của triple infobox = **trích nguyên văn** giá trị trường (`"Cha: Lê Khánh Dư"`), không dựng lại từ template.
+- Ngày chuẩn hóa theo ISO-8601 `YYYY-MM-DD`, **năm 4 chữ số** (`0939-02-01`, không phải `939-02-01`).
+- Triple có đối tượng là **tổ chức** (phe phái, quân đội) → **loại**, không gán `person`.
+- `entity_id` sinh bằng `make_entity_id()`; `year_id` bằng `make_year_id()`.
+
 ## Trường bắt buộc của một entity
 
 ```json

@@ -126,13 +126,19 @@ ENTITY_SOURCE_METHODS: frozenset[str] = frozenset(
 
 #: Quan hệ hợp lệ theo từng loại node (dùng cho validator và prompt).
 #: ``None`` nghĩa là không giới hạn theo loại.
+#:
+#: **Nguồn**: `docs/04-schema-knowledge-graph.md` §3.1 (bảng 18 quan hệ).
+#: Phase 3 sửa 4 dòng cho khớp hướng quan hệ đã chốt trong docs/04:
+#:   - ``thuoc_trieu_dai``: person/event → dynasty (thêm ``dynasty``, ``event``)
+#:   - ``sinh_tai`` / ``mat_tai``: person → place (bỏ ``place`` khỏi subject)
+#:   - ``dong_doi_tai``: dynasty → place (đổi ``place`` → ``dynasty``)
 RELATION_SUBJECT_TYPES: dict[str, frozenset[str]] = {
     "cha_cua": frozenset({"person"}),
     "me_cua": frozenset({"person"}),
     "vo_cua": frozenset({"person"}),
     "chong_cua": frozenset({"person"}),
     "anh_em_cua": frozenset({"person"}),
-    "thuoc_trieu_dai": frozenset({"person", "dynasty"}),
+    "thuoc_trieu_dai": frozenset({"person", "dynasty", "event"}),
     "ke_vi": frozenset({"person"}),
     "giu_chuc_vu": frozenset({"person"}),
     "lap_ra": frozenset({"person", "event"}),
@@ -140,11 +146,11 @@ RELATION_SUBJECT_TYPES: dict[str, frozenset[str]] = {
     "tham_gia_tran": frozenset({"person"}),
     "danh_bai": frozenset({"person"}),
     "dien_ra_tai": frozenset({"person", "event"}),
-    "sinh_tai": frozenset({"person", "place"}),
-    "mat_tai": frozenset({"person", "place"}),
+    "sinh_tai": frozenset({"person"}),
+    "mat_tai": frozenset({"person"}),
     "sinh_nam": frozenset({"person"}),
     "mat_nam": frozenset({"person"}),
-    "dong_doi_tai": frozenset({"place"}),
+    "dong_doi_tai": frozenset({"dynasty"}),
 }
 
 #: Quan hệ dùng để tạo node `Year` (năm được biểu diễn cả 2 chiều).

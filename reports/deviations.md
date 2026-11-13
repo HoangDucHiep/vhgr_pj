@@ -221,3 +221,69 @@
 - Ảnh hưởng: Thời gian tách câu toàn corpus giảm còn **~86 giây** (−52%) → thời gian chạy lại pipeline khi tinh chỉnh giảm rõ rệt.
 - Xử lý: Thêm `_get_segmenter()` cache ở mức module.
 - Cập nhật file: `src/preprocess/split_sentences.py`
+
+## D-019 — Căn `RELATION_SUBJECT_TYPES` theo `docs/04` (Phase 3)
+- Ngày: 2026-11-14
+- Phase: 3
+- Loại: kỹ thuật
+- Kế hoạch: `docs/09` Phase 3 sinh triple theo 18 quan hệ đã chốt ở `docs/04` §3.1.
+- Thực tế: Bảng `RELATION_SUBJECT_TYPES` trong `src/common/schemas.py` lệch `docs/04` ở 4 dòng: `dong_doi_tai` ghi subject=`place` (đúng: `dynasty` → place); `thuoc_trieu_dai` thiếu `dynasty`/`event`; `sinh_tai`/`mat_tai` cho phép subject=`place` (đúng: `person` → place).
+- Lý do: Validator dùng bảng này để **loại** triple vi phạm. Không sửa thì `dien_ra_tai` với subject=`event` (hợp lệ theo `docs/04`) bị loại oan.
+- Ảnh hưởng: Sửa 4 dòng. **Tập 18 quan hệ không đổi** → không cần sửa danh mục ở `docs/CONTEXT.md` §2.5, chỉ bổ sung bảng ràng buộc loại.
+- Xử lý: Sửa `src/common/schemas.py`; ghi chú vào `docs/04` §3.1 và `docs/CONTEXT.md`.
+- Cập nhật file: `src/common/schemas.py`, `docs/04-schema-knowledge-graph.md`, `docs/CONTEXT.md`
+
+## D-020 — `battle` → `event`, giữ nguyên `infobox_parser.py` (Phase 3)
+- Ngày: 2026-11-14
+- Phase: 3
+- Loại: kỹ thuật
+- Kế hoạch: KG có 7 loại node đóng (`docs/CONTEXT.md` §2.4), trong đó `event` bao trùm chiến tranh.
+- Thực tế: `INFOBOX_TYPE_MAP` (Phase 1) trả `"battle"` cho template chiến tranh — **không phải** loại node KG hợp lệ.
+- Lý do: Sửa `infobox_parser.py` sẽ làm đổi hành vi Phase 1 (checksum corpus, test cũ). Phase 3 có bảng `type_map` riêng trong `configs/infobox_mapping.yaml` map `battle`/`chiến tranh`/`military conflict` → `event`.
+- Ảnh hưởng: 202 bài `battle` + 11 bài `event` → 213 node `event`. `normalize_type()` bỏ tiền tố "Infobox"/"Thông tin" trước khi tra bảng (vì `wikitextparser` trả tên template đầy đủ, regex Phase 1 trả tên đã bỏ tiền tố).
+- Xử lý: Không sửa file Phase 1; dùng config riêng + `normalize_type()`.
+- Cập nhật file: `configs/infobox_mapping.yaml`, `src/preprocess/infobox_entity_types.py`
+
+## D-021 — 146/1.061 bài `person` có infobox rỗng → đổi định nghĩa Gate 1 (Phase 3)
+- Ngày: 2026-11-14
+- Phase: 3
+- Loại: tiêu chí
+- Kế hoạch: `docs/09` Phase 3 Gate 1 yêu cầu "≥95% bài person có infobox parse thành công".
+- Thực tế: **146 / 1.061** bài có template `{{Thông tin nhân vật phong kiến}}` **hoàn toàn rỗng** (không tham số nào). Đo theo "có ít nhất 1 tham số" chỉ đạt 86,2%.
+- Lý do: Wikipedia viết infobox cho có, không điền tham số. Đây là **đặc điểm dữ liệu**, không phải lỗi parse.
+- Ảnh hưởng: Gate 1 đổi định nghĩa thành "nhận diện được khối template" (tên loại + dict tham số, kể cả rỗng) → **100%**. Thêm test thứ hai đo "mọi infobox **có** tham số đều parse ≥99% tham số" → 100%. Coverage thực sự đo ở **Gate 2**.
+- Xử lý: Ghi rõ định nghĩa trong `reports/phase_03_report.md` và `docs/10-nhat-ky/phase-03.md` §D-021.
+- Cập nhật file: `reports/phase_03_report.md`, `docs/10-nhat-ky/phase-03.md`, `tests/test_infobox.py`
+
+## D-022 — `parse_vi_date` trả ISO 4 chữ số cho năm < 1000 (Phase 3)
+- Ngày: 2026-11-14
+- Phase: 3
+- Loại: kỹ thuật
+- Kế hoạch: `docs/01` quy định định dạng ngày ISO-8601 `YYYY-MM-DD`.
+- Thực tế: `datetime.date(939, 2, 1).isoformat()` → `"939-02-01"` — thiếu số 0 ở đầu.
+- Lý do: Python không padding năm < 1000; lịch sử Việt Nam có **nhiều** năm 3 chữ số (938, 939, 944, 965, 974…) nên lỗi này ảnh hưởng lớn.
+- Ảnh hưởng: Thêm helper `_to_iso()` → `f"{year:04d}-{month:02d}-{day:02d}"`. 2 fixture đổi kỳ vọng `"939-02-01"` → `"0939-02-01"`.
+- Xử lý: Thêm `_to_iso()` vào `src/common/normalize.py`; dùng cho mọi nhánh trả ngày.
+- Cập nhật file: `src/common/normalize.py`, `tests/fixtures/dates.jsonl`, `tests/test_normalize.py`
+
+## D-023 — 3 artifact mới ở Phase 3 (Phase 3)
+- Ngày: 2026-11-14
+- Phase: 3
+- Loại: contract
+- Kế hoạch: `AGENTS.md` §7 liệt kê artifact theo phase; Phase 3 trong `docs/09` mới nêu output contract cục bộ.
+- Thực tế: Phase 3 sinh **3** file mới: `data/interim/infobox_triples.jsonl`, `data/interim/lead_triples.jsonl`, `data/interim/infobox_entities.jsonl`.
+- Lý do: Cần tách triple theo nguồn (đường sạch confidence 0,95+ vs fallback 0,85) và tách node props khỏi triple để Phase 8 (entity linking) và Phase 10 (nạp Neo4j) dùng lại.
+- Ảnh hưởng: Bổ sung 3 dòng vào `AGENTS.md` §7 + `.cursor/rules/data-contracts.mdc` + output contract của `docs/09` §Phase 3.
+- Xử lý: Cập nhật 3 file tài liệu trong cùng một lần.
+- Cập nhật file: `AGENTS.md`, `.cursor/rules/data-contracts.mdc`, `docs/09-ke-hoach-thuc-thien.md`
+
+## D-024 — Loại chủ thể không suy được → `article`, không mặc định `person` (Phase 3)
+- Ngày: 2026-11-14
+- Phase: 3
+- Loại: kỹ thuật
+- Kế hoạch: `docs/09` Phase 3 yêu cầu "suy `subject_type`/`object_type` từ infobox type + giá trị".
+- Thực tế: `resolved_type = normalize_type(...) or doc_type or "person"` → khi tên template không có trong `type_map` (43 bài), chủ thể **rơi xuống mặc định `person`**. Kết quả: node **"Hà Nội"** và **"Cần Thơ"** trong `infobox_entities.jsonl` có `type="person"` (sai hoàn toàn).
+- Lý do: `person` là loại phổ biến nhất (1.205/1.764 entity) nên dễ trở thành mặc định ngầm — nhưng đó chính là lý do nó **bịa âm thầm** (vi phạm `AGENTS.md` §5.3).
+- Ảnh hưởng: 9 triple bị loại (thay vì sinh sai). Triple 10.403 → **10.394**. Gate 1–5 **không đổi** (100% / 92,4% / 100% / 100% / 0) — vì Gate đo *tỉ lệ*, không đo *sai lệch nội dung*.
+- Xử lý: Tách **hai mặc định** vì vai trò khác nhau: `DEFAULT_TYPE="article"` cho **chủ thể** (loại trung tính) và `DEFAULT_OBJECT_TYPE="person"` cho **đối tượng** (trường không khai báo `value_type` gần như luôn là người). Thêm bước suy loại chủ thể từ `wikidata_signal` (Phase 1) giữa tên template và mặc định. Sửa kèm: (a) `normalize_type()` thử khớp chính xác **trước** khi bỏ tiền tố — 6 khoá `type_map` có tiền tố trở nên không bao giờ được gọi, 451 bài "Thông tin nhân vật phong kiến" không map được; (b) bổ sung 36 khoá `type_map` cho template chưa có (đo trên 2.441 bài). Thêm 6 test regression.
+- Cập nhật file: `src/preprocess/infobox_entity_types.py`, `src/preprocess/parse_infobox.py`, `configs/infobox_mapping.yaml`, `tests/test_infobox.py`, `reports/phase_03_report.md`, `docs/10-nhat-ky/phase-03.md`

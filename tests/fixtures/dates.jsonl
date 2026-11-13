@@ -1,0 +1,30 @@
+{"input": "10 tháng 5 năm 1385", "expected_iso": "1385-05-10", "expected_year": 1385, "expected_precision": "day"}
+{"input": "31 tháng 3 năm 1028", "expected_iso": "1028-03-31", "expected_year": 1028, "expected_precision": "day"}
+{"input": "15-3-1028", "expected_iso": "1028-03-15", "expected_year": 1028, "expected_precision": "day"}
+{"input": "1385-05-10", "expected_iso": "1385-05-10", "expected_year": 1385, "expected_precision": "day"}
+{"input": "10/5/1385", "expected_iso": "1385-05-10", "expected_year": 1385, "expected_precision": "day"}
+{"input": "tháng 5 năm 1284", "expected_iso": "1284-05-01", "expected_year": 1284, "expected_precision": "month"}
+{"input": "năm 1385", "expected_iso": null, "expected_year": 1385, "expected_precision": "year"}
+{"input": "1385", "expected_iso": null, "expected_year": 1385, "expected_precision": "year"}
+{"input": "khoảng năm 1000", "expected_iso": null, "expected_year": 1000, "expected_precision": "year"}
+{"input": "sau năm 1230", "expected_iso": null, "expected_year": 1230, "expected_precision": "year"}
+{"input": "trước năm 1400", "expected_iso": null, "expected_year": 1400, "expected_precision": "year"}
+{"input": "năm Ất Tý (938)", "expected_iso": null, "expected_year": 938, "expected_precision": "year"}
+{"input": "năm Bính Thân (968)", "expected_iso": null, "expected_year": 968, "expected_precision": "year"}
+{"input": "năm Kỷ Hùng (1009)", "expected_iso": null, "expected_year": 1009, "expected_precision": "year"}
+{"input": "năm Tý (938)", "expected_iso": null, "expected_year": 938, "expected_precision": "year"}
+{"input": "năm Ất Tý (900)", "expected_iso": null, "expected_year": null, "expected_precision": "none"}
+{"input": "25 tháng 12 năm 1933", "expected_iso": "1933-12-25", "expected_year": 1933, "expected_precision": "day"}
+{"input": "22 tháng 12 năm 1788", "expected_iso": "1788-12-22", "expected_year": 1788, "expected_precision": "day"}
+{"input": "16 tháng 9 năm 1792", "expected_iso": "1792-09-16", "expected_year": 1792, "expected_precision": "day"}
+{"input": "1 tháng 2 năm 939", "expected_iso": "0939-02-01", "expected_year": 939, "expected_precision": "day"}
+{"input": "14 tháng 2 năm 944", "expected_iso": "0944-02-14", "expected_year": 944, "expected_precision": "day"}
+{"input": "tháng 12 năm 1930", "expected_iso": "1930-12-01", "expected_year": 1930, "expected_precision": "month"}
+{"input": "25–26 tháng 12 năm 1944", "expected_iso": null, "expected_year": 1944, "expected_precision": "year"}
+{"input": "13 tháng 3 – 7 tháng 5 năm 1954", "expected_iso": null, "expected_year": 1954, "expected_precision": "year"}
+{"input": "1884–1913", "expected_iso": null, "expected_year": 1884, "expected_precision": "year"}
+{"input": "26 tháng 5 năm 1998", "expected_iso": "1998-05-26", "expected_year": 1998, "expected_precision": "day"}
+{"input": "27 tháng 4 năm 2022", "expected_iso": "2022-04-27", "expected_year": 2022, "expected_precision": "day"}
+{"input": "1791-05-25", "expected_iso": "1791-05-25", "expected_year": 1791, "expected_precision": "day"}
+{"input": "1822-07-01", "expected_iso": "1822-07-01", "expected_year": 1822, "expected_precision": "day"}
+{"input": "", "expected_iso": null, "expected_year": null, "expected_precision": "none"}

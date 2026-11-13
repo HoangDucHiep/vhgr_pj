@@ -240,13 +240,21 @@ python scripts/stats_text.py
 
 **Output contract**
 ```json
-{"doc_id":"doc_1","sentence_id":"ibx_1","subject":"Lê Lợi","subject_type":"person",
- "relation":"cha_cua","object":"Lê Khánh Dư","object_type":"person",
+{"doc_id":"doc_1","sentence_id":"ibx_1","subject":"ent_le_loi_1a2b3c4d","subject_type":"person",
+ "relation":"cha_cua","object":"ent_le_khanh_du_9f8e7d6c","object_type":"person",
  "evidence_sentence":"Cha: Lê Khánh Dư","source_url":"https://vi.wikipedia.org/wiki/Lê_Lợi",
- "doc_title":"Lê Lợi","confidence":0.98,"method":"infobox",
- "start_year":null,"end_year":null}
+ "doc_title":"Lê Lợi","confidence":0.97,"method":"infobox",
+ "start_year":null,"end_year":null,"alt_evidence":[]}
 ```
 > `method` chỉ nhận 5 giá trị: `infobox`, `distant_supervision`, `phobert_re`, `llm`, `rule`.
+
+**Artifact sinh ra ở Phase 3** (3 file):
+
+| Đường dẫn | Nội dung | `method` | `confidence` |
+|---|---|---|---|
+| `data/interim/infobox_triples.jsonl` | triple từ trường infobox | `infobox` | ≥ 0,95 |
+| `data/interim/lead_triples.jsonl` | triple fallback từ đoạn dẫn | `rule` | 0,85 |
+| `data/interim/infobox_entities.jsonl` | entity + `props` node | — | — |
 
 **Việc phải làm**
 1. `src/preprocess/parse_infobox.py`: dùng `wikitextparser` parse template, đưa ra dict phẳng `key → value` (key lowercase, bỏ dấu gạch dưới). Giữ nguyên giá trị gốc trong `raw_values`.
@@ -262,12 +270,18 @@ python scripts/stats_text.py
    - `"ngày 15 tháng 3 năm 1028"` → `("1028-03-15","year",1028)`
    - `"15-3-1028"`, `"1028"`, `"tháng 5 năm 1284"`, `"khoảng năm 1000"` (precision `year`, qualifier `khoảng`)
    - Năm âm lịch kèm năm dương (`"năm Ất Tý (938)"`) → lấy năm dương 938.
+   - **ISO-8601 với năm 4 chữ số**: năm < 1000 → `0939-02-01` (không phải `939-02-01`).
 4. `src/preprocess/infobox_entity_types.py`: suy `subject_type`/`object_type` từ infobox type + giá trị (vd `cha` → `person`).
+   - Thứ tự suy loại **chủ thể**: tên template (`type_map`) → `wikidata_signal` (Phase 1) → `"article"`.
+   - **Không** mặc định `person` cho chủ thể (xem `reports/deviations.md` D-024).
+   - Trường có giá trị là **tổ chức** (phe phái, quân đội) → **loại** triple, không gán `person`.
 5. Ghi `data/interim/infobox_entities.jsonl`: trích **thuộc tính node** từ infobox (`birth_year`, `death_year`, `reign_start`, `reign_end`, `temple_name`, `aliases`) — dùng cho Phase 9 (alias) và Phase 10 (node props).
+6. Fallback đoạn dẫn → `data/interim/lead_triples.jsonl`: chỉ ngoặc đầu tiên của câu dẫn, khoảng cách sinh–mất ≤ 120 năm, chỉ bài `person`.
 
 **Lệnh kiểm thử**
 ```bash
 python -m src.preprocess.parse_infobox --config configs/default.yaml
+python -m src.preprocess.extract_lead_dates --config configs/default.yaml
 pytest -q tests/test_infobox.py tests/test_normalize.py
 python - <<'PY'
 import json
@@ -285,13 +299,16 @@ python scripts/stats_infobox.py     # tỉ lệ parse thành công, tỉ lệ c�
 ```
 
 **Gate**
-- [ ] ≥ 95% bài có infobox `person` được parse thành công
-- [ ] ≥ 90% bài nhân vật có ít nhất 1 trường ngày sinh/mất hoặc quan hệ gia đình được trích
-- [ ] Chuẩn hóa ngày đúng ≥ 95% trên tập 30 chuỗi mẫu trong `tests/fixtures/dates.jsonl`
-- [ ] 100% triple có đủ 6 trường bắt buộc, `method="infobox"`, `confidence ≥ 0.95`
-- [ ] 0 quan hệ ngoài danh mục
+- [x] ≥ 95% bài có infobox `person` được parse thành công → **100,0%** (1.061/1.061)
+      *(định nghĩa: nhận diện được khối template — 146 bài có template rỗng, xem D-021)*
+- [x] ≥ 90% bài nhân vật có ít nhất 1 trường ngày sinh/mất hoặc quan hệ gia đình được trích → **92,4%** (980/1.061)
+- [x] Chuẩn hóa ngày đúng ≥ 95% trên tập 30 chuỗi mẫu trong `tests/fixtures/dates.jsonl` → **100,0%** (30/30)
+- [x] 100% triple có đủ 6 trường bắt buộc, `method="infobox"`, `confidence ≥ 0.95` → **100%** (10.394/10.394)
+- [x] 0 quan hệ ngoài danh mục → **0** (0 vi phạm `RELATION_SUBJECT_TYPES`)
 
 **Lùi:** nếu parse thấp → thay `wikitextparser` bằng regex cân bằng ngoặc cho template (viết trong `parse_infobox.py` với cờ `--fallback-regex`).
+
+**Kết quả thực tế (14/11/2026):** báo cáo `reports/phase_03_report.md` · nhật ký `docs/10-nhat-ky/phase-03.md` · số liệu `docs/10-nhat-ky/so-lieu/phase-03-infobox-stats.json` · sai lệch D-019 → D-024.
 
 ---
 

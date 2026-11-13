@@ -1,0 +1,521 @@
+# Mapping trường infobox → quan hệ KG (Phase 3 — A4)
+#
+# Đây là **nguồn sự thật** cho mapping. Không hard-code trong code.
+#
+# Vì sao key là "đã bỏ dấu"?
+#   `normalize_name()` (src/common/normalize.py) bỏ dấu, lowercase, gộp khoảng
+#   trắng. Mọi key trong config phải viết theo đúng dạng đó:
+#   "ngay sinh", "noi sinh", "mieu hieu"... (KHÔNG viết "ngày sinh").
+#
+# Vì sao không sửa `src/preprocess/infobox_parser.py`?
+#   Module đó là hành vi Phase 1 — sửa nó sẽ đổi checksum corpus, vi phạm tính
+#   tất định của Phase 1. Mọi mapping mở rộng nằm riêng ở file này.
+#
+# ---------------------------------------------------------------------------
+# Spec của một field
+# ---------------------------------------------------------------------------
+#   relation:      tên quan hệ trong 18 quan hệ đóng (docs/04 §3.1)
+#   kind:          "date" | "entity" | "period"
+#       - date   : giá trị là ngày/tháng/năm của **chính chủ thể**
+#       - entity : giá trị là một thực thể khác (người, nơi chốn, triều đại...)
+#       - period : giá trị là khoảng thời gian (nhiệm kỳ) → 2 mốc start/end
+#   value_type:    loại node của giá trị được trích
+#   direction:     "forward" (mặc định) | "reverse" (đảo subject ↔ object)
+#   prop:          tên thuộc tính node sinh ra (nếu có)
+#   needs_gender:  quan hệ phụ thuộc giới tính chủ thể
+#   object_types:  (tuỳ chọn) danh sách loại được phép cho *object*
+#   link_mode:     "target" (mặc định) | "anchor" — lấy tên bài đích hay
+#                  phần chữ hiển thị của liên kết wiki
+#
+# Quy tắc hướng (đã kiểm chứng trên corpus):
+#   - `cha`  : giá trị là **cha**  → forward  (con → cha)
+#   - `con trai`: giá trị là **con** → reverse  (con → cha)
+#   - `ke nhiem` : giá trị là **kế nhiệm**  → forward  (tiền nhiệm → kế nhiệm)
+#   - `tien nhiem`: giá trị là **tiền nhiệm** → reverse  (tiền nhiệm → kế nhiệm)
+#   - `commander1`: giá trị là **chỉ huy** → reverse  (người → trận)
+#   - `combatant1`: giá trị là **bên tham chiến** → reverse (người → trận)
+#
+# ---------------------------------------------------------------------------
+# Fields
+# ---------------------------------------------------------------------------
+fields:
+  # --- Ngày tháng của chính chủ thể ---
+  sinh: {relation: sinh_nam, kind: date, value_type: year, prop: birth_year}
+  ngay sinh: {relation: sinh_nam, kind: date, value_type: year, prop: birth_year}
+  ngay sinh va tuoi: {relation: sinh_nam, kind: date, value_type: year, prop: birth_year}
+  nam sinh va tuoi: {relation: sinh_nam, kind: date, value_type: year, prop: birth_year}
+  nam sinh: {relation: sinh_nam, kind: date, value_type: year, prop: birth_year}
+  birth_date: {relation: sinh_nam, kind: date, value_type: year, prop: birth_year}
+  birthdate: {relation: sinh_nam, kind: date, value_type: year, prop: birth_year}
+  date of birth: {relation: sinh_nam, kind: date, value_type: year, prop: birth_year}
+  born: {relation: sinh_nam, kind: date, value_type: year, prop: birth_year}
+
+  mat: {relation: mat_nam, kind: date, value_type: year, prop: death_year}
+  ngay mat: {relation: mat_nam, kind: date, value_type: year, prop: death_year}
+  ngay mat va tuoi: {relation: mat_nam, kind: date, value_type: year, prop: death_year}
+  nam mat va tuoi: {relation: mat_nam, kind: date, value_type: year, prop: death_year}
+  death_date: {relation: mat_nam, kind: date, value_type: year, prop: death_year}
+  deathdate: {relation: mat_nam, kind: date, value_type: year, prop: death_year}
+  date of death: {relation: mat_nam, kind: date, value_type: year, prop: death_year}
+  died: {relation: mat_nam, kind: date, value_type: year, prop: death_year}
+
+  # --- Nơi sinh / nơi mất ---
+  noi sinh: {relation: sinh_tai, kind: entity, value_type: place}
+  birth_place: {relation: sinh_tai, kind: entity, value_type: place}
+  birthplace: {relation: sinh_tai, kind: entity, value_type: place}
+  place of birth: {relation: sinh_tai, kind: entity, value_type: place}
+  noi mat: {relation: mat_tai, kind: entity, value_type: place}
+  death_place: {relation: mat_tai, kind: entity, value_type: place}
+  deathplace: {relation: mat_tai, kind: entity, value_type: place}
+  place of death: {relation: mat_tai, kind: entity, value_type: place}
+
+  # --- Gia đình ---
+  cha: {relation: cha_cua, kind: entity, value_type: person}
+  father: {relation: cha_cua, kind: entity, value_type: person}
+  me: {relation: me_cua, kind: entity, value_type: person}
+  mother: {relation: me_cua, kind: entity, value_type: person}
+  # `vo`/`chong` là quan hệ xác định → không cần đoán giới tính.
+  vo: {relation: vo_cua, kind: entity, value_type: person}
+  wife: {relation: vo_cua, kind: entity, value_type: person}
+  chong: {relation: chong_cua, kind: entity, value_type: person}
+  husband: {relation: chong_cua, kind: entity, value_type: person}
+  phu quan: {relation: vo_cua, kind: entity, value_type: person}
+  queen consort: {relation: vo_cua, kind: entity, value_type: person}
+  # `spouse`/`consort`/`phoi ngau` không cho biết vị thế → cần giới tính chủ thể.
+  spouse: {relation: vo_cua, kind: entity, value_type: person, needs_gender: true}
+  consort: {relation: vo_cua, kind: entity, value_type: person, needs_gender: true}
+  phoi ngau: {relation: vo_cua, kind: entity, value_type: person, needs_gender: true}
+  anh em: {relation: anh_em_cua, kind: entity, value_type: person}
+  sibling: {relation: anh_em_cua, kind: entity, value_type: person}
+  em: {relation: anh_em_cua, kind: entity, value_type: person}
+  con trai: {relation: cha_cua, kind: entity, value_type: person, direction: reverse}
+  son: {relation: cha_cua, kind: entity, value_type: person, direction: reverse}
+  con gai: {relation: me_cua, kind: entity, value_type: person, direction: reverse}
+  daughter: {relation: me_cua, kind: entity, value_type: person, direction: reverse}
+  # `con cai` = con (không rõ trê/gái) → dùng `cha_cua` (quan hệ cha mặc định
+  # theo `docs/04` §3.1: con → cha). Đây là quy ước đã chốt, ghi trong
+  # `docs/10-nhat-ky/phase-03.md` §3.
+  con cai: {relation: cha_cua, kind: entity, value_type: person, direction: reverse}
+  con: {relation: cha_cua, kind: entity, value_type: person, direction: reverse}
+
+  # --- Triều đại / gia tộc ---
+  trieu dai: {relation: thuoc_trieu_dai, kind: entity, value_type: dynasty}
+  dynasty: {relation: thuoc_trieu_dai, kind: entity, value_type: dynasty}
+  the: {relation: thuoc_trieu_dai, kind: entity, value_type: dynasty}
+  hoang toc: {relation: thuoc_trieu_dai, kind: entity, value_type: dynasty}
+  # `quoc gia` = quốc gia mà nhân vật cai trị ("[[Đại Việt]], [[Đại Ngu]]").
+  # Theo `docs/04` §3.1, `thuoc_trieu_dai` là person/event → dynasty.
+  quoc gia: {relation: thuoc_trieu_dai, kind: entity, value_type: dynasty}
+  # `kieu hoang toc` = "Triều đại" / "Gia tộc" — dùng nhánh "goc" làm liên kết
+  # chính xác hơn `hoang toc`.
+  kieu hoang toc: {relation: thuoc_trieu_dai, kind: entity, value_type: dynasty}
+
+  # --- Kế vị ---
+  ke nhiem: {relation: ke_vi, kind: entity, value_type: person}
+  successor: {relation: ke_vi, kind: entity, value_type: person}
+  tien nhiem: {relation: ke_vi, kind: entity, value_type: person, direction: reverse}
+  predecessor: {relation: ke_vi, kind: entity, value_type: person, direction: reverse}
+
+  # --- Chức vụ / nghề nghiệp / tước hiệu ---
+  chuc vi: {relation: giu_chuc_vu, kind: entity, value_type: title, link_mode: anchor}
+  chuc quan: {relation: giu_chuc_vu, kind: entity, value_type: title, link_mode: anchor}
+  office: {relation: giu_chuc_vu, kind: entity, value_type: title, link_mode: anchor}
+  position: {relation: giu_chuc_vu, kind: entity, value_type: title, link_mode: anchor}
+  tuoc vi: {relation: giu_chuc_vu, kind: entity, value_type: title, link_mode: anchor}
+  nghe nghiep: {relation: giu_chuc_vu, kind: entity, value_type: title, link_mode: anchor}
+  occupation: {relation: giu_chuc_vu, kind: entity, value_type: title, link_mode: anchor}
+
+  # --- Thành lập (chủ thể là sự kiện/triều đại, người sáng lập là object) ---
+  nguoi sang lap: {relation: lap_ra, kind: entity, value_type: person, direction: reverse, object_types: [dynasty, event]}
+  founder: {relation: lap_ra, kind: entity, value_type: person, direction: reverse, object_types: [dynasty, event]}
+  sang lap: {relation: lap_ra, kind: entity, value_type: person, direction: reverse, object_types: [dynasty, event]}
+
+  # --- Chiến tranh / sự kiện ---
+  place: {relation: dien_ra_tai, kind: entity, value_type: place}
+  location: {relation: dien_ra_tai, kind: entity, value_type: place}
+  dia diem: {relation: dien_ra_tai, kind: entity, value_type: place}
+  commander1: {relation: chi_huy_tran, kind: entity, value_type: person, direction: reverse}
+  commander2: {relation: chi_huy_tran, kind: entity, value_type: person, direction: reverse}
+  # Infobox chiến tranh tiếng Việt dùng "chi huy 1/2" (người chỉ huy).
+  chi huy 1: {relation: chi_huy_tran, kind: entity, value_type: person, direction: reverse}
+  chi huy 2: {relation: chi_huy_tran, kind: entity, value_type: person, direction: reverse}
+  combatant1: {relation: tham_gia_tran, kind: entity, value_type: person, direction: reverse, require_person: true}
+  combatant2: {relation: tham_gia_tran, kind: entity, value_type: person, direction: reverse, require_person: true}
+  # Infobox chiến tranh tiếng Việt dùng "ben 1/2" — nhưng đó là **tổ chức**
+  # ("Nam Hán", "Tĩnh Hải quân"), không phải người. `docs/04` §3.1 quy định
+  # `tham_gia_tran`: person ↔ event → không trích từ trường này.
+  #
+  # Trận đánh cổ: quan hệ `chi_huy_tran` với chủ thể là **người** cầm quân.
+  # `danh_bai` (winner → loser) chỉ trích được khi `ket qua` có cấu trúc rõ,
+  # xem `battle_result`.
+
+# ---------------------------------------------------------------------------
+# Date templates — cách đọc tham số của từng template ngày
+# ---------------------------------------------------------------------------
+# Mỗi mục: tên template (đã bỏ dấu) → spec
+#   year/month/day: vị trí tham số (1-based) của năm/tháng/ngày
+#   end_year/end_month/end_day: vị trí tham số của mốc cuối (nếu template chứa
+#                                cả hai mốc, ví dụ "ngày mất và tuổi")
+#   qualifier: template chỉ cho khoảng năm (circa) → gắn nhãn "khoảng"
+#
+# Quy ước chung:
+#   - Tham số có từ khoá (df=y, df=yes) bị bỏ qua.
+#   - Tham số rỗng bị bỏ qua.
+#   - Tham số không phải số được giữ lại như "qualifier" (ví dụ "sau năm 1230").
+date_templates:
+  ngay sinh: {year: 1, month: 2, day: 3}
+  ngay sinh va tuoi: {year: 1, month: 2, day: 3}
+  nam sinh va tuoi: {year: 1, month: 2, day: 3}
+  nam sinh: {year: 1, month: 2, day: 3}
+  ngay mat: {year: 1, month: 2, day: 3, birth_year: 4, birth_month: 5, birth_day: 6}
+  ngay mat va tuoi: {year: 1, month: 2, day: 3, birth_year: 4, birth_month: 5, birth_day: 6}
+  nam mat va tuoi: {year: 1, month: 2, day: 3, birth_year: 4, birth_month: 5, birth_day: 6}
+  death_date: {year: 1, month: 2, day: 3, birth_year: 4, birth_month: 5, birth_day: 6}
+  death_date_and_age: {year: 1, month: 2, day: 3, birth_year: 4, birth_month: 5, birth_day: 6}
+  death_year_and_age: {year: 1, month: 2, day: 3, birth_year: 4, birth_month: 5, birth_day: 6}
+  birth_date: {year: 1, month: 2, day: 3}
+  birthdate: {year: 1, month: 2, day: 3}
+  birth_date_and_age: {year: 1, month: 2, day: 3}
+  date_of_birth: {year: 1, month: 2, day: 3}
+  bda: {year: 1, month: 2, day: 3}
+  ngay_bat_dau_va_tuoi: {year: 1, month: 2, day: 3}
+  nam_bat_dau_va_tuoi: {year: 1, month: 2, day: 3}
+  ngay_thanh_lap_va_tuoi: {year: 1, month: 2, day: 3}
+  start_date_and_age: {year: 1, month: 2, day: 3}
+  start and end dates: {year: 1, month: 2, day: 3, end_year: 4, end_month: 5, end_day: 6}
+  so nam theo nam va ngay: {year: 1, month: 2, day: 3, end_year: 4, end_month: 5, end_day: 6}
+  circa: {year: 1, qualifier: true}
+
+# ---------------------------------------------------------------------------
+# Type map — loại infobox (đã bỏ dấu) → loại node KG
+# ---------------------------------------------------------------------------
+# Mở rộng so với `infobox_parser.INFOBOX_TYPE_MAP` (Phase 1). File này là nguồn
+# cho Phase 3, không sửa file Phase 1.
+#
+# Lưu ý: `battle` của Phase 1 → ở đây map sang **event**, vì KG chỉ có 7 loại
+# node (docs/CONTEXT.md §2.4) và `docs/04` quy định `chi_huy_tran`:
+# person → event (ví dụ "Trần Hưng Đạo → Trận Bạch Đằng").
+type_map:
+  # --- Nhân vật ---
+  thong tin nhan vat phong kien: person
+  thong tin nhan vat hoang gia: person
+  thong tin nhan vat: person
+  nhan vat phong kien: person
+  nhan vat hoang gia: person
+  nhan vat: person
+  person: person
+  monarch: person
+  king: person
+  queen: person
+  emperor: person
+  royal: person
+  royalty: person
+  officeholder: person
+  officeholder 1: person
+  vien chuc: person
+  vien chuc 1: person
+  the loai nhan vat: person
+  nhan vat hang ngay: person
+  nghe si: person
+  nghe danh: person
+  nhac si: person
+  ca si: person
+  nha van: person
+  writer: person
+  poet: person
+  author: person
+  artist: person
+  tu si phat giao: person
+  tu si: person
+  thanh: person
+  saint: person
+  thanh thien: person
+  nha su hoc: person
+  nha khoa hoc: person
+  nha chinh tri: person
+  biet nhan: person
+  danh nhan: person
+  diem vien: person
+  comedian: person
+  film actor: person
+  actor: person
+  activist: person
+  hoang tu: person
+  cong chua: person
+  cau: person
+  nguoi: person
+  vua: person
+  hoang de: person
+  hoang hau: person
+  cong tuoc: person
+  tuong: person
+  quan: person
+  general: person
+  politician: person
+  military person: person
+
+  # --- Triều đại ---
+  dynasty: dynasty
+  nha: dynasty
+  trieu dai: dynasty
+  house: dynasty
+  the: dynasty
+  former monarchy: dynasty
+
+  # --- Trận đánh → event (KG không có node "battle") ---
+  battle: event
+  tran: event
+  tran danh: event
+  military conflict: event
+  chien tranh: event
+  cuoc chien: event
+  thong tin chien tranh: event
+  military unit: event
+  don vi quan su: event
+  don vi quan su viet nam: event
+  xung dot dan su: event
+  civil conflict: event
+  national military: event
+  quan nhan: event
+
+  # --- Sự kiện ---
+  event: event
+  su kien: event
+  su kien thoi su: event
+  historical event: event
+  terrorist attack: event
+  civilian attack: event
+  uprising: event
+  rebellion: event
+  coup: event
+  conflict: event
+  famine: event
+  treaty: event
+  hiep uoc: event
+  summit meeting: event
+  un resolution: event
+  ngay le: event
+  order: event
+  document: event
+  book: event
+  weapon: event
+  coin: event
+
+  # --- Tổ chức / đảng phái → event (không có node "organization") ---
+  organization: event
+  political party: event
+  dang phai chinh tri: event
+  government agency: event
+  co quan viet nam: event
+  official post: event
+  ethnic group: event
+  church: event
+  giao phat: event
+  di dan: event
+
+  # --- Địa danh ---
+  place: place
+  dia danh: place
+  location: place
+  settlement: place
+  cong trinh: place
+  cong trinh xay dung: place
+  lang mo: place
+  den: place
+  den viet nam: place
+  chua: place
+  mieu: place
+  cung dien: place
+  di tich: place
+  di tich lich su: place
+  monument: place
+  historic site: place
+  cua: place
+  di sa: place
+  lang tam: place
+  co do: place
+  thanh pho: place
+  tinh: place
+  huyen: place
+  thanh: place
+  phuong: place
+  truong hoc: place
+  thong tin don vi hanh chinh viet nam: place
+  don vi hanh chinh viet nam: place
+  thong tin chua viet nam: place
+  former country: place
+  former subdivision: place
+  country: place
+  chinese: place
+  mandir: place
+  religious building: place
+  military structure: place
+  unesco world heritage site: place
+  world heritage site: place
+  ancient site: place
+  building: place
+  museum: place
+  zoo: place
+  airport: place
+  san bay: place
+  cong vien: place
+  khu vuc bao ton: place
+  ca nguoi: place
+  muong: place
+  cang bien: place
+  cong ty: place
+  giao phat: place
+  thap cham: place
+  he chu viet: place
+  to chuc phi loi nhuan: place
+  khu dan cu: place
+  diao su quan: place
+  military installation: place
+  diplomatic mission: place
+  university: place
+  press: place
+  bao chi: place
+
+# ---------------------------------------------------------------------------
+# Template chưa có trong bảng trên — bổ sung sau khi đo trên corpus 2.441 bài.
+# Nguồn: `scripts/stats_infobox.py` → `theo_loai_infobox` (Phase 3).
+#
+# Lưu ý: khoá phải **không dấu** (đã qua `normalize_name`) và có thể là
+# **tiền tố** của tên template dài hơn ("chuc sac kito giao" khớp
+# "chuc sac kito giao chi tiết").
+# ---------------------------------------------------------------------------
+  # --- Nhân vật (tương đương "thông tin nhan vat") ---
+  chuc sac kito giao: person
+  the loai cau thu: person
+  tieu su bong da: person
+  football biography: person
+  former political post: person
+  # --- Sự kiện ---
+  nhiem ky chinh phu: event
+  government cabinet: event
+  holiday: event
+  thien tai: event
+  military operation: event
+  hurricane: event
+  # --- Văn bản / tác phẩm ---
+  bai hat: event
+  sach: event
+  phim: event
+  artifact: event
+  award: event
+  giao phan: place
+  to chuc: place
+
+# ---------------------------------------------------------------------------
+# Kết quả trận đánh → quan hệ `danh_bai` (winner → loser)
+# ---------------------------------------------------------------------------
+# Trường `ket qua` / `result` là **câu văn**, không phải tên node. Ta chỉ trích
+# được khi cấu trúc câu rõ ràng:
+#   - "<bên> chiến thắng"            → bên thắng
+#   - "Chiến thắng của <bên>"        → bên thắng
+#   - "<bên> thất bại"               → bên thua
+# Bên thua được suy từ **bên tham chiến đối diện** (`ben 1`/`ben 2` hoặc
+# `combatant1`/`combatant2`) — không có suy đoán ngoài dữ liệu.
+battle_result:
+  fields: [ket qua, result, outcome, ket qua va hau qua]
+  #: Trường chứa hai bên tham chiến (theo thứ tự).
+  sides_fields:
+    vi: [ben 1, ben 2]
+    en: [combatant1, combatant2]
+  #: Mẫu câu → vị trí bên thắng / bên thua trong nhóm link.
+  winner_patterns:
+    - "chiến thắng"
+    - "thắng lợi"
+    - "thắng trận"
+  loser_patterns:
+    - "thất bại"
+    - "bị đánh bại"
+    - "bị đẹp"
+
+# ---------------------------------------------------------------------------
+# Aliases — trường chứa bí danh / tên khác (thuộc tính node, không sinh triple)
+# ---------------------------------------------------------------------------
+aliases:
+  mieu hieu: temple
+  thuy hieu: posthumous
+  nien hieu: era
+  ton hieu: era
+  tu: courtesy
+  ten tu: courtesy
+  hieu: courtesy
+  ten hieu: courtesy
+  ten khai sinh: birth
+  ten that: birth
+  ten khac: other
+  kieu ten khac: other
+  bi danh: other
+  nickname: other
+  other names: other
+  penname: other
+  realname: other
+  birthname: other
+  birth name: other
+  real name: other
+  alias: other
+  danh hieu: honorific
+  chuc sắc: honorific
+
+# ---------------------------------------------------------------------------
+# Thuộc tính node lấy từ trường riêng (không sinh triple)
+# ---------------------------------------------------------------------------
+node_props:
+  mieu hieu: temple_name
+  thuy hieu: posthumous_name
+  nien hieu: reign_title
+  ton hieu: reign_title
+  tu: courtesy_name
+  ten tu: courtesy_name
+  hieu: courtesy_name
+  ten hieu: courtesy_name
+  gioi tinh: gender
+  gender: gender
+  sex: gender
+  ngay thanh lap: founded_year
+  giai the: founded_year
+  founded: founded_year
+  tai vi: reign_period
+  chu ky: reign_period
+  thoi gian cua nien hieu: reign_period
+  nhiem ky: reign_period
+
+# ---------------------------------------------------------------------------
+# Giới tính — suy từ trường `gioi tinh` / tiền tố tiêu đề / tên
+# ---------------------------------------------------------------------------
+gender_keys: [gioi tinh, gender, sex]
+gender_values:
+  nam: male
+  nu: female
+  gioi tinh nam: male
+  gioi tinh nu: female
+  male: male
+  female: female
+  nữ: female
+  nam: male
+
+#: Tiền tố tiêu đề bài → giới tính (chỉ dùng khi không có trường `gioi tinh`).
+title_gender_prefixes:
+  bà: female
+  ông: male
+  bác: female
+  cụ: female
+  cô: female
+  chú: male
+  cháu: male
+  lady: female
+  mrs: female
+  ms: female
+  miss: female
+  mr: male
+  sir: male
+  dame: female
+
+#: Tên tốc khiên đặc trưng nữ trong tiếng Việt (dùng khi cần đoán giới tính
+#: chủ thể từ `spouse`/`consort`).
+female_name_markers: [thị]
+#: Tên tốc khiên đặc trưng nam trong tiếng Việt.
+male_name_markers: [thái, văn, hữu, đức, công, quang, minh, tuấn]

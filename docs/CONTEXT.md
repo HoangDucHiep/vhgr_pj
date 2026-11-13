@@ -87,6 +87,22 @@ Quan hệ đối xứng: `anh_em_cua`, `tham_gia_tran` → chuẩn hóa orientat
 
 7 label node: `Person`, `Dynasty`, `Event`, `Place`, `Title`, `Year`, `Article`.
 
+**Ràng buộc loại chủ thể** (`RELATION_SUBJECT_TYPES` trong `src/common/schemas.py`, căn theo
+`docs/04` §3.1 — đã sửa ở Phase 3, xem `reports/deviations.md` D-019):
+
+| Quan hệ | Loại chủ thể được phép |
+|---|---|
+| `cha_cua`, `me_cua`, `vo_cua`, `chong_cua`, `anh_em_cua` | `person` |
+| `ke_vi`, `giu_chuc_vu`, `chi_huy_tran`, `tham_gia_tran`, `danh_bai` | `person` |
+| `sinh_tai`, `mat_tai`, `sinh_nam`, `mat_nam` | `person` |
+| `thuoc_trieu_dai` | `person`, `dynasty`, `event` |
+| `lap_ra` | `person`, `event` |
+| `dien_ra_tai` | `person`, `event` |
+| `dong_doi_tai` | `dynasty` |
+
+> **Quy tắc suy loại chủ thể** (Phase 3, D-024): tên loại infobox (`type_map`) → tín hiệu
+> `wikidata_signal` (Phase 1) → loại trung tính `article`. **Không** mặc định `person`.
+
 Chi tiết đầy đủ: `docs/04-schema-knowledge-graph.md`.
 
 ### 2.6. QID đã verify (10/11/2026)
