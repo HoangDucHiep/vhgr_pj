@@ -22,6 +22,7 @@ Xây **Knowledge Graph lịch sử Việt Nam** từ Wikipedia tiếng Việt + 
 |---|---|
 | Bắt đầu phiên làm việc | `docs/CONTEXT.md` (context + quyết định đã chốt), `docs/PROGRESS.md` (phase đang làm) |
 | Làm 1 phase của pipeline | `docs/09-ke-hoach-thuc-thien.md` → phần phase tương ứng |
+| Cần **ghi chép sâu** để làm báo cáo / slide | `docs/10-nhat-ky/phase-XX.md` (mẫu ở `docs/10-nhat-ky/README.md`) |
 | Định nghĩa quan hệ / node / thuộc tính | `docs/04-schema-knowledge-graph.md` |
 | Ghi/chạy code Python | `.cursor/rules/python-standards.mdc`, `.cursor/rules/data-contracts.mdc` |
 | Làm frontend | `.cursor/rules/frontend.mdc` |
@@ -63,8 +64,9 @@ reports/      # kết quả đánh giá, phase reports
 4. **Chạy lệnh kiểm thử** ghi trong phase. Không bỏ qua.
 5. **Đạt Gate** (checklist trong phase) mới được sang phase sau.
 6. **Ghi `reports/phase_XX_report.md`**: mô tả, lệnh đã chạy, output thực tế, gate pass/fail, sai lệch.
-7. **Cập nhật `docs/PROGRESS.md`** (trạng thái phase, ngày, kết quả chính).
-8. Nếu lệch khỏi kế hoạch → ghi vào `reports/deviations.md` và cập nhật `docs/CONTEXT.md`.
+7. **Ghi `docs/10-nhat-ky/phase_XX.md`**: quyết định, thang số liệu so sánh, lỗi & bài học (theo mẫu ở `docs/10-nhat-ky/README.md`).
+8. **Cập nhật `docs/PROGRESS.md`** (trạng thái phase, ngày, kết quả chính).
+9. Nếu lệch khỏi kế hoạch → ghi vào `reports/deviations.md` và cập nhật `docs/CONTEXT.md`.
 
 > **Lưu ý về phạm vi:** setup vibe-coding (`AGENTS.md`, rules, skills, docs) là việc *độc lập* với triển khai pipeline.
 > Chỉ bắt đầu code khi người dùng **nói rõ** muốn triển khai phase nào. Đọc `docs/PROGRESS.md` để biết phase hiện tại,
@@ -140,6 +142,7 @@ python scripts/evaluate.py --all --out reports/    # đánh giá (sau phase 13)
 | `docs/GLOSSARY.md` | Thuật ngữ Việt ↔ Anh ↔ trường dữ liệu |
 | `docs/annotation-guidelines.md` | Hướng dẫn gán nhãn NER/RE |
 | `docs/09-ke-hoach-thuc-thien.md` | **Kế hoạch thực thi chi tiết theo phase** (nguồn chân lý cho agent) |
+| `docs/10-nhat-ky/` | **Nhật ký triển khai chi tiết theo phase** — quyết định, thang số liệu so sánh, lỗi & bài học (dùng làm báo cáo / slide) |
 
 ## 11. Bảo vệ dữ liệu đầu vào
 

@@ -172,6 +172,7 @@ Chi tiết đầy đủ: `docs/04-schema-knowledge-graph.md`.
 | Cần biết | Đọc |
 |---|---|
 | Quyết định kiến trúc chi tiết | `docs/DECISIONS.md` |
+| Nhật ký triển khai chi tiết (để làm báo cáo / slide) | `docs/10-nhat-ky/README.md` |
 | Phase cần làm tiếp | `docs/PROGRESS.md` |
 | Định nghĩa schema node/edge | `docs/04-schema-knowledge-graph.md` |
 | Thuật ngữ | `docs/GLOSSARY.md` |

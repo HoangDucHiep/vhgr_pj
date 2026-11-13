@@ -1,0 +1,110 @@
+{
+  "_meta": {
+    "phase": 0,
+    "dump_version": "20261101",
+    "mo_ta": "So lieu moi truong va ha tang kiem chung tai cuoi Phase 0 (dung lam slide nen tang).",
+    "ngay_do": "2026-11-14"
+  },
+  "moi_truong": {
+    "he_dieu_hanh": "Linux 7.0.0-42-generic",
+    "shell": "zsh",
+    "python": "3.14.8",
+    "venv": ".venv (uv venv)",
+    "cai_dat": "uv pip install -r requirements.txt (~167s, 0 loi)"
+  },
+  "neo4j": {
+    "image": "neo4j:5-community",
+    "version": "5.26.32",
+    "edition": "community",
+    "http_port": 7474,
+    "bolt_port": 7687,
+    "trang_thai": "running (healthy)",
+    "heap": "1G",
+    "pagecache": "512M",
+    "co_rbac_khong": false,
+    "co_lop_bao_ve_thay_the": "session default_access_mode=READ_ACCESS",
+    "ghi_thu_cong_vao_db": "bi chan (Ne.ClientError.Statement.AccessMode)"
+  },
+  "backend": {
+    "framework": "FastAPI 0.162.6",
+    "server": "uvicorn 0.54.0",
+    "pydantic": "2.14.3",
+    "httpx": "0.28.1",
+    "driver_neo4j": "neo4j 6.4.1",
+    "health_endpoint": "GET /api/health -> {\"status\":\"ok\",\"version\":\"0.1.0\",\"neo4j\":\"up\"}",
+    "stats_endpoint": "GET /api/stats -> {\"status\":\"found\",\"nodes\":2,\"edges\":0,\"by_type\":{\"T2\":1,\"T3\":1}}"
+  },
+  "frontend": {
+    "stack": "React 18 + TypeScript + Vite + Cytoscape.js",
+    "tsconfig_strict": true,
+    "no_unused_locals": true,
+    "no_unused_parameters": true,
+    "no_unchecked_indexed_access": true,
+    "project_references": false,
+    "ly_do_bo_project_references": "composite + noEmit xung dot -> TS6310 (D-006)",
+    "bundle_khi_build": "dist/ 144.74 kB (gzip 46.79 kB)",
+    "tsc_no_emit_loi": 0
+  },
+  "thu_vien_da_cai": {
+    "fastapi": "0.162.6",
+    "uvicorn": "0.54.0",
+    "pydantic": "2.14.3",
+    "httpx": "0.28.1",
+    "neo4j": "6.4.1",
+    "pyyaml": "6.0.3",
+    "python-dotenv": "1.2.4",
+    "tqdm": "4.70.1",
+    "lxml": "6.1.3",
+    "wikitextparser": "3.0.0",
+    "pysbd": "0.3.4",
+    "requests": "2.34.2",
+    "numpy": "2.5.4",
+    "pandas": "3.1.1",
+    "scikit-learn": "1.9.1",
+    "transformers": "5.23.0",
+    "datasets": "5.2.0",
+    "accelerate": "1.15.0",
+    "seqeval": "1.2.2",
+    "torch": "2.15.0",
+    "pytest": "9.2.0",
+    "pytest-cov": "7.1.0"
+  },
+  "khong_dung": {
+    "mwparser": "PyPI chi co ban 0.1 (ban 0.6.2 chua publish) -> dung lxml.etree.iterparse + wikitextparser (D-004)",
+    "underthesea": "khong bat buoc; tach cau bang pysbd, tach doan bang regex \\n\\s*\\n (D-005)"
+  },
+  "kiem_thu": {
+    "lenh": ".venv/bin/python -m pytest -q tests/",
+    "so_test_phase_0": 56,
+    "ket_qua": "56 passed",
+    "thoi_gian": "4.9s",
+    "marker": ["integration", "slow"]
+  },
+  "hop_dong_du_lieu": {
+    "so_quan_he_dong_trong_schemas_py": 18,
+    "so_qid_trien_dai": 9,
+    "so_lop_the_entity_wikidata": 18,
+    "so_nhan_ner": 6,
+    "seed": 42,
+    "nguon_su_that": "src/common/schemas.py + configs/default.yaml (khong hard-code trong code)"
+  },
+  "so_sanh_quet_dong": {
+    "cach_bao_ve_du_lua_chon": [
+      {
+        "phuong_an": "A. Neo4j Community voi RBAC (CREATE USER / GRANT)",
+        "ket_qua": "khong khop - Community khong ho tro RBAC, user 'reader' van ghi duoc",
+        "trang_thai": "loai"
+      },
+      {
+        "phuong_an": "B. Session default_access_mode=READ_ACCESS",
+        "ket_qua": "server tu choi ghi, ke ca superuser",
+        "trang_thai": "da chon"
+      },
+      {
+        "phuong_an": "C. Chi dung validator tinh (static) o tang application",
+        "ket_qua": "khong du - application co quyen ghi truc tiep neu bi hack, DB khong phong ngua o lop server",
+        "trang_thai": "bo sung, khong thay the B"
+      }
+    ]
+  }
+}

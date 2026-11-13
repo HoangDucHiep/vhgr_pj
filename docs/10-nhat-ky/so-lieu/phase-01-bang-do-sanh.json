@@ -1,0 +1,137 @@
+{
+  "_meta": {
+    "phase": 1,
+    "dump_version": "20261101",
+    "mo_ta": "So lieu so sanh corpus Phase 1 truoc/sau tang T5 (chot pham vi lich su Viet Nam).",
+    "nguon": "data/interim/documents.jsonl + ban 3.113 bai truoc T5 (da xoa khoi /tmp, chi luu thong ke).",
+    "ngay_do": "2026-11-14"
+  },
+  "thang_loc_nhieu": [
+    {
+      "phuong_an": "A",
+      "mo_ta": "T0-T4, khong co T5 (ke hoach ban dau)",
+      "so_bai": 3113,
+      "ty_le_so_vi_goc": 1.0,
+      "trang_thai": "bi loai - ~35% nam ngoai pham vi"
+    },
+    {
+      "phuong_an": "B",
+      "mo_ta": "Giu T0 person/place/house; battle/dynasty/event phai co category chu Viet",
+      "so_bai": 2606,
+      "ty_le_so_vi_goc": 0.8368
+    },
+    {
+      "phuong_an": "C",
+      "mo_ta": "B + T1 phai nam trong cay seed VA co category chu Viet",
+      "so_bai": 2250,
+      "ty_le_so_vi_goc": 0.7227,
+      "ghi_chu": "siet qua tay - mat nhieu bai hop le"
+    },
+    {
+      "phuong_an": "D",
+      "mo_ta": "C + mo rong category pham vi bang VN_HOUSE_RE (nhom 'nha vua')",
+      "so_bai": 2331,
+      "ty_le_so_vi_goc": 0.7486
+    },
+    {
+      "phuong_an": "hien_thuc",
+      "mo_ta": "D tich hop + place/event giu theo dieu kien rieng",
+      "so_bai": 2441,
+      "ty_le_so_vi_goc": 0.7841,
+      "trang_thai": "da chon"
+    }
+  ],
+  "tinhieu_wikidata_tho": {
+    "tong_entries": 3786,
+    "by_signal": {
+      "person": 3193,
+      "battle": 385,
+      "dynasty": 121,
+      "place": 77,
+      "house": 9,
+      "event": 1
+    },
+    "khoang_nam": {
+      "person": [10, 1949],
+      "battle": [194, 1944],
+      "dynasty": [35, 1976],
+      "place": [192, 1899],
+      "house": [939, 1802],
+      "event": [1941, 1941]
+    }
+  },
+  "sieu_lieu_hang_tang": {
+    "tong_trang_quet": 2255249,
+    "ram_peak_kb": 1211772,
+    "ram_peak_gb": 1.16,
+    "thoi_gian_phut": 31.13,
+    "checksum": "b04dd858b1494fb6f9365e7a69b980c6a4cb3bc15f365e01fedcb2980712de19",
+    "checksum_2_lan_giong_het": true,
+    "so_test": 107,
+    "mau_kiem_tra_seed": 99,
+    "mau_dung_pham_vi": "25/25"
+  },
+  "truoc_T5": {
+    "total_articles": 3113,
+    "by_keep_reason": {
+      "wikidata": 1425,
+      "category": 1190,
+      "infobox": 277,
+      "seed_expansion": 221
+    },
+    "by_infobox_type": {
+      "none": 1286,
+      "person": 997,
+      "battle": 651,
+      "place": 151,
+      "dynasty": 16,
+      "event": 12
+    },
+    "by_wikidata_signal": {
+      "place": 77,
+      "person": 832,
+      "dynasty": 119,
+      "house": 9,
+      "battle": 385,
+      "none": 2,
+      "event": 1
+    },
+    "articles_with_qid": 3046,
+    "articles_with_qid_ratio": 0.9785,
+    "co_category_chu_viet": 2010,
+    "ratio_co_category_chu_viet": 0.6457,
+    "trong_pham_vi_nghiem": 2281,
+    "ratio_trong_pham_vi": 0.7327
+  },
+  "sau_T5": {
+    "total_articles": 2441,
+    "by_keep_reason": {
+      "wikidata": 930,
+      "category": 933,
+      "infobox": 302,
+      "seed_expansion": 276
+    },
+    "by_infobox_type": {
+      "none": 1001,
+      "person": 1061,
+      "place": 150,
+      "battle": 202,
+      "dynasty": 16,
+      "event": 11
+    },
+    "by_wikidata_signal": {
+      "place": 77,
+      "person": 832,
+      "dynasty": 7,
+      "house": 9,
+      "none": 2,
+      "battle": 3
+    },
+    "articles_with_qid": 2375,
+    "articles_with_qid_ratio": 0.973,
+    "co_category_chu_viet": 2009,
+    "ratio_co_category_chu_viet": 0.823,
+    "trong_pham_vi_nghiem": 2361,
+    "ratio_trong_pham_vi": 0.9672
+  }
+}
