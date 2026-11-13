@@ -58,15 +58,18 @@ reports/      # kết quả đánh giá, phase reports
 
 ## 4. Quy trình làm việc bắt buộc
 
-1. **Đọc `docs/PROGRESS.md`** để biết phase hiện tại và phase kế tiếp.
+1. **Đọc `docs/PROGRESS.md`** để biết phase hiện tại và phase kế tiếp. Đọc thêm `docs/10-nhat-ky/phase-<số trước>.md` (nếu có) để nắm quyết định đã chốt và lỗi đã gặp của phase trước.
 2. **Chỉ làm 1 phase mỗi lần.** Phase = 1 phần trong `docs/09-ke-hoach-thuc-thien.md`.
 3. **Tuân thủ Input contract / Output contract** của phase đó. Không đổi format output.
 4. **Chạy lệnh kiểm thử** ghi trong phase. Không bỏ qua.
 5. **Đạt Gate** (checklist trong phase) mới được sang phase sau.
 6. **Ghi `reports/phase_XX_report.md`**: mô tả, lệnh đã chạy, output thực tế, gate pass/fail, sai lệch.
-7. **Ghi `docs/10-nhat-ky/phase_XX.md`**: quyết định, thang số liệu so sánh, lỗi & bài học (theo mẫu ở `docs/10-nhat-ky/README.md`).
+7. **Ghi `docs/10-nhat-ky/phase_XX.md`** (bắt buộc): bối cảnh, phương án đã cân nhắc, quyết định, **thang số liệu so sánh**, số liệu Gate, lỗi & bài học, ý tưởng cho slide. Mẫu ở `docs/10-nhat-ky/README.md`. Số liệu máy đọc được đặt ở `docs/10-nhat-ky/so-lieu/*.json`.
 8. **Cập nhật `docs/PROGRESS.md`** (trạng thái phase, ngày, kết quả chính).
 9. Nếu lệch khỏi kế hoạch → ghi vào `reports/deviations.md` và cập nhật `docs/CONTEXT.md`.
+
+> Bước 6 và bước 7 bổ sung cho nhau: báo cáo trả lời *"làm gì, đạt Gate chưa"*; nhật ký trả lời
+> *"vì sao chọn cách đó, số liệu so sánh ra sao, sai ở đâu, bài học gì"* — để làm báo cáo và slide.
 
 > **Lưu ý về phạm vi:** setup vibe-coding (`AGENTS.md`, rules, skills, docs) là việc *độc lập* với triển khai pipeline.
 > Chỉ bắt đầu code khi người dùng **nói rõ** muốn triển khai phase nào. Đọc `docs/PROGRESS.md` để biết phase hiện tại,

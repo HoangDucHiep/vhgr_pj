@@ -28,6 +28,8 @@ Câu hỏi cần trả lời nhanh, **không cần viết code**. Đọc file ph
 | Tiêu chí phi chức năng | `docs/02-requirements-phi-chuc-nang.md` |
 | Nguồn dữ liệu, giấy phép? | `docs/05-du-lieu-va-nguon.md` |
 | Công cụ, môi trường, lệnh? | `docs/08-cong-cu-va-moi-truong.md` |
+| Vì sao chọn cách đó? Số liệu so sánh? Lỗi đã gặp? | `docs/10-nhat-ky/phase-XX.md` (chi tiết theo phase) |
+| Cần số liệu máy đọc được để dựng biểu đồ | `docs/10-nhat-ky/so-lieu/*.json` |
 
 ## Quy tắc
 

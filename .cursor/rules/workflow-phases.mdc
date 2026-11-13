@@ -7,13 +7,14 @@ alwaysApply: true
 
 ## Bắt buộc
 
-1. **Đọc trước khi làm:** `AGENTS.md` → `docs/CONTEXT.md` → `docs/PROGRESS.md` → phần phase tương ứng trong `docs/09-ke-hoach-thuc-thien.md`.
+1. **Đọc trước khi làm:** `AGENTS.md` → `docs/CONTEXT.md` → `docs/PROGRESS.md` → phần phase tương ứng trong `docs/09-ke-hoach-thuc-thien.md` → (nếu phase trước đã có) `docs/10-nhat-ky/phase-<số trước>.md`.
 2. **Chỉ làm 1 phase mỗi lần.** Không nhảy phase, không làm trước phase sau.
 3. **Tuân thủ Input/Output contract.** Không đổi tên trường, không thêm trường bắt buộc mới mà không cập nhật contract.
 4. **Chạy lệnh kiểm thử** ghi trong phase — không bỏ qua, không "chạy sau".
 5. **Đạt Gate** (checklist của phase) mới chuyển phase sau.
 6. **Ghi `reports/phase_XX_report.md`** ngay khi xong phase.
-7. **Cập nhật `docs/PROGRESS.md`** (trạng thái, ngày, số liệu, việc tiếp theo).
+7. **Ghi `docs/10-nhat-ky/phase_XX.md`** ngay khi xong phase — nhật ký triển khai chi tiết (quyết định, thang số liệu so sánh, lỗi & bài học). **Bắt buộc**, không phải tuỳ chọn. Mẫu ở `docs/10-nhat-ky/README.md`.
+8. **Cập nhật `docs/PROGRESS.md`** (trạng thái, ngày, số liệu, việc tiếp theo).
 
 ## Cấu trúc một phase trong `docs/09-ke-hoach-thuc-thien.md`
 
@@ -24,6 +25,37 @@ Mỗi phase có 6 phần bắt buộc:
 4. **Việc phải làm** — thứ tự công việc.
 5. **Lệnh kiểm thử** — lệnh chạy để tự kiểm tra.
 6. **Gate** — checklist có/không đạt + mục **Lùi** (fallback).
+
+## Định dạng nhật ký triển khai (bắt buộc)
+
+Ngoài báo cáo Gate, mỗi phase phải có **một file nhật ký chi tiết** tại
+`docs/10-nhat-ky/phase_XX.md` — đây là nguyên liệu chính cho **báo cáo, số liệu và slide**.
+
+Mẫu đầy đủ ở `docs/10-nhat-ky/README.md`. Tóm tắt 9 mục:
+
+| # | Mục | Bắt buộc | Nội dung |
+|---|---|---|---|
+| 1 | Bối cảnh và vấn đề cần giải | ✅ | Phase này giải quyết vấn đề gì, ràng buộc nào |
+| 2 | Phương án đã cân nhắc | ✅ | Bảng *phương án → cách làm → kết quả đo được → chọn? → lý do* |
+| 3 | Quyết định đã chốt | ✅ | D-0XX + lý do + ảnh hưởng + file đã cập nhật |
+| 4 | Thang số liệu so sánh | ✅ | Bảng so sánh các phương án, hoặc so sánh trước/sau |
+| 5 | Số liệu đo được (Gate) | ✅ | Bảng *chỉ số → kỳ vọng → thực tế → đạt?* |
+| 6 | Lỗi gặp phải và cách xử lý | ✅ | Bảng *lỗi → triệu chứng → nguyên nhân gốc → cách sửa → bài học* |
+| 7 | Bài học kinh nghiệm | ✅ | 3–5 điểm rút ra |
+| 8 | Ý tưởng cho slide | ✅ | 3–5 gạch đầu dòng kèm số liệu chèn thẳng được |
+| 9 | Việc tiếp theo | ✅ | Phase kế tiếp + trạng thái |
+
+Nếu có nhiều phương án đo được số liệu → tạo thêm file máy đọc được
+`docs/10-nhat-ky/so-lieu/phase-XX-<tên>.json` (UTF-8, JSON hợp lệ, có `_meta` mô tả nguồn).
+
+**Nguyên tắc số liệu trong nhật ký**
+
+| Nguyên tắc | Ví dụ |
+|---|---|
+| Mọi con số truy được về nguồn | ghi lệnh đã chạy → output thực tế, hoặc trỏ tới `so-lieu/*.json` |
+| Số liệu so sánh > số liệu đơn lẻ | luôn có bảng nhiều phương án khi có lựa chọn |
+| Sai lệch phải công khai | nêu số thực tế, không sửa số liệu để "cho xanh" |
+| Không dùng tiếng Trung | toàn bộ nội dung bằng tiếng Việt hoặc tiếng Anh |
 
 ## Định dạng báo cáo phase
 
@@ -78,9 +110,10 @@ Không cần hỏi khi: thêm test, sửa lỗi nội bộ, thêm log, refactor 
 
 | Thay đổi | Cập nhật file |
 |---|---|
-| Quyết định kỹ thuật mới | `docs/DECISIONS.md` (+ mục mới) |
+| Quyết định kỹ thuật mới | `docs/DECISIONS.md` (+ mục mới) + dẫn chiếu trong `docs/10-nhat-ky/phase_XX.md` §3 |
 | Đổi định dạng ID / trường bắt buộc | `AGENTS.md` §6-7, `.cursor/rules/data-contracts.mdc`, `docs/CONTEXT.md` |
 | Đổi tập quan hệ | `docs/04`, `src/common/schemas.py`, prompt, validator, test — **cùng lúc** |
 | Đổi model / quota | `docs/CONTEXT.md` §2.2, `.cursor/rules/llm-usage.mdc` |
 | Đổi kiến trúc | `docs/DECISIONS.md` + `docs/03` |
 | Lệch kế hoạch | `reports/deviations.md` + `docs/PROGRESS.md` |
+| Có số liệu so sánh nhiều phương án | `docs/10-nhat-ky/so-lieu/phase-XX-<tên>.json` |

@@ -1,6 +1,6 @@
 ---
 description: Hợp đồng dữ liệu bắt buộc cho artifact JSONL, định dạng ID và trường bắt buộc của triple trong dự án KG
-globs: **/*.py,**/*.jsonl,**/*.yaml
+globs: **/*.py,**/*.jsonl,**/*.yaml,**/*.json
 alwaysApply: false
 ---
 
@@ -34,6 +34,17 @@ Mọi phase giao tiếp qua **artifact JSONL**. Đổi format = đổi hợp đ�
 - Offset luôn là **chỉ số ký tự Python** (0-based, `[start, end)`) trong chuỗi gốc của record đó.
 - Không dùng byte offset.
 - Luôn kiểm tra được: `text[start:end] == span_text`.
+
+## Số liệu máy đọc được cho báo cáo / slide
+
+Mỗi phase có thể sinh file JSON bổ sung tại `docs/10-nhat-ky/so-lieu/phase-XX-<tên>.json`,
+dùng để dựng biểu đồ / slide mà không phải chép tay số từ markdown.
+
+- UTF-8, JSON hợp lệ, 1 object trên mỗi dòng nếu là collection.
+- Bắt buộc có khóa `_meta`: `phase`, `dump_version`, `mo_ta`, `nguon`, `ngay_do`.
+- **Mọi con số phải truy được về nguồn** — ghi rõ lệnh đã chạy hoặc artifact nguồn trong `_meta.nguon`.
+- Nếu có nhiều phương án đo được → thêm mảng so sánh (vd `thang_loc_nhieu`) thay vì chỉ ghi kết quả cuối.
+- **Không** sửa số liệu để "cho xanh"; số thực tế phải được ghi nguyên vẹn.
 
 ## Trường bắt buộc của một triple
 

@@ -16,6 +16,9 @@
 > - Seed cố định `42` ở mọi phase có ngẫu nhiên.
 > - Không bỏ qua Gate. Nếu không đạt Gate → đọc mục "Lùi" của phase đó và ghi vào `reports/deviations.md`.
 > - Mỗi phase kết thúc ghi `reports/phase_XX_report.md` (kết quả, số liệu, lệnh đã chạy, sai lệch so với kế hoạch).
+> - Mỗi phase kết thúc **ghi thêm** `docs/10-nhat-ky/phase_XX.md` — nhật ký triển khai chi tiết
+>   (bối cảnh, phương án đã cân nhắc, quyết định, thang số liệu so sánh, lỗi & bài học, ý tưởng cho slide).
+>   Mẫu ở `docs/10-nhat-ky/README.md`. Số liệu máy đọc được đặt ở `docs/10-nhat-ky/so-lieu/*.json`.
 
 ---
 
@@ -972,6 +975,11 @@ python scripts/validate_graph.py                   # chỉ sau Phase 10
 python scripts/evaluate.py --all --out reports/   # chỉ sau Phase 13
 ```
 Kết quả mỗi phase ghi vào `reports/phase_XX_report.md` với: mô tả, lệnh đã chạy, output thực tế, gate pass/fail, sai lệch.
+
+Kèm theo, mỗi phase ghi vào `docs/10-nhat-ky/phase_XX.md` với: bối cảnh, phương án đã cân nhắc,
+quyết định đã chốt, thang số liệu so sánh, lỗi gặp phải & cách xử lý, bài học, ý tưởng cho slide.
+Hai file này bổ sung cho nhau: báo cáo trả lời *"làm gì, đạt Gate chưa"*, nhật ký trả lời
+*"vì sao chọn cách đó, số liệu so sánh ra sao, sai ở đâu, bài học gì"*.
 
 ## Phụ lục 3 — Quy tắc ứng xử khi bị kẹt
 
