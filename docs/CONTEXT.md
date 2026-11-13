@@ -7,8 +7,8 @@
 
 | Hạng mục | Trạng thái |
 |---|---|
-| Giai đoạn | **Đang triển khai** — Phase 0 xong 13/11/2026 |
-| Phase hiện tại | **Phase 1 — Tải dump + lọc bài** (sắp bắt đầu) |
+| Giai đoạn | **Đang triển khai** — Phase 1 xong 13/11/2026 |
+| Phase hiện tại | **Phase 2 — Làm sạch wikitext, tách câu/đoạn, trích hyperlink** (code xong, chưa chạy pipeline) |
 | Tài liệu | `docs/00` … `docs/09` đã hoàn thành |
 | Môi trường | Python 3.12.3, Docker 29.9.2, Node 24.15, RAM 23GB, đĩa 2.5TB, **không GPU local** |
 | Hạ tầng | `.venv` đã tạo + cài `requirements.txt` ✅ · Neo4j 5.26.32 Community ở `:7474`/`:7687` ✅ · user `reader` đã tạo ✅ |
@@ -16,7 +16,7 @@
 | Frontend | Vite + React 18 + TS — `npm run build` 0 lỗi ✅ |
 | Kaggle | `KAGGLE_USERNAME=hoangduchiep` + `KAGGLE_KEY` trong `.env` ✅ (auth bằng `Authorization: Bearer`) |
 | API key | `GEMINI_API_KEY`, `GROQ_API_KEY` trong `.env` ✅ |
-| Test | `pytest -q tests/` → **56 passed** |
+| Test | `pytest -q tests/` → **56 passed** (Phase 0) · thêm 18 test Phase 2 (`test_clean_text.py`, `test_sentence_split.py`) |
 
 ## 2. Quyết định đã chốt (KHÔNG đổi nếu không có lý do ghi vào DECISIONS.md)
 
@@ -127,6 +127,9 @@ Chi tiết đầy đủ: `docs/04-schema-knowledge-graph.md`.
 | `READ_ACCESS` chặn ghi | ✅ **Đã kiểm chứng 13/11/2026:** session `default_access_mode=READ_ACCESS` → đọc OK, `CREATE` bị từ chối bởi server với `Neo.ClientError.Statement.AccessMode` | Dùng làm cơ chế bảo vệ chính (D-002) |
 | Ngày âm lịch | ⚠️ Không quy đổi âm → dương trong code (D-007) | Chỉ nhận diện `is_lunar`; quy đổi tuyệt đối cần thư viện chuyên dụng + múi giờ |
 | Frontend build | ✅ Vite 5.4.21 + TS 5.6, `tsc --noEmit` 0 lỗi | Không dùng project reference (TS6310) — xem D-006 |
+| Corpus Phase 1 | ✅ **2.441 bài** trong `data/interim/documents.jsonl` (dump `20261101`), QID 97,3%, RAM peak 1,16 GB, 31 phút | Chuẩn 2.441 bài cho mọi phase sau; xem `reports/phase_01_report.md` |
+| Cây category viwiki | ⚠️ `categorylinks.cl_from` là `page_id` của trang category, `cl_target_id` là `lt_id` trong bảng `linktarget` | Phải khóa cây theo **title**, không theo `page_id`/`lt_id` — xem D-010 |
+| Lọc T2/T5 | ⚠️ Infobox `battle`/`dynasty` chung + tín hiệu Wikidata `P31=Q178561`/`Q164950` không đủ để kết luận "lịch sử Việt Nam" | Bắt buộc thêm category trong phạm Việt Nam (chứa "Việt" **hoặc** nhóm "nhà vua") — xem D-008, D-012 |
 
 ## 3. Chỉ số mục tiêu
 

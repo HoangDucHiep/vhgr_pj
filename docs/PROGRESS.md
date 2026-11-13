@@ -8,8 +8,8 @@
 | Phase | Tên | Trạng thái | Ngày | Kết quả chính |
 |---|---|---|---|---|
 | 0 | Bootstrap repo, cấu hình, hạ tầng | ✅ Xong | 13/11/2026 | 56 test pass · `/api/health` ok · Neo4j 5.26.32 · READ_ACCESS chặn ghi ✅ · build TS 0 lỗi |
-| 1 | Tải dump, lọc bài (A1) | ⬜ Chưa bắt đầu | — | — |
-| 2 | Làm sạch, tách câu, hyperlink (A2/A3/A5) | ⬜ Chưa bắt đầu | — | — |
+| 1 | Tải dump, lọc bài (A1) | ✅ Xong | 14/11/2026 | **2.441 bài** trong `documents.jsonl` · QID 97,3% · `person` 1.061/`battle` 202/`place` 150/`dynasty` 16 · RAM peak 1,16 GB |
+| 2 | Làm sạch, tách câu, hyperlink (A2/A3/A5) | 🟡 Code xong, chưa chạy | — | `clean_text.py` + `split_sentences.py` + 18 test pass — chờ Phase 1 xong mới chạy pipeline |
 | 3 | Parse infobox, chuẩn hóa ngày (A4) | ⬜ Chưa bắt đầu | — | — |
 | 4 | Nhãn bạc NER từ hyperlink (B2.1) | ⬜ Chưa bắt đầu | — | — |
 | 5 | Huấn luyện + suy luận NER (B1/B2) | ⬜ Chưa bắt đầu | — | — |
@@ -27,28 +27,29 @@ Ký hiệu: ⬜ chưa · 🟡 đang làm · ✅ xong (đạt Gate) · ⚠️ xon
 
 ## Việc tiếp theo
 
-**Phase kế tiếp: Phase 1 — Tải dump viwiki `20261101` + lọc 2.000–5.000 bài lịch sử.**
+**Phase kế tiếp: Phase 2 — Làm sạch wikitext, tách câu/đoạn, trích hyperlink.**
 
-Chi tiết ở `docs/09-ke-hoach-thuc-thien.md` → mục "Phase 1".
+Chi tiết ở `docs/09-ke-hoach-thuc-thien.md` → mục "Phase 2".
 
-> Phase 0 đã xong (13/11/2026). Cây thư mục `src/`, `backend/`, `frontend/`, `scripts/`,
-> `tests/`, `configs/` **đã được tạo** và kiểm thử xanh.
+> Phase 1 đã xong (13/11/2026) — báo cáo: `reports/phase_01_report.md`.
 
-Việc cần làm ở Phase 1:
-1. `scripts/download_dump.py` — tải `pages-articles.xml.bz2` (1111 MB) + `pages-meta-current.xml.bz2` (1442 MB),
-   ghi `data/raw/manifest.json` (tên file, kích thước, sha1, ngày tải). Hỗ trợ `--resume`.
-   **Lưu ý:** viwiki **không có** `redirects.xml.bz2` riêng — redirect nằm trong `pages-articles` (thẻ `<redirect>`).
-2. `src/preprocess/filter_articles.py` — parse `pages-articles.xml.bz2` bằng `lxml.etree.iterparse`
-   (streaming, không nạp toàn bộ vào RAM), bỏ namespace ≠ 0, bỏ redirect.
-3. `src/preprocess/wikidata_map.py` — đọc `pages-meta-current.xml.bz2`, lấy `page_props/wikibase_item`
-   → `data/interim/pageid_to_qid.json`.
-4. Bộ lọc 5 tín hiệu: **T0 Wikidata** (SPARQL → QID → sitelink viwiki → seed) ·
-   **T1 category** (tên đã kiểm chứng: `Vua Việt Nam` 57, `Địa danh Việt Nam` 90, `Người Việt Nam` 68;
-   mở rộng đệ quy `<text>` trong `pages-meta-current`, độ sâu ≤ 3) ·
-   **T2 infobox** (whitelist loại + ≥ 2 trường lịch sử) · **T3 BFS hyperlink** (từ seed T0, sâu ≤ 2) ·
-   **T4 loại trừ** (`Danh sách`, `Bảng`, `Wikipedia:`, `Dự án Wikimedia`...).
-5. Ghi `data/interim/documents.jsonl` + `data/interim/filter_stats.json`.
-6. Chạy lệnh kiểm thử trong Phase 1 → đạt Gate → ghi `reports/phase_01_report.md`.
+Kết quả Phase 1 đã chốt:
+- `data/interim/documents.jsonl` — **2.441 bài** (khoảng mục tiêu 2.000–5.000).
+- Phân bố `keep_reason`: `wikidata` 930 · `category` 933 · `infobox` 302 · `seed_expansion` 276.
+- Phân bố `infobox_type`: `person` 1.061 · `battle` 202 · `place` 150 · `dynasty` 16 · `event` 11 · `none` 1.001.
+- QID coverage **97,3%**; RAM peak **≈ 1,16 GB**; chạy 31 phút.
+- Có tầng **T5** chốt phạm vi lịch sử Việt Nam (xem `reports/deviations.md` D-012) — lượt chạy đầu giữ 3.113 bài
+  nhưng ~35% rơi ra ngoài phạm vi (Trận Stalingrad, Nhà Ptolemaios…).
+
+Việc cần làm ở Phase 2:
+1. `python -m src.preprocess.clean_text --config configs/default.yaml` — tách infobox ra `infobox_raw`,
+   xoá template/ref/File/Thể loại/bảng/HTML, thay wikilink bằng anchor **kèm offset chính xác**.
+2. `python -m src.preprocess.split_sentences --config configs/default.yaml` — tách đoạn (theo `\n\n`) và
+   câu (`pysbd` `Language.MULTI`), sinh `sentence_id` = `s<page_id>_<para_idx>_<sent_idx>`.
+3. Chạy `pytest -q tests/test_clean_text.py tests/test_sentence_split.py` (18 test — đã xanh).
+4. Chạy `python scripts/stats_text.py` → đối chiếu Gate:
+   0 ký tự wiki còn sót · ≥95% câu kết thúc bằng dấu câu · 100% offset hợp lệ · ≥95% link được giữ.
+5. Ghi `reports/phase_02_report.md` + cập nhật file này.
 
 **Vận hành đã kiểm chứng** (xem `docs/CONTEXT.md` §2.7) — dùng luôn cho Phase 1:
 - Đọc dump bằng `lxml.etree.iterparse` (không dùng `mwparser` — PyPI chỉ có bản `0.1`).
@@ -67,13 +68,14 @@ Việc cần làm ở Phase 1:
 | 10/11/2026 | — | Thu hồi code triển khai sớm (`src/`, `backend/`, `frontend/`, `tests/`, `scripts/`, `configs/`, `.venv`) — giữ nguyên bộ setup vibe-coding | Theo yêu cầu: chỉ setup, chưa triển khai |
 | 10/11/2026 | — | Rà soát chất lượng bộ setup: sửa 10 link/anchor hỏng trong `docs/00` và `docs/09`, bổ sung mục `docs/09` + `annotation-guidelines` vào bảng cấu trúc tài liệu | Kiểm tra tự động: 0 link hỏng, 0 anchor hỏng, 0 tiếng Trung, đủ 9 artifact theo `AGENTS.md` §7 |
 | 13/11/2026 | — | Sửa bộ QID sai trong `docs/05` §3.1 + commit nền tảng vibe-coding setup | Dùng bộ 9 QID đã verify trong `docs/CONTEXT.md` §2.6; thay ví dụ SPARQL `P463`/`P361` (trả 0) bằng `P31=Q5`+`P27=Q881`+`P569`+`P22` |
+| 13–14/11/2026 | 1 | Tải dump viwiki `20261101` + lọc 5 tầng T0–T5 | **2.441 bài** trong `data/interim/documents.jsonl` · QID 97,3% · `person` 1.061/`battle` 202/`place` 150/`dynasty` 16 · RAM peak 1,16 GB · 31 phút · 107 test pass. Sửa 4 lỗi: cây category khóa theo `lt_id` (D-010), khớp tiền tố loại infobox (D-009), T2 cần category Việt Nam (D-008), thêm T5 chốt phạm vi (D-012). Báo cáo: `reports/phase_01_report.md` |
 | 13/11/2026 | 0 | Bootstrap repo, cấu hình, hạ tầng | 56 test pass · Neo4j 5.26.32 ở `:7474` · `/api/health` → `ok`/`neo4j: up` · `READ_ACCESS` chặn ghi ở cấp server ✅ · `npm run build` 0 lỗi TS. Báo cáo: `reports/phase_00_report.md` |
 
 ## Chỉ số đo được (điền sau mỗi phase có số liệu)
 
 | Chỉ số | Mục tiêu | Hiện tại |
 |---|---|---|
-| Số bài trong corpus | 2.000–5.000 | — |
+| Số bài trong corpus | 2.000–5.000 | **2.441** (Phase 1) |
 | Số câu | 150k–400k | — |
 | NER F1 (dev) | ≥ 0.85 | — |
 | NER F1 (auto-gold) | ≥ 0.85 | — |
