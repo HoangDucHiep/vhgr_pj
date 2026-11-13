@@ -193,6 +193,39 @@ Sau khi chặn: **736 triple / 376 bài**, mọi mẫu đều đúng.
   `src/preprocess/parse_infobox.py`, `configs/infobox_mapping.yaml`,
   `tests/test_infobox.py` (+6 test regression).
 
+### D-025 — Bổ sung 11 thuộc tính node đầy đủ (`birth_place`/`death_place` còn thiếu)
+
+- **Lý do:** `docs/09` §Phase 3 liệt kê 11 thuộc tính node bắt buộc cho
+  `infobox_entities.jsonl`. Lần chạy đầu mới chỉ ghi được **9/11** — thiếu
+  `birth_place` và `death_place`, vì `configs/infobox_mapping.yaml` khai báo
+  `noi sinh` / `noi mat` chỉ sinh **triple** (`sinh_tai` / `mat_tai`) mà không
+  ghi thêm vào `props`.
+- **Quyết định:** thêm khoá `prop:` vào spec của trường trong config
+  (`noi sinh` → `prop: birth_place`, `noi mat` → `prop: death_place`) và xử lý
+  trong `parse_infobox.py`. `add_triple()` **trả về `bool`** để prop chỉ được ghi
+  khi triple **thực sự** được sinh — không khẳng định thuộc tính cho quan hệ
+  đã bị loại vì lỗi schema.
+- **Ảnh hưởng:** `birth_place` 643 entity, `death_place` 516 entity. Tổng triple
+  **không đổi** (10.394) vì `prop` chỉ bổ sung thuộc tính, không sinh quan hệ mới.
+  Gate 1–5 **không đổi**.
+- **File đã cập nhật:** `configs/infobox_mapping.yaml`, `src/preprocess/parse_infobox.py`,
+  `.cursor/rules/data-contracts.mdc`, `tests/test_infobox.py` (+2 test).
+
+### D-026 — Mọi artifact Phase 3 ghi `dump_version` + `model_name`
+
+- **Lý do:** ràng buộc bắt buộc `AGENTS.md` §5.6 ("Tái lập": *"ghi `dump_version` +
+  `model_name` vào mọi artifact"*). Lần chạy đầu của Phase 3 không ghi 2 trường này
+  → không truy được artifact về đúng lần chạy.
+- **Quyết định:** cả 3 artifact ghi `dump_version` (`20261101`, lấy từ
+  `config.dump.dump_version`) + `model_name` (`vinai/phobert-base`, lấy từ
+  `config.ner.model_name`). Giá trị `dump_version` của **triple** lấy theo từng bài
+  từ `documents.jsonl` (không phụ thuộc thứ tự chạy).
+- **Ảnh hưởng:** không đổi số liệu Gate. Thêm 3 test bắt buộc trong
+  `tests/test_infobox.py`.
+- **File đã cập nhật:** `src/preprocess/parse_infobox.py`,
+  `src/preprocess/extract_lead_dates.py`, `.cursor/rules/data-contracts.mdc`,
+  `docs/DECISIONS.md` (D-014), `tests/test_infobox.py` (+3 test).
+
 ---
 
 ## 4. Thang số liệu so sánh
@@ -291,7 +324,11 @@ trong tham số 1–6 (`{{ngày mất và tuổi|1820|9|16|1766|1|3}}`). Xử l�
 | Entity sinh ra | — | 1.764 | |
 | Quan hệ được sinh (trên 18) | — | 15 | |
 | Loại node được sinh (trên 7) | — | 6 (`person`, `dynasty`, `event`, `place`, `title`, `year`) | |
-| pytest | — | **268 passed** (185 trước + 83 mới) | ✅ |
+| Thuộc tính node được phủ (mục tiêu 11) | 11 | **11 / 11** | ✅ |
+| Entity có `birth_place` | — | 643 | |
+| Entity có `death_place` | — | 516 | |
+| Artifact có `dump_version` + `model_name` | 3 / 3 | **3 / 3** | ✅ |
+| pytest | — | **274 passed** (268 trước + 6 mới) | ✅ |
 
 ### Phân bố confidence
 
@@ -299,6 +336,19 @@ trong tham số 1–6 (`{{ngày mất và tuổi|1820|9|16|1766|1|3}}`). Xử l�
 |---|---|---|
 | 0,97 | 10.115 | Trường infobox trực tiếp |
 | 0,95 | 288 | Mốc sinh suy từ tham số phụ của template "X và tuổi" |
+
+### Phân bố thuộc tính node (`props` trong `infobox_entities.jsonl`)
+
+| Prop | Số entity | | Prop | Số entity |
+|---|---|---|---|---|
+| `birth_year` | 833 | | `temple_name` | 89 |
+| `death_year` | 736 | | `courtesy_name` | 79 |
+| `birth_place` | 643 | | `reign_title` | 104 |
+| `death_place` | 516 | | `gender` | 23 |
+| `aliases` | 238 | | `founded_year` | 23 |
+| `posthumous_name` | 217 | | | |
+| `reign_start` | 220 | | | |
+| `reign_end` | 211 | | | |
 
 ### Phân bố loại đối tượng
 
@@ -330,6 +380,8 @@ trong tham số 1–6 (`{{ngày mất và tuổi|1820|9|16|1766|1|3}}`). Xử l�
 | 11 | **Địa danh bị gán loại `person`** | Node "Hà Nội" và "Cần Thơ" có `type="person"` | `resolved_type = normalize_type(...) or doc_type or "person"` — template chưa có trong `type_map` rơi xuống mặc định `person` | Tách 2 mặc định: chủ thể → `"article"`, đối tượng → `"person"`; thêm bước suy từ `wikidata_signal` (D-024) | *"Không xác định được" ≠ "giá trị phổ biến nhất"* — dùng chung mặc định là công thức của việc bịa âm thầm |
 | 12 | **6 khoá `type_map` không bao giờ được gọi** | `thong tin nhan vat phong kien` (451 bài) không map được dù có trong bảng | `normalize_type()` **bỏ tiền tố trước** khi tra bảng, nên khoá có tiền tố không bao giờ khớp; khoá không tiền tố thì `wikitextparser` không trả về | Thử khớp **chính xác trước**, rồi mới bỏ tiền tố rồi thử lại | Khi hai nguồn sinh cùng một khái niệm với **định dạng khác nhau**, bảng tra phải nhận **cả hai** — chuẩn hóa ở lúc tra, không ở lúc lưu |
 | 13 | **36 template chưa có trong `type_map`** | 43 bài có template lạ → mặc định `person` | `type_map` viết trước khi đo trên corpus | Đo trên 2.441 bài, bổ sung 36 khoá | Bảng mapping phải **đo trên dữ liệu thật** rồi mới hoàn thiện, không đoán từ đầu |
+| 14 | **Thiếu 2/11 thuộc tính node** | `birth_place`/`death_place` không có trong `infobox_entities.jsonl` | Config khai báo `noi sinh`/`noi mat` **chỉ sinh triple**, không ghi thêm `props` | Thêm khoá `prop:` vào config + `add_triple()` trả `bool` để prop chỉ ghi khi triple thực sự sinh (D-025) | "Có quan hệ" ≠ "có thuộc tính" — hai loại kiểm tra khác nhau, phải có test riêng cho từng loại |
+| 15 | **Artifact không truy được về lần chạy** | 3 artifact Phase 3 thiếu `dump_version` + `model_name` | Bỏ sót ràng buộc `AGENTS.md` §5.6 khi viết code | Bổ sung 2 trường cho cả 3 artifact + 3 test bắt buộc (D-026) | Ràng buộc "ghi metadata vào artifact" phải **có test**, nếu không sẽ bị bỏ sót lặp lại ở mỗi phase |
 
 ---
 
@@ -373,6 +425,11 @@ trong tham số 1–6 (`{{ngày mất và tuổi|1820|9|16|1766|1|3}}`). Xử l�
    khi đo thiếu 36 khoá; 6 khoá viết sai định dạng khiến 451 bài không map được. Một vòng
    "đo → sửa → đo lại" trên corpus thật là bắt buộc, không phải tuỳ chọn.
 
+10. **Ràng buộc về metadata phải có test, nếu không sẽ bị bỏ sót lặp lại ở mỗi phase.**
+    "Mọi artifact ghi `dump_version` + `model_name`" là ràng buộc từ Phase 0 nhưng bị bỏ sót
+    ở cả 3 artifact Phase 3 — vì không có test nào kiểm nó. Sau khi thêm 3 test, quy tắc này
+    đã **tự động** áp cho mọi phase sau.
+
 ---
 
 ## 8. Ý tưởng cho slide
@@ -387,6 +444,9 @@ trong tham số 1–6 (`{{ngày mất và tuổi|1820|9|16|1766|1|3}}`). Xử l�
   thành ngày đơn · bịa năm khi năm âm lịch lệch bảng.
 - **Slide "Không bịa là nguyên tắc thiết kế"**: `combatant1` = "Hoa Kỳ" → **loại** triple thay vì
   gán `person`; năm âm lịch lệch bảng → `none` chứ không đoán.
+- **Slide "Gate đo tỉ lệ, không đo sai lệch"**: 5 Gate đều xanh (100% / 92,4% / 100% / 100% /
+  0) mà vẫn còn node "Hà Nội" bị gán `person`. Phải có lượt rà chéo artifact — đó là nơi
+  phát hiện D-024.
 
 ---
 
@@ -399,6 +459,6 @@ vừa tạo ở Phase 3 (`infobox_entities.jsonl` cho 1.764 node) → `docs/09` 
 
 | Artifact | Nội dung | Dùng cho |
 |---|---|---|
-| `data/interim/infobox_entities.jsonl` | 1.764 node + `props` (birth_year, death_year, reign_start/end, temple_name, gender, aliases) | Entity linking (Phase 8), node props (Phase 10) |
+| `data/interim/infobox_entities.jsonl` | 1.764 node + `props` (birth_year, death_year, reign_start/end, temple_name, gender, aliases, birth_place, death_place) | Entity linking (Phase 8), node props (Phase 10) |
 | `data/interim/infobox_triples.jsonl` | 10.394 triple confidence ≥ 0,95 | Đường sạch để đo NER/RE |
 | `data/interim/lead_triples.jsonl` | 736 triple confidence 0,85 | Bổ sung coverage |

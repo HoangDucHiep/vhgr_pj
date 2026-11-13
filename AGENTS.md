@@ -110,7 +110,7 @@ reports/      # kết quả đánh giá, phase reports
 | `data/interim/documents.jsonl` | 1 | bài đã lọc + clean_text + sentences + links |
 | `data/interim/infobox_triples.jsonl` | 3 | triple từ infobox (`method="infobox"`, `confidence ≥ 0.95`) |
 | `data/interim/lead_triples.jsonl` | 3 | triple fallback từ đoạn dẫn (`method="rule"`, `confidence=0.85`) |
-| `data/interim/infobox_entities.jsonl` | 3 | entity + node props (birth_year, death_year, reign_start/end, gender, aliases…) |
+| `data/interim/infobox_entities.jsonl` | 3 | entity + 11 node props (birth_year, death_year, reign_start/end, temple_name, posthumous_name, reign_title, gender, aliases, birth_place, death_place) |
 | `data/interim/ner_silver.jsonl` | 4 | nhãn bạc NER |
 | `data/interim/ner_predictions.jsonl` | 5 | NER dự đoán (offset ký tự) |
 | `data/interim/coref_resolved.jsonl` | 6 | mention + canonical_id |

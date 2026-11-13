@@ -596,3 +596,88 @@ def test_relation_distribution_is_reasonable():
     assert len(counter) >= 8, f"chỉ {len(counter)} loại quan hệ"
     assert counter["sinh_nam"] > 0
     assert counter["cha_cua"] > 0
+
+
+# ---------------------------------------------------------------------------
+# Truy vết artifact — `dump_version` + `model_name` (ràng buộc bắt buộc)
+# ---------------------------------------------------------------------------
+
+REQUIRED_NODE_PROPS = (
+    "birth_year",
+    "death_year",
+    "reign_start",
+    "reign_end",
+    "temple_name",
+    "posthumous_name",
+    "reign_title",
+    "gender",
+    "aliases",
+    "birth_place",
+    "death_place",
+)
+
+
+@pytest.mark.parametrize("filename", ["infobox_triples.jsonl", "lead_triples.jsonl"])
+def test_triples_carry_dump_version_and_model_name(filename):
+    """Mọi triple phải có `dump_version` + `model_name` để truy vết."""
+    path = TRIPLES_PATH.with_name(filename)
+    if not path.exists():
+        pytest.skip(f"chưa có {filename}")
+
+    records = _load_jsonl(path)
+    assert records, f"{filename} rỗng"
+    for record in records:
+        assert record.get("dump_version"), f"{filename}: thiếu dump_version"
+        assert record.get("model_name"), f"{filename}: thiếu model_name"
+
+
+def test_entities_carry_dump_version_and_model_name():
+    """Mọi entity phải có `dump_version` + `model_name` để truy vết."""
+    if not ENTITIES:
+        pytest.skip("chưa có infobox_entities.jsonl")
+
+    for entity in ENTITIES:
+        assert entity.get("dump_version"), f"{entity.get('name')}: thiếu dump_version"
+        assert entity.get("model_name"), f"{entity.get('name')}: thiếu model_name"
+
+
+def test_entity_props_cover_documented_keys():
+    """Tập `props` phải phủ đủ 11 thuộc tính node đã chốt ở `docs/09` §Phase 3."""
+    if not ENTITIES:
+        pytest.skip("chưa có infobox_entities.jsonl")
+
+    seen: set[str] = set()
+    for entity in ENTITIES:
+        seen.update(entity.get("props", {}).keys())
+        if entity.get("aliases"):
+            seen.add("aliases")
+
+    missing = [key for key in REQUIRED_NODE_PROPS if key not in seen]
+    assert not missing, f"thiếu thuộc tính node: {missing}"
+
+
+def test_birth_place_and_death_place_are_populated():
+    """`birth_place`/`death_place` phải có dữ liệu thật, không chỉ khai báo."""
+    if not ENTITIES:
+        pytest.skip("chưa có infobox_entities.jsonl")
+
+    with_birth_place = [
+        e for e in ENTITIES if e.get("props", {}).get("birth_place")
+    ]
+    with_death_place = [
+        e for e in ENTITIES if e.get("props", {}).get("death_place")
+    ]
+    assert len(with_birth_place) > 100, "birth_place gần như không có dữ liệu"
+    assert len(with_death_place) > 50, "death_place gần như không có dữ liệu"
+
+
+def test_birth_place_only_set_when_triple_emitted():
+    """Regression: prop chỉ được ghi khi triple **thực sự** được sinh.
+
+    Nếu ghi prop trước khi kiểm tra schema thì node sẽ khẳng định
+    `birth_place` cho quan hệ đã bị loại — vi phạm nguyên tắc "không bịa".
+    """
+    triples, props, _ = _build("Lý Thái Tổ")
+    if "birth_place" in props:
+        assert any(t["relation"] == "sinh_tai" for t in triples)
+

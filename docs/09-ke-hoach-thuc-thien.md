@@ -275,8 +275,12 @@ python scripts/stats_text.py
    - Thứ tự suy loại **chủ thể**: tên template (`type_map`) → `wikidata_signal` (Phase 1) → `"article"`.
    - **Không** mặc định `person` cho chủ thể (xem `reports/deviations.md` D-024).
    - Trường có giá trị là **tổ chức** (phe phái, quân đội) → **loại** triple, không gán `person`.
-5. Ghi `data/interim/infobox_entities.jsonl`: trích **thuộc tính node** từ infobox (`birth_year`, `death_year`, `reign_start`, `reign_end`, `temple_name`, `aliases`) — dùng cho Phase 9 (alias) và Phase 10 (node props).
+5. Ghi `data/interim/infobox_entities.jsonl`: trích **thuộc tính node** từ infobox — dùng cho Phase 9 (alias) và Phase 10 (node props).
+   Tập **11 thuộc tính** đã chốt: `birth_year`, `death_year`, `reign_start`, `reign_end`,
+   `temple_name`, `posthumous_name`, `reign_title`, `gender`, `aliases`, `birth_place`, `death_place`.
+   > Prop chỉ được ghi khi triple tương ứng **thực sự** được sinh — không khẳng định thuộc tính cho quan hệ đã bị loại vì lỗi schema (xem `reports/deviations.md` D-025).
 6. Fallback đoạn dẫn → `data/interim/lead_triples.jsonl`: chỉ ngoặc đầu tiên của câu dẫn, khoảng cách sinh–mất ≤ 120 năm, chỉ bài `person`.
+7. **Truy vết**: cả 3 artifact phải ghi `dump_version` + `model_name` (ràng buộc `AGENTS.md` §5.6 — xem D-026).
 
 **Lệnh kiểm thử**
 ```bash
@@ -308,7 +312,7 @@ python scripts/stats_infobox.py     # tỉ lệ parse thành công, tỉ lệ c�
 
 **Lùi:** nếu parse thấp → thay `wikitextparser` bằng regex cân bằng ngoặc cho template (viết trong `parse_infobox.py` với cờ `--fallback-regex`).
 
-**Kết quả thực tế (14/11/2026):** báo cáo `reports/phase_03_report.md` · nhật ký `docs/10-nhat-ky/phase-03.md` · số liệu `docs/10-nhat-ky/so-lieu/phase-03-infobox-stats.json` · sai lệch D-019 → D-024.
+**Kết quả thực tế (14/11/2026):** báo cáo `reports/phase_03_report.md` · nhật ký `docs/10-nhat-ky/phase-03.md` · số liệu `docs/10-nhat-ky/so-lieu/phase-03-infobox-stats.json` · sai lệch D-019 → D-026.
 
 ---
 

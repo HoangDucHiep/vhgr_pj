@@ -25,6 +25,7 @@
    - `detect_gender()` — trường `gioi tinh` → tiền tố tiêu đề → marker trong tên.
    - `infer_object_type()` — suy loại đối tượng; nhận diện **tổ chức** (phe phái/quân đội) để loại thay vì gán nhầm `person`.
    - Suy loại chủ thể theo thứ tự: **tên template → tín hiệu Wikidata → `article`** (trung tính, không mặc định `person`).
+   - Hai mặc định tách biệt: `DEFAULT_TYPE="article"` (chủ thể) vs `DEFAULT_OBJECT_TYPE="person"` (đối tượng).
 
 4. **`src/preprocess/extract_lead_dates.py`** (mới) — fallback đoạn dẫn:
    - Chỉ xét **ngoặc đầu tiên** của câu dẫn; kiểm tra khoảng cách sinh–mất ≤ 120 năm.
@@ -106,6 +107,26 @@ PY
 | `person` | 1.205 | | `dynasty` | 2 |
 | `event` | 309 | | `article` | 0 |
 | `place` | 248 | | | |
+
+### Phân bố thuộc tính node (`props`)
+
+11 thuộc tính đã chốt tại `docs/09` §Phase 3 — tất cả đều **có dữ liệu thật**:
+
+| Prop | Số entity | | Prop | Số entity |
+|---|---|---|---|---|
+| `birth_year` | 833 | | `temple_name` | 89 |
+| `death_year` | 736 | | `courtesy_name` | 79 |
+| `birth_place` | 643 | | `reign_title` | 104 |
+| `death_place` | 516 | | `gender` | 23 |
+| `aliases` | 238 | | `founded_year` | 23 |
+| `posthumous_name` | 217 | | | |
+| `reign_start` | 220 | | | |
+| `reign_end` | 211 | | | |
+
+### Truy vết artifact
+
+Cả 3 artifact đều ghi `dump_version` (`20261101`) + `model_name` (`vinai/phobert-base`) —
+bắt buộc theo `AGENTS.md` §5.6.
 
 ### Phân bố loại đối tượng (10.394 triple)
 

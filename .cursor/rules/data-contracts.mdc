@@ -98,6 +98,30 @@ Quy tắc bắt buộc:
 - Ngày chuẩn hóa theo ISO-8601 `YYYY-MM-DD`, **năm 4 chữ số** (`0939-02-01`, không phải `939-02-01`).
 - Triple có đối tượng là **tổ chức** (phe phái, quân đội) → **loại**, không gán `person`.
 - `entity_id` sinh bằng `make_entity_id()`; `year_id` bằng `make_year_id()`.
+- **Truy vết**: cả 3 artifact phải có `dump_version` + `model_name` (ràng buộc bắt buộc của dự án).
+- Loại chủ thể: tên template (`type_map`) → `wikidata_signal` → `"article"`.
+  **Không** mặc định `person` — gán sai loại là *bịa* (vi phạm `AGENTS.md` §5.3).
+
+### Tập thuộc tính node (`props` trong `infobox_entities.jsonl`)
+
+11 thuộc tính đã chốt (`docs/09` §Phase 3):
+
+| Prop | Nguồn trường infobox |
+|---|---|
+| `birth_year` | `sinh` / `ngày sinh` / `birth date` (+ suy từ tham số phụ template "X và tuổi") |
+| `death_year` | `mất` / `ngày mất` / `death date` |
+| `reign_start` / `reign_end` | `tại vị` / `chủ kỳ` / `nhiệm kỳ` / `thời gian của niên hiệu` |
+| `temple_name` | `miếu hiệu` |
+| `posthumous_name` | `thụy hiệu` |
+| `reign_title` | `niên hiệu` / `tôn hiệu` |
+| `courtesy_name` | `tự` / `tên tự` |
+| `gender` | `giới tính` (hoặc suy từ tiền tố tiêu đề) |
+| `aliases` | `miếu hiệu` / `thụy hiệu` / `niên hiệu` / `tự` (kèm nhãn loại alias) |
+| `birth_place` | `nơi sinh` / `birth place` |
+| `death_place` | `nơi mất` / `death place` |
+
+> Prop chỉ được ghi khi triple tương ứng **thực sự** được sinh — không khẳng định
+> thuộc tính cho quan hệ đã bị loại vì lỗi schema.
 
 ## Trường bắt buộc của một entity
 

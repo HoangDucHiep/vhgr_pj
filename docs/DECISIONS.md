@@ -140,3 +140,94 @@
 **Lý do:** là yêu cầu bắt buộc của đề tài (CC BY-SA cũng yêu cầu ghi nguồn); đồng thời cho phép đánh giá chất lượng theo `method`.
 
 **Hệ quả:** `scripts/validate_graph.py` phải trả 0 lỗi cho các trường này.
+
+---
+
+## D-011 — Tách 2 artifact triple: `infobox_triples.jsonl` vs `lead_triples.jsonl`
+
+**Ngày:** 14/11/2026 · **Trạng thái:** đã chốt
+
+**Bối cảnh:** Infobox cho triple có độ tin cậy rất cao (`confidence ≥ 0.95`) nhưng chỉ phủ
+67,3% bài nhân vật. Trích thêm từ đoạn dẫn (regex) phủ được tới 92,4% nhưng độ tin cậy
+thấp hơn. Nếu gộp chung một file, Gate "100% `method=infobox`, `confidence ≥ 0.95`" của
+`infobox_triples.jsonl` sẽ **không còn đúng nghĩa**.
+
+**Quyết định:** Tách làm 2 file:
+- `data/interim/infobox_triples.jsonl` — `method="infobox"`, `confidence ≥ 0.95` (đường sạch).
+- `data/interim/lead_triples.jsonl` — `method="rule"`, `confidence=0.85` (fallback đoạn dẫn).
+
+**Lý do:** Giữ đúng nghĩa của Gate, cho phép đánh giá chất lượng theo từng `method`, và
+để Phase 8 (gộp triple) quyết định cách gộp dựa trên đường sạch.
+
+**Hệ quả:** `docs/09` §Phase 3, `.cursor/rules/data-contracts.mdc` và `AGENTS.md` §7 liệt kê
+cả 3 artifact (kể cả `infobox_entities.jsonl`).
+
+---
+
+## D-012 — Mapping infobox nằm ở config riêng, **không** sửa `infobox_parser.py`
+
+**Ngày:** 14/11/2026 · **Trạng thái:** đã chốt
+
+**Bối cảnh:** Phase 1 đã dựng `src/preprocess/infobox_parser.py` với `INFOBOX_TYPE_MAP` và
+dùng nó để lọc corpus. Phase 3 cần mapping trường → quan hệ KG và bảng loại mở rộng
+(170+ loại infobox). Sửa file Phase 1 sẽ làm đổi hành vi lọc → checksum corpus đổi →
+không còn đối chiếu được với kết quả Phase 1.
+
+**Quyết định:** `configs/infobox_mapping.yaml` là nguồn sự thật cho mapping của Phase 3;
+`src/preprocess/infobox_parser.py` **giữ nguyên**. `wikitextparser` (tên template đầy đủ)
+và regex Phase 1 (tên đã bỏ tiền tố) cùng tra bảng này → `normalize_type()` thử khớp
+chính xác trước, rồi mới bỏ tiền tố rồi thử lại.
+
+**Lý do:** Tách "lọc corpus" (Phase 1) khỏi "trích triple" (Phase 3) — hai mục đích khác
+nhau, hai vòng đời khác nhau. Giữ checksum ổn định để truy vết được dữ liệu nguồn.
+
+**Hệ quả:** `battle` trong `INFOBOX_TYPE_MAP` (Phase 1) trả `"battle"` — không phải loại node
+KG. Phase 3 map sang `event` trong config riêng (xem `reports/deviations.md` D-020).
+
+---
+
+## D-013 — Loại chủ thể không suy được → `article`, **không** mặc định `person`
+
+**Ngày:** 14/11/2026 · **Trạng thái:** đã chốt
+
+**Bối cảnh:** 43 bài có template infobox không có trong bảng mapping. Code ban đầu rơi xuống
+mặc định `person` → node **"Hà Nội"** và **"Cần Thơ"** bị gán `type="person"` (sai hoàn toàn).
+Đây là **bịa âm thầm** (vi phạm `AGENTS.md` §5.3) mà 5 Gate đều **vẫn đạt**.
+
+**Quyết định:** Tách **hai mặc định** vì vai trò khác nhau:
+
+| Hằng số | Giá trị | Áp dụng cho | Lý do |
+|---|---|---|---|
+| `DEFAULT_TYPE` | `"article"` | **chủ thể** | Loại trung tính — không khẳng định điều gì |
+| `DEFAULT_OBJECT_TYPE` | `"person"` | **đối tượng** | Trường không khai báo `value_type` gần như luôn là người (cha, mẹ, vợ, tiền nhiệm…) |
+
+Thứ tự suy loại chủ thể: **tên template** (`type_map`) → **tín hiệu `wikidata_signal`**
+(Phase 1) → `article`.
+
+**Lý do:** `person` là loại phổ biến nhất nên dễ trở thành mặc định ngầm — nhưng cũng là
+loại bịa nhiều nhất khi suy sai. "Không xác định được" và "giá trị phổ biến nhất" là hai
+thứ khác nhau.
+
+**Hệ quả:** Thêm bước suy từ `wikidata_signal`; bổ sung 36 khoá `type_map`; thêm 6 test
+regression. Xem `reports/deviations.md` D-024.
+
+---
+
+## D-014 — Mọi artifact Phase 3 ghi `dump_version` + `model_name`
+
+**Ngày:** 14/11/2026 · **Trạng thái:** đã chốt
+
+**Bối cảnh:** Ràng buộc bắt buộc của dự án: *"artifact ghi `dump_version` + `model_name`"*
+(`AGENTS.md` §5.6 — tái lập). Phase 3 sinh 3 artifact mới nhưng ban đầu không ghi 2 trường
+này, khiến không truy được artifact về đúng lần chạy.
+
+**Quyết định:** Cả 3 artifact (`infobox_triples.jsonl`, `lead_triples.jsonl`,
+`infobox_entities.jsonl`) ghi `dump_version` (từ `config.dump.dump_version`) và
+`model_name` (từ `config.ner.model_name`). Giá trị `dump_version` của triple lấy theo từng
+bài từ `documents.jsonl` để không phụ thuộc thứ tự chạy.
+
+**Lý do:** Cho phép tái lập và đối chiếu khi dump Wikipedia cập nhật, và đo chất lượng theo
+model khi Phase 5+ thay đổi mô hình.
+
+**Hệ quả:** 3 test bắt buộc trong `tests/test_infobox.py`; `.cursor/rules/data-contracts.mdc`
+§"Artifact Phase 3" ghi rõ quy tắc này.

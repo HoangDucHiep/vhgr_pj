@@ -758,6 +758,7 @@ def build_triples(
     infobox_type: str,
     params: dict[str, str],
     mapping: dict[str, Any],
+    model_name: str = "",
 ) -> tuple[list[dict[str, Any]], dict[str, Any], dict[str, int]]:
     """Sinh triple + thuộc tính node từ một bài có infobox.
 
@@ -766,6 +767,7 @@ def build_triples(
         infobox_type: Tên loại infobox (đã chuẩn hóa).
         params: Tham số infobox.
         mapping: Config mapping đã nạp.
+        model_name: Tên mô hình đã dùng (ghi vào mọi triple).
 
     Returns:
         Bộ ba ``(triples, node_props, counters)``.
@@ -821,17 +823,21 @@ def build_triples(
         confidence: float,
         start_year: int | None = None,
         end_year: int | None = None,
-    ) -> None:
-        """Ghi một triple nếu hợp lệ theo schema."""
+    ) -> bool:
+        """Ghi một triple nếu hợp lệ theo schema.
+
+        Returns:
+            ``True`` nếu triple **được** ghi, ``False`` nếu bị loại.
+        """
         if relation not in RELATION_TYPES:
             counters["skipped_schema"] += 1
-            return
+            return False
         if not _subject_allowed(relation, subject_type_value):
             counters["skipped_schema"] += 1
-            return
+            return False
         if not subject or not object_value:
             counters["skipped_empty"] += 1
-            return
+            return False
         triples.append(
             {
                 "doc_id": doc_id,
@@ -849,9 +855,12 @@ def build_triples(
                 "start_year": start_year,
                 "end_year": end_year,
                 "alt_evidence": [],
+                "dump_version": doc.get("dump_version", ""),
+                "model_name": model_name,
             }
         )
         counters["triples"] += 1
+        return True
 
     for key, raw_value in params.items():
         if not raw_value or not raw_value.strip():
@@ -898,6 +907,10 @@ def build_triples(
         direction = spec.get("direction", "forward")
         declared_type = spec.get("value_type")
         needs_gender = bool(spec.get("needs_gender"))
+        #: Tên thuộc tính node gắn thêm từ trường này (vd `noi sinh` →
+        #: `birth_place`). Trường này **không** sinh triple riêng — triple đã
+        #: có sẵn từ `relation`; ở đây chỉ ghi **tên hiển thị** vào props.
+        prop_name = spec.get("prop")
         label = FIELD_LABELS.get(key, key.title())
 
         # --- Trường ngày ---
@@ -1013,7 +1026,7 @@ def build_triples(
                     sub_id, sub_type = subject_id, subject_type
                     obj_id, obj_type = object_id, object_type
 
-                add_triple(
+                added = add_triple(
                     relation=relation,
                     subject=sub_id,
                     subject_type_value=sub_type,
@@ -1022,6 +1035,13 @@ def build_triples(
                     evidence=f"{label}: {display}",
                     confidence=CONFIDENCE_INFOBOX,
                 )
+
+                # Ghi thuộc tính node (vd `birth_place`, `death_place`).
+                # Chỉ ghi khi triple **thực sự** được sinh — nếu bị loại vì
+                # schema thì không được ghi prop (tránh khẳng định điều không
+                # có bằng chứng).
+                if added and prop_name and prop_name not in props:
+                    props[prop_name] = display
 
     # --- Quan hệ `danh_bai` (winner → loser) cho trận đánh ---
     battle_config = mapping.get("battle_result") or {}
@@ -1070,13 +1090,23 @@ def load_mapping(path: str | Path) -> dict[str, Any]:
         return yaml.safe_load(handle) or {}
 
 
-def _entity_record(doc: dict[str, Any], props: dict[str, Any], subject_type: str) -> dict[str, Any]:
+def _entity_record(
+    doc: dict[str, Any],
+    props: dict[str, Any],
+    subject_type: str,
+    *,
+    dump_version: str = "",
+    model_name: str = "",
+) -> dict[str, Any]:
     """Dựng record entity cho `infobox_entities.jsonl`.
 
     Args:
         doc: Record document.
         props: Thuộc tính node đã trích.
         subject_type: Loại node của chủ thể.
+        dump_version: Phiên bản dump nguồn (để truy vết).
+        model_name: Tên mô hình đã dùng (Phase 3 không dùng mô hình → giá trị
+            mặc định của config để hợp đồng artifact thống nhất).
 
     Returns:
         Dict theo hợp đồng entity.
@@ -1096,6 +1126,8 @@ def _entity_record(doc: dict[str, Any], props: dict[str, Any], subject_type: str
         "verified": False,
         "mention_count": 0,
         "source_method": "infobox",
+        "dump_version": dump_version or doc.get("dump_version", ""),
+        "model_name": model_name,
         "props": {k: v for k, v in props.items() if k != "aliases"},
     }
 
@@ -1107,6 +1139,8 @@ def run(
     entities_path: str | Path,
     mapping_path: str | Path,
     limit: int | None = None,
+    dump_version: str = "",
+    model_name: str = "",
 ) -> dict[str, Any]:
     """Chạy pipeline parse infobox.
 
@@ -1116,6 +1150,8 @@ def run(
         entities_path: Đườn dẫn output entity.
         mapping_path: Đường dẫn config mapping.
         limit: Giới hạn số bài (để test nhanh).
+        dump_version: Phiên bản dump nguồn (ghi vào mọi artifact).
+        model_name: Tên mô hình đã dùng (ghi vào mọi artifact).
 
     Returns:
         Dict thống kê.
@@ -1191,6 +1227,7 @@ def run(
             infobox_type=infobox_type,
             params=params,
             mapping=mapping,
+            model_name=model_name,
         )
 
         stats["skipped_schema"] += counters["skipped_schema"]
@@ -1202,7 +1239,15 @@ def run(
             relation = triple["relation"]
             stats["triples_by_relation"][relation] = stats["triples_by_relation"].get(relation, 0) + 1
 
-        entity_buffer.append(_entity_record(doc, props, resolved_type))
+        entity_buffer.append(
+            _entity_record(
+                doc,
+                props,
+                resolved_type,
+                dump_version=dump_version,
+                model_name=model_name,
+            )
+        )
 
         # Gate 2: bài person có ≥1 trường ngày hoặc quan hệ gia đình.
         if doc_type == "person" or resolved_type == "person":
@@ -1258,6 +1303,8 @@ def main(argv: Iterable[str] | None = None) -> int:
         entities_path=entities_path,
         mapping_path=args.mapping,
         limit=args.limit,
+        dump_version=str(config.get("dump", {}).get("dump_version", "")),
+        model_name=str(config.get("ner", {}).get("model_name", "")),
     )
 
     logger.info(

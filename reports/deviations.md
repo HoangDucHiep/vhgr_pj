@@ -287,3 +287,25 @@
 - Ảnh hưởng: 9 triple bị loại (thay vì sinh sai). Triple 10.403 → **10.394**. Gate 1–5 **không đổi** (100% / 92,4% / 100% / 100% / 0) — vì Gate đo *tỉ lệ*, không đo *sai lệch nội dung*.
 - Xử lý: Tách **hai mặc định** vì vai trò khác nhau: `DEFAULT_TYPE="article"` cho **chủ thể** (loại trung tính) và `DEFAULT_OBJECT_TYPE="person"` cho **đối tượng** (trường không khai báo `value_type` gần như luôn là người). Thêm bước suy loại chủ thể từ `wikidata_signal` (Phase 1) giữa tên template và mặc định. Sửa kèm: (a) `normalize_type()` thử khớp chính xác **trước** khi bỏ tiền tố — 6 khoá `type_map` có tiền tố trở nên không bao giờ được gọi, 451 bài "Thông tin nhân vật phong kiến" không map được; (b) bổ sung 36 khoá `type_map` cho template chưa có (đo trên 2.441 bài). Thêm 6 test regression.
 - Cập nhật file: `src/preprocess/infobox_entity_types.py`, `src/preprocess/parse_infobox.py`, `configs/infobox_mapping.yaml`, `tests/test_infobox.py`, `reports/phase_03_report.md`, `docs/10-nhat-ky/phase-03.md`
+
+## D-025 — Bổ sung 11 thuộc tính node đầy đủ (`birth_place`/`death_place` còn thiếu) (Phase 3)
+- Ngày: 2026-11-14
+- Phase: 3
+- Loại: kỹ thuật
+- Kế hoạch: `docs/09` §Phase 3 liệt kê 11 thuộc tính node bắt buộc cho `data/interim/infobox_entities.jsonl`: `birth_year`, `death_year`, `reign_start`, `reign_end`, `temple_name`, `posthumous_name`, `reign_title`, `gender`, `aliases`, `birth_place`, `death_place`.
+- Thực tế: lần chạy đầu chỉ ghi được **9/11** — thiếu `birth_place` và `death_place`, vì `configs/infobox_mapping.yaml` khai báo `noi sinh` / `noi mat` chỉ sinh **triple** (`sinh_tai` / `mat_tai`) mà không ghi thêm vào `props`.
+- Lý do: `props` và triple là hai loại kiểm tra khác nhau — có quan hệ **không** đồng nghĩa có thuộc tính. Phase 3 chỉ có test cho quan hệ nên không phát hiện thiếu thuộc tính.
+- Ảnh hưởng: `birth_place` **643** entity, `death_place` **516** entity. Tổng triple **không đổi** (10.394) vì `prop` chỉ bổ sung thuộc tính node, không sinh quan hệ mới. Gate 1–5 **không đổi**.
+- Xử lý: Thêm khoá `prop:` vào spec của trường trong config (`noi sinh` → `prop: birth_place`, `noi mat` → `prop: death_place`; tương ứng cho các khoá tiếng Anh). `add_triple()` **trả về `bool`** để prop chỉ được ghi khi triple **thực sự** được sinh — không khẳng định thuộc tính cho quan hệ đã bị loại vì lỗi schema. Thêm 2 test: (a) tập `props` phủ đủ 11 khoá; (b) prop chỉ được ghi khi triple tương ứng được sinh.
+- Cập nhật file: `configs/infobox_mapping.yaml`, `src/preprocess/parse_infobox.py`, `.cursor/rules/data-contracts.mdc`, `tests/test_infobox.py`, `reports/phase_03_report.md`, `docs/10-nhat-ky/phase-03.md`
+
+## D-026 — Mọi artifact Phase 3 ghi `dump_version` + `model_name` (Phase 3)
+- Ngày: 2026-11-14
+- Phase: 3
+- Loại: contract
+- Kế hoạch: `AGENTS.md` §5.6 (nguyên tắc "Tái lập") — *"ghi `dump_version` + `model_name` vào mọi artifact"*.
+- Thực tế: lần chạy đầu của Phase 3 không ghi 2 trường này vào bất kỳ artifact nào → không truy được artifact về đúng phiên bản dump / mô hình đã dùng.
+- Lý do: ràng buộc không có test kiểm tra → dễ bị bỏ sót lặp lại ở mỗi phase (Phase 1/2 chỉ có `documents.jsonl` nên không lộ).
+- Ảnh hưởng: không đổi số liệu Gate. Sau khi sửa, cả 3 artifact đều có `dump_version="20261101"` + `model_name="vinai/phobert-base"`.
+- Xử lý: Bổ sung 2 trường vào `src/preprocess/parse_infobox.py` (triple + entity) và `src/preprocess/extract_lead_dates.py` (triple đoạn dẫn). `dump_version` của triple lấy **theo từng bài** từ `documents.jsonl` (không phụ thuộc thứ tự chạy). Thêm 3 test bắt buộc (`test_triples_carry_dump_version_and_model_name` với 2 tham số + `test_entities_carry_dump_version_and_model_name`) để quy tắc này tự động áp cho các phase sau.
+- Cập nhật file: `src/preprocess/parse_infobox.py`, `src/preprocess/extract_lead_dates.py`, `docs/DECISIONS.md` (D-014), `.cursor/rules/data-contracts.mdc`, `tests/test_infobox.py`, `reports/phase_03_report.md`, `docs/10-nhat-ky/phase-03.md`

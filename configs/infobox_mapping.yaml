@@ -60,14 +60,14 @@ fields:
   died: {relation: mat_nam, kind: date, value_type: year, prop: death_year}
 
   # --- Nơi sinh / nơi mất ---
-  noi sinh: {relation: sinh_tai, kind: entity, value_type: place}
-  birth_place: {relation: sinh_tai, kind: entity, value_type: place}
-  birthplace: {relation: sinh_tai, kind: entity, value_type: place}
-  place of birth: {relation: sinh_tai, kind: entity, value_type: place}
-  noi mat: {relation: mat_tai, kind: entity, value_type: place}
-  death_place: {relation: mat_tai, kind: entity, value_type: place}
-  deathplace: {relation: mat_tai, kind: entity, value_type: place}
-  place of death: {relation: mat_tai, kind: entity, value_type: place}
+  noi sinh: {relation: sinh_tai, kind: entity, value_type: place, prop: birth_place}
+  birth_place: {relation: sinh_tai, kind: entity, value_type: place, prop: birth_place}
+  birthplace: {relation: sinh_tai, kind: entity, value_type: place, prop: birth_place}
+  place of birth: {relation: sinh_tai, kind: entity, value_type: place, prop: birth_place}
+  noi mat: {relation: mat_tai, kind: entity, value_type: place, prop: death_place}
+  death_place: {relation: mat_tai, kind: entity, value_type: place, prop: death_place}
+  deathplace: {relation: mat_tai, kind: entity, value_type: place, prop: death_place}
+  place of death: {relation: mat_tai, kind: entity, value_type: place, prop: death_place}
 
   # --- Gia đình ---
   cha: {relation: cha_cua, kind: entity, value_type: person}

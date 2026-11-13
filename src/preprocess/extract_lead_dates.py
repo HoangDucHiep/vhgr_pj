@@ -135,11 +135,12 @@ def _lead_sentences(doc: dict[str, Any], limit: int = LEAD_SENTENCES) -> list[di
     return list(sentences[:limit])
 
 
-def extract_lead_dates(doc: dict[str, Any]) -> list[dict[str, Any]]:
+def extract_lead_dates(doc: dict[str, Any], *, model_name: str = "") -> list[dict[str, Any]]:
     """Trích cặp (sinh_nam, mat_nam) từ đoạn dẫn của một bài.
 
     Args:
         doc: Record document (Phase 2).
+        model_name: Tên mô hình đã dùng (ghi vào mọi triple).
 
     Returns:
         Danh sách triple (chưa gán `doc_id`/`source_url`).
@@ -205,6 +206,8 @@ def extract_lead_dates(doc: dict[str, Any]) -> list[dict[str, Any]]:
                     "start_year": year,
                     "end_year": year,
                     "alt_evidence": [],
+                    "dump_version": doc.get("dump_version", ""),
+                    "model_name": model_name,
                 }
             )
 
@@ -216,6 +219,7 @@ def run(
     documents_path: str | Path,
     triples_path: str | Path,
     skip_docs_with_dates: bool = True,
+    model_name: str = "",
 ) -> dict[str, Any]:
     """Chạy pipeline trích ngày từ đoạn dẫn.
 
@@ -223,6 +227,7 @@ def run(
         documents_path: Đường dẫn `documents.jsonl`.
         triples_path: Đường dẫn output.
         skip_docs_with_dates: Bỏ qua bài đã có ngày trong infobox.
+        model_name: Tên mô hình đã dùng (ghi vào mọi triple).
 
     Returns:
         Dict thống kê.
@@ -249,7 +254,7 @@ def run(
         if doc_id in docs_with_dates:
             stats["documents_skipped_has_date"] += 1
             continue
-        triples = extract_lead_dates(doc)
+        triples = extract_lead_dates(doc, model_name=model_name)
         if not triples:
             continue
         stats["documents_with_lead_dates"] += 1
@@ -283,7 +288,11 @@ def main(argv: Iterable[str] | None = None) -> int:
     documents_path = resolve_path(args.input) if args.input else interim_dir / "documents.jsonl"
     triples_path = resolve_path(args.out) if args.out else interim_dir / "lead_triples.jsonl"
 
-    stats = run(documents_path=documents_path, triples_path=triples_path)
+    stats = run(
+        documents_path=documents_path,
+        triples_path=triples_path,
+        model_name=str(config.get("ner", {}).get("model_name", "")),
+    )
     logger.info(
         "Đã trích %d triple từ đoạn dẫn của %d bài",
         stats["triples_total"],

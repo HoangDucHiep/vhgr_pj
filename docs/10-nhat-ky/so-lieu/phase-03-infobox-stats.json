@@ -3,15 +3,16 @@
     "phase": 3,
     "name": "Parse infobox + chuẩn hóa ngày (A4)",
     "ngay_do": "2026-11-14",
-    "dump_version": "viwiki-20261101",
+    "dump_version": "20261101",
+    "model_name": "vinai/phobert-base",
     "seed": 42,
     "nguon": [
       "python scripts/stats_infobox.py --json-out /tmp/phase3_stats_raw.json",
       "python -m src.preprocess.parse_infobox --config configs/default.yaml",
       "python -m src.preprocess.extract_lead_dates --config configs/default.yaml",
-      "pytest -q tests/ (268 tests)"
+      "pytest -q tests/ (274 tests)"
     ],
-    "mo_ta": "Mọi con so truy duoc ve nguon. Confidence 0,97 cho triple suy truc tiep tu truong infobox; 0,95 cho moc sinh suy tu tham so phu cua template 'X va tuoi'; 0,85 cho triple tu doan dan (method='rule'). Corpus 2.441 bai (1.764 bai co infobox, 1.061 bai person)."
+    "mo_ta": "Mọi con so truy duoc ve nguon. Confidence 0,97 cho triple suy truc tiep tu truong infobox; 0,95 cho moc sinh suy tu tham so phu cua template 'X va tuoi'; 0,85 cho triple tu doan dan (method='rule'). Corpus 2.441 bai (1.764 bai co infobox, 1.061 bai person). Ca 3 artifact deu ghi dump_version + model_name."
   },
   "corpus": {
     "documents": 2441,
@@ -720,14 +721,29 @@
       "person": 1205,
       "event": 309,
       "dynasty": 2
+    },
+    "phan_bo_props": {
+      "reign_start": 220,
+      "reign_end": 211,
+      "reign_title": 104,
+      "posthumous_name": 217,
+      "temple_name": 89,
+      "birth_year": 833,
+      "birth_place": 643,
+      "death_year": 736,
+      "death_place": 516,
+      "aliases": 238,
+      "founded_year": 23,
+      "courtesy_name": 79,
+      "gender": 23
     }
   },
   "misc": {
-    "pytest_passed": 268,
+    "pytest_passed": 274,
     "pytest_failed": 0,
     "so_bai_co_infobox_rong": 146,
     "so_bai_co_infobox_rong_note": "146/1061 bai person co template {{Thong tin nhan vat phong kien}} rong — khong co truong nao de trich; doi doan dan la fallback chinh",
-    "so_triple_thieu_bang_chung_bi_loai": 9,
-    "so_triple_thieu_bang_chung_note": "9 triple bi loai do schema (vd 'combatant1' la to chuc 'Hoa Ky' → khong gan nham person)"
+    "so_triple_bi_loai_schema": 9,
+    "so_triple_bi_loai_schema_note": "9 triple bi loai do schema (vd 'combatant1' la to chuc 'Hoa Ky' → khong gan nham person)"
   }
 }
