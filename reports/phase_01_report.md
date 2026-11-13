@@ -46,7 +46,7 @@ python -m src.preprocess.filter_articles --stats-only
 → in lại thống kê từ filter_stats.json
 
 pytest -q tests/
-→ 107 passed
+→ 107 passed (gồm 7 test mới cho tầng T5 trong `tests/test_filter_scope.py`)
 
 python - <<'PY'   # assert Gate
 ...
@@ -65,7 +65,7 @@ PY
 | Bài có `wikibase_item` (QID) | ≥ 80% | **97,3%** (2.375/2.441) ✅ |
 | `infobox_type` có đủ `person`/`battle`/`dynasty`/`place` | đủ 4 | `person` 1.061 · `battle` 202 · `place` 150 · `dynasty` 16 · `event` 11 · `none` 1.001 ✅ |
 | RAM peak | < 4 GB | **≈ 1,16 GB** ✅ |
-| Checksum 2 lần chạy | giống hệt | xem bảng dưới |
+| Checksum 2 lần chạy | giống hệt | **IDENTICAL** ✅ (`b04dd858…12de19`) |
 
 ### Phân bố `keep_reason`
 
@@ -83,7 +83,15 @@ PY
 - [x] ≥ 80% bài có `wikibase_item` — **97,3%**
 - [x] Phân bố `infobox_type` có đủ `person`, `battle`, `dynasty`, `place`
 - [x] RAM peak < 4GB — **≈ 1,16 GB**
-- [x] Chạy lại 2 lần cho checksum `documents.jsonl` giống hệt — xem `checksum` bên dưới
+- [x] Chạy lại 2 lần cho checksum `documents.jsonl` giống hệt — **IDENTICAL**
+
+### Checksum 2 lần chạy
+
+```
+run A (14/11 00:38): b04dd858b1494fb6f9365e7a69b980c6a4cb3bc15f365e01fedcb2980712de19
+run B (14/11 01:15): b04dd858b1494fb6f9365e7a69b980c6a4cb3bc15f365e01fedcb2980712de19
+→ IDENTICAL ✅
+```
 
 ## Sai lệch so với kế hoạch
 

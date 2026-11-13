@@ -155,3 +155,25 @@
   - Tín hiệu `category` → phải nằm trong cây seed **và** có category trong phạm vi.
   - Category trong phạm Việt Nam = có chữ "Việt" **hoặc** khớp regex "nhà vua" (`VN_HOUSE_RE`: Nhà Ngô/Đinh/Tiền Lê/Lý/Trần/Hồ/Mạc/Lê sơ/Hậu Lê/Lê Trung Hưng/Nguyễn/Tây Sơn) — vì nhiều nhân vật chỉ có category địa phương ("Người Bắc Ninh", "Vương tước nhà Lý").
 - Cập nhật file: `src/preprocess/filter_articles.py`, `tests/test_filter_scope.py`, `reports/phase_01_report.md`, `docs/CONTEXT.md` §2.7
+
+## D-013 — `pysbd` 0.3.4 không có `Language.MULTI` (Phase 2, phát hiện khi chuẩn bị chạy)
+- Ngày: 2026-11-14
+- Phase: 2 (phát hiện khi dry-run code đã commit ở Phase 1)
+- Loại: công nghệ
+- Kế hoạch: `docs/09` Phase 2 yêu cầu dùng `pysbd.Segmenter(language=pysbd.Language.MULTI)`.
+- Thực tế: Bản `pysbd` 0.3.4 cài được (Python 3.14) **không có** `Language.MULTI`; hỗ trợ 23 ngôn ngữ, **không có tiếng Việt**.
+- Lý do: `Language.MULTI` là API của một bản pysbd khác; bản phát hành hiện tại không có.
+- Ảnh hưởng: Code đã commit sẽ **luôn** rơi vào regex fallback → không đạt chất lượng tách câu của pysbd.
+- Xử lý: Dùng `pysbd.Segmenter(language="en", clean=False, char_span=True)` — bộ quy tắc tiếng Anh tách đúng tiếng Việt vì dấu kết thúc câu (`.`/`!`/`?`/`…`) giống nhau và tiếng Việt không có dấu phẩy cuối câu. Regex fallback vẫn giữ nguyên làm lưới an toàn.
+- Cập nhật file: `src/preprocess/split_sentences.py`
+
+## D-014 — Wikitext thật có link lồng nhau và link hỏng ngoặc (Phase 2)
+- Ngày: 2026-11-14
+- Phase: 2 (phát hiện khi dry-run code đã commit ở Phase 1)
+- Loại: kỹ thuật
+- Kế hoạch: `docs/09` Phase 2 yêu cầu thay link nội bộ bằng regex `[[Đích|anchor]]`.
+- Thực tế: Wikitext trong dump có (a) **link lồng nhau** — `[[Tập tin:X.jpg|nhỏ|[[Đê sông Hồng]] và [[Dãy núi Ba Vì]]]]`; (b) **link không cân bằng ngoặc** — `[[23 tháng 9 năm 1945 … [[Cộng hòa Tự trị Nam Kỳ|Nam Kỳ]]`; (c) **anchor mồ côi** — `|nhãn]]` khi mở `[[` đã bị nuốt.
+- Lý do: Regex phẳng không theo dõi độ sâu ngoặc → cắt đôi link, để lại ký tự `]]` rác trong `clean_text`.
+- Ảnh hưởng: Trước khi sửa, còn ký tự wiki trong `clean_text` (Gate Phase 2 yêu cầu 0 bài).
+- Xử lý: Thay regex phẳng bằng bộ quét cân bằng ngoặc (`_find_link_end`) + thay thế nhiều vòng theo link trong cùng (`_innermost_links`); thêm `_strip_stray_markers` dọn `|nhãn]]` và `[[`/`]]` còn sót; xoá dấu in đậm/nghiêng (`'''`, `''`) và quy đổi link ngoài `[nhãn](url)` → `nhãn`.
+- Cập nhật file: `src/preprocess/clean_text.py`
