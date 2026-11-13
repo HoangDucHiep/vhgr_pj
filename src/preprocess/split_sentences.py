@@ -32,7 +32,7 @@ from typing import Any
 from src.common.config import REPO_ROOT, load_config
 from src.common.ids import make_sentence_id
 from src.common.logger import get_logger
-from src.common.text_utils import read_jsonl
+from src.common.text_utils import paragraph_spans, read_jsonl
 
 logger = get_logger(__name__)
 
@@ -57,6 +57,27 @@ SENTENCE_ENDINGS = (".", "!", "?", "…")
 
 #: Ngôn ngữ truyền cho `pysbd.Segmenter`. `pysbd` 0.3.4 không có "multi".
 _PYSBD_LANGUAGE = "en"
+
+
+#: Segmenter `pysbd` dùng chung cho toàn corpus — tạo lại cho mỗi đoạn sẽ
+#: tốn ~3 phút cho 2.441 bài (đo được), nên cache lại ở mức module.
+_SEGMENTER: Any = None
+
+
+def _get_segmenter() -> Any:
+    """Trả về segmenter `pysbd` (khởi tạo một lần rồi cache).
+
+    Returns:
+        Đối tượng `pysbd.Segmenter`.
+    """
+    global _SEGMENTER
+    if _SEGMENTER is None:
+        import pysbd
+
+        _SEGMENTER = pysbd.Segmenter(
+            language=_PYSBD_LANGUAGE, clean=False, char_span=True
+        )
+    return _SEGMENTER
 
 
 def _load_name_exceptions(path: Path) -> tuple[str, ...]:
@@ -97,9 +118,7 @@ def _segment(text: str) -> list[tuple[int, int]]:
         # Bản cài đặt chỉ hỗ trợ 23 ngôn ngữ, trong đó không có tiếng Việt;
         # bộ quy tắc tiếng Anh vẫn tách đúng tiếng Việt vì dấu kết thúc câu
         # (`.`/`!`/`?`/`…`) là giống nhau. Xem `reports/deviations.md` D-013.
-        segmenter = pysbd.Segmenter(
-            language=_PYSBD_LANGUAGE, clean=False, char_span=True
-        )
+        segmenter = _get_segmenter()
         for sentence in segmenter.segment(text):
             start = sentence.start
             end = sentence.end
@@ -118,21 +137,37 @@ def _segment(text: str) -> list[tuple[int, int]]:
     return [(start, end) for start, end in spans if end > start]
 
 
-def build_paragraphs(text: str, headings: list[dict[str, Any]]) -> list[dict[str, Any]]:
+def build_paragraphs(
+    text: str,
+    headings: list[dict[str, Any]],
+    paragraph_kinds: list[str] | None = None,
+) -> list[dict[str, Any]]:
     """Tách đoạn theo dòng trống, đánh dấu đoạn là tiêu đề.
 
     Args:
         text: Văn bản đã làm sạch.
         headings: Danh sách tiêu đề đã trích từ `clean_text.py`.
+        paragraph_kinds: Nhãn từng đoạn từ `clean_text.py` (``"prose"`` /
+            ``"list_item"``). Nếu `None`, mọi đoạn được coi là văn xuôi.
 
     Returns:
         Danh sách dict đoạn: ``para_idx``, ``text``, ``char_start``, ``char_end``,
-        ``heading``.
+        ``heading``, ``kind``.
     """
     heading_titles = {str(item.get("title", "")).strip() for item in headings}
+    # Tiêu đề có thể chứa link (`== Thời [[nhà Nguyễn]] ==`) — `clean_text`
+    # đã thay link nên phải so sánh cả bản "rút gọn".
+    heading_titles |= {
+        str(item.get("plain_title", item.get("title", ""))).strip()
+        for item in headings
+    }
+    kinds = paragraph_kinds or []
     paragraphs: list[dict[str, Any]] = []
-    for para_idx, (start, end) in enumerate(_paragraph_spans(text)):
+    for para_idx, (start, end) in enumerate(paragraph_spans(text)):
         body = text[start:end]
+        # Nhãn đoạn do `clean_text.py` gắn theo **nội dung** (xem
+        # `_label_paragraphs`), nên chỉ số luôn khớp với đoạn ở đây.
+        kind = kinds[para_idx] if para_idx < len(kinds) else "prose"
         paragraphs.append(
             {
                 "para_idx": para_idx,
@@ -140,35 +175,10 @@ def build_paragraphs(text: str, headings: list[dict[str, Any]]) -> list[dict[str
                 "char_start": start,
                 "char_end": end,
                 "heading": body.strip() in heading_titles,
+                "kind": kind,
             }
         )
     return paragraphs
-
-
-def _paragraph_spans(text: str) -> list[tuple[int, int]]:
-    """Trả về các khoảng offset của từng đoạn trong `text`.
-
-    Args:
-        text: Văn bản đã làm sạch.
-
-    Returns:
-        Danh sách ``(start, end)`` của các đoạn đã trim.
-    """
-    spans: list[tuple[int, int]] = []
-    index = 0
-    length = len(text)
-    while index <= length:
-        separator = text.find("\n\n", index)
-        chunk_end = length if separator == -1 else separator
-        chunk = text[index:chunk_end]
-        stripped = chunk.strip()
-        if stripped:
-            start = index + (len(chunk) - len(chunk.lstrip()))
-            spans.append((start, start + len(stripped)))
-        if separator == -1:
-            break
-        index = separator + 2
-    return spans
 
 
 def build_sentences(doc: dict[str, Any]) -> list[dict[str, Any]]:
@@ -184,10 +194,20 @@ def build_sentences(doc: dict[str, Any]) -> list[dict[str, Any]]:
     page_id = int(doc.get("page_id", 0))
     doc_id = doc.get("doc_id", f"doc_{page_id}")
 
-    paragraphs = build_paragraphs(text, doc.get("headings", []))
+    paragraphs = build_paragraphs(
+        text, doc.get("headings", []), doc.get("paragraph_kinds")
+    )
     sentences: list[dict[str, Any]] = []
 
     for para in paragraphs:
+        # Đoạn là TIÊU ĐỀ mục (vd "Tiểu sử", "Tham khảo") không phải văn xuôi
+        # → không sinh câu. Đo được trên corpus trước khi sửa: 9,5% "câu" là
+        # tiêu đề, không có dấu kết thúc → kéo tỉ lệ câu hợp lệ xuống 74,34%.
+        # Tiêu đề vẫn được giữ đầy đủ trong `paragraphs` (mục "Tiểu sử" là
+        # ranh giới đoạn quan trọng cho Phase 4/5).
+        if para.get("heading"):
+            continue
+
         para_text = para["text"]
         for sent_idx, (local_start, local_end) in enumerate(_segment(para_text)):
             start = para["char_start"] + local_start
@@ -204,6 +224,7 @@ def build_sentences(doc: dict[str, Any]) -> list[dict[str, Any]]:
                     "text": body.strip(),
                     "char_start": start + (len(body) - len(body.lstrip())),
                     "char_end": end - (len(body) - len(body.rstrip())),
+                    "para_kind": para.get("kind", "prose"),
                 }
             )
 
@@ -266,13 +287,17 @@ def process_file(input_path: Path, output_path: Path) -> dict[str, Any]:
     total_links = 0
     total_paragraphs = 0
     ending_ok = 0
+    ending_ok_prose = 0
+    sentences_prose = 0
 
     with output_path.open("w", encoding="utf-8", newline="\n") as handle:
         for record in read_jsonl(input_path):
             sentences = build_sentences(record)
             links = assign_links_to_sentences(sentences, record.get("links", []))
             paragraphs = build_paragraphs(
-                record.get("clean_text", ""), record.get("headings", [])
+                record.get("clean_text", ""),
+                record.get("headings", []),
+                record.get("paragraph_kinds"),
             )
             total_docs += 1
             total_sentences += len(sentences)
@@ -281,6 +306,15 @@ def process_file(input_path: Path, output_path: Path) -> dict[str, Any]:
             ending_ok += sum(
                 1
                 for sentence in sentences
+                if sentence["text"].rstrip().endswith(SENTENCE_ENDINGS)
+            )
+            prose_sentences = [
+                s for s in sentences if s.get("para_kind") == "prose"
+            ]
+            sentences_prose += len(prose_sentences)
+            ending_ok_prose += sum(
+                1
+                for sentence in prose_sentences
                 if sentence["text"].rstrip().endswith(SENTENCE_ENDINGS)
             )
             new_record = dict(record)
@@ -300,6 +334,10 @@ def process_file(input_path: Path, output_path: Path) -> dict[str, Any]:
         else 0.0,
         "sentence_ending_ratio": round(ending_ok / total_sentences, 4)
         if total_sentences
+        else 0.0,
+        "prose_sentences": sentences_prose,
+        "prose_sentence_ending_ratio": round(ending_ok_prose / sentences_prose, 4)
+        if sentences_prose
         else 0.0,
     }
     logger.info("Thống kê tách câu: %s", stats)

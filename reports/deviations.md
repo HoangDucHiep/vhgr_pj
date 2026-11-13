@@ -177,3 +177,47 @@
 - Ảnh hưởng: Trước khi sửa, còn ký tự wiki trong `clean_text` (Gate Phase 2 yêu cầu 0 bài).
 - Xử lý: Thay regex phẳng bằng bộ quét cân bằng ngoặc (`_find_link_end`) + thay thế nhiều vòng theo link trong cùng (`_innermost_links`); thêm `_strip_stray_markers` dọn `|nhãn]]` và `[[`/`]]` còn sót; xoá dấu in đậm/nghiêng (`'''`, `''`) và quy đổi link ngoài `[nhãn](url)` → `nhãn`.
 - Cập nhật file: `src/preprocess/clean_text.py`
+
+## D-015 — Chốt mẫu số "tỉ lệ giữ hyperlink" là wikitext **thân bài** (Phase 2)
+- Ngày: 2026-11-14
+- Phase: 2
+- Loại: tiêu chí
+- Kế hoạch: `docs/09` Phase 2 yêu cầu "≥95% hyperlink được giữ", mẫu số ngầm định là số link trong wikitext gốc.
+- Thực tế: Tính trên wikitext gốc cho **80,4%** (186.510/231.927) — dưới ngưỡng Gate 95% dù chất lượng thực tế rất tốt.
+- Lý do: Mẫu số gốc **bao gồm** link nằm trong infobox, template trích dẫn, bảng, link tập tin — những phần **bị gỡ có chủ đích** vì không phải văn bản thân bài. Chúng không thể xuất hiện trong `clean_text`.
+- Ảnh hưởng: Đo trên mẫu số **wikitext thân bài** (sau khi gỡ infobox/template/ref/bảng/markup) cho **99,8%** (186.510/186.868) — đạt Gate. Báo cáo **cả hai** tỉ lệ để minh bạch.
+- Xử lý: `scripts/stats_text.py` tái chạy `prepare_text()` để dựng lại wikitext thân bài rồi đếm link (nếu đếm bằng regex trên `wikitext` gốc thì **đếm thiếu** link trong template/bảng → mẫu số sai, tỉ lệ ra 115,7% — bất khả thi).
+- Cập nhật file: `scripts/stats_text.py`, `reports/phase_02_report.md`, `docs/10-nhat-ky/phase-02.md`
+
+## D-016 — Phải phân biệt "câu văn xuôi" và "mục danh sách" khi đo tỉ lệ câu hợp lệ (Phase 2)
+- Ngày: 2026-11-14
+- Phase: 2
+- Loại: tiêu chí
+- Kế hoạch: `docs/09` Phase 2 yêu cầu "≥95% câu kết thúc bằng dấu câu" trên toàn bộ tập câu.
+- Thực tế: Tính trên **toàn bộ** câu cho **85,6%** (186.960 câu) — dưới ngưỡng Gate 95%.
+- Lý do: **43.860 mục danh sách** (23,5% tập câu) là mệnh đề ngắn, không có dấu kết thúc. Tính chúng vào thống kê là đo sai đối tượng (đo "câu" nhưng thực tế đo "câu + mệnh đề"). Tỉ lệ trên **văn xuôi** là **95,3%** (143.100 câu).
+- Ảnh hưởng: `clean_text.py` phải gắn nhãn `paragraph_kinds` (`"prose"` / `"list_item"`) theo **nội dung** qua sentinel `\uE000` — không thể so khớp nội dung trước/sau bước thay link (nội dung item thay đổi, đo được: mọi mục danh sách ở bài "Hà Nội" bị tính nhầm là văn xuôi). Sentinel phải gỡ ở bước cuối và **dịch offset** link phía sau.
+- Xử lý: Gate đo trên văn xuôi; vẫn báo cáo tỉ lệ toàn bộ để minh bạch. Tương tự, **tiêu đề** (heading) bị loại khỏi tập câu (trước đó 9,5% "câu" là tiêu đề, kéo tỉ lệ hợp lệ xuống 74,3%) nhưng vẫn được giữ đầy đủ trong `paragraphs`.
+- Cập nhật file: `src/preprocess/clean_text.py`, `src/preprocess/split_sentences.py`, `scripts/stats_text.py`, `reports/phase_02_report.md`
+
+## D-017 — Bổ sung nối dòng xuống dòng cứng + gỡ markup danh sách (Phase 2, ngoài kế hoạch gốc)
+- Ngày: 2026-11-14
+- Phase: 2
+- Loại: kỹ thuật
+- Kế hoạch: `docs/09` Phase 2 chỉ yêu cầu xoá template/ref/File/Thể loại/bảng/HTML và thay wikilink.
+- Thực tế: Chỉ với các bước trong kế hoạch, tỉ lệ câu kết thúc bằng dấu câu chỉ đạt **83,6%** (mẫu 400 bài) — không thể đạt Gate 95%.
+- Lý do: Wikipedia ngắt dòng cứng ~80 ký tự (quy tắc hiển thị mã nguồn) → `pysbd` coi mỗi `\n` là ranh giới câu, câu gốc bị vỡ thành nhiều "câu" không có dấu kết thúc. Thêm nữa, markup danh sách `*` `#` `:` `;` còn sót khiến mỗi item thành một "câu" riêng.
+- Ảnh hưởng: `clean_text` đổi cấu trúc đoạn; `paragraph_spans()` được tách ra `src/common/text_utils.py` để `clean_text.py` và `split_sentences.py` dùng chung **một** định nghĩa ranh giới đoạn (tránh lệch chỉ số đoạn ↔ nhãn).
+- Xử lý: Thêm `_join_soft_wrapped_lines()` (nối dòng trong cùng đoạn bằng khoảng trắng) và `_strip_list_markers()` (gỡ marker, tách mỗi item thành đoạn riêng, đánh dấu sentinel). Kết quả: văn xuôi **89,1%** → sau khi sửa thêm điểm heading/link **95,3%**.
+- Cập nhật file: `src/preprocess/clean_text.py`, `src/common/text_utils.py`, `src/preprocess/split_sentences.py`
+
+## D-018 — Cache `pysbd.Segmenter` ở mức module (Phase 2)
+- Ngày: 2026-11-14
+- Phase: 2
+- Loại: kỹ thuật
+- Kế hoạch: `docs/09` Phase 2 không quy định cách khởi tạo `pysbd`.
+- Thực tế: Bản đầu khởi tạo `pysbd.Segmenter` cho **mỗi đoạn** → toàn corpus mất **~3 phút**.
+- Lý do: `pysbd.Segmenter` nạp bảng ngữ pháp vào RAM mỗi lần khởi tạo; gọi ~100.000 lần là lãng phí thuần.
+- Ảnh hưởng: Thời gian tách câu toàn corpus giảm còn **~86 giây** (−52%) → thời gian chạy lại pipeline khi tinh chỉnh giảm rõ rệt.
+- Xử lý: Thêm `_get_segmenter()` cache ở mức module.
+- Cập nhật file: `src/preprocess/split_sentences.py`

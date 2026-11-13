@@ -158,3 +158,33 @@ def split_lines_paragraphs(text: str) -> list[str]:
         return []
     paragraphs = [line.strip() for line in text.split("\n")]
     return [p for p in paragraphs if p]
+
+
+def paragraph_spans(text: str) -> list[tuple[int, int]]:
+    """Trả về các khoảng offset của từng đoạn (tách theo dòng trống).
+
+    Hàm dùng chung cho `clean_text.py` (để gắn nhãn đoạn) và
+    `split_sentences.py` (để tách câu) — nhờ vậy **chỉ số đoạn luôn khớp**
+    giữa hai bên.
+
+    Args:
+        text: Văn bản.
+
+    Returns:
+        Danh sách ``(start, end)`` của các đoạn đã trim.
+    """
+    spans: list[tuple[int, int]] = []
+    index = 0
+    length = len(text)
+    while index <= length:
+        separator = text.find("\n\n", index)
+        chunk_end = length if separator == -1 else separator
+        chunk = text[index:chunk_end]
+        stripped = chunk.strip()
+        if stripped:
+            start = index + (len(chunk) - len(chunk.lstrip()))
+            spans.append((start, start + len(stripped)))
+        if separator == -1:
+            break
+        index = separator + 2
+    return spans

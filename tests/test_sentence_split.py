@@ -2,11 +2,19 @@
 
 from __future__ import annotations
 
+import json
+from pathlib import Path
+
+import pytest
+
 from src.preprocess.split_sentences import (
+    SENTENCE_ENDINGS,
     assign_links_to_sentences,
     build_paragraphs,
     build_sentences,
 )
+
+FIXTURES = Path(__file__).parent / "fixtures"
 
 DOC = {
     "doc_id": "doc_123",
@@ -97,3 +105,99 @@ def test_empty_text_no_sentences() -> None:
     """Văn bản rỗng → không có câu nào."""
     doc = {"doc_id": "doc_1", "page_id": 1, "clean_text": "", "headings": []}
     assert build_sentences(doc) == []
+
+
+# --------------------------------------------------------------------------
+# Gate 5 — 30 tên có dấu phẩy lấy từ corpus thật
+# --------------------------------------------------------------------------
+
+
+def _load_comma_names() -> list[dict[str, str]]:
+    """Nạp fixture 30 tên có dấu phẩy.
+
+    Returns:
+        Danh sách dict có `name` và `sentence`.
+    """
+    path = FIXTURES / "comma_names_30.jsonl"
+    rows: list[dict[str, str]] = []
+    with path.open("r", encoding="utf-8") as handle:
+        for line in handle:
+            if line.strip():
+                rows.append(json.loads(line))
+    return rows
+
+
+def test_comma_names_fixture_has_30_rows() -> None:
+    """Fixture phải có đúng 30 tên như Gate yêu cầu."""
+    rows = _load_comma_names()
+    assert len(rows) == 30
+    assert all("," in row["name"] for row in rows)
+
+
+@pytest.mark.parametrize("row", _load_comma_names(), ids=lambda r: r["name"])
+def test_comma_name_sentence_not_broken(row: dict[str, str]) -> None:
+    """Tên có dấu phẩy không được vỡ thành nhiều câu."""
+    doc = {
+        "doc_id": "doc_0",
+        "page_id": 0,
+        "clean_text": row["sentence"],
+        "headings": [],
+    }
+    sentences = build_sentences(doc)
+    assert len(sentences) == 1, f"vỡ câu: {sentences}"
+    assert row["name"] in sentences[0]["text"]
+    assert sentences[0]["text"].rstrip().endswith(SENTENCE_ENDINGS)
+
+
+# --------------------------------------------------------------------------
+# Heading không sinh câu + nhãn đoạn
+# --------------------------------------------------------------------------
+
+
+def test_heading_paragraph_does_not_produce_sentences() -> None:
+    """Đoạn là tiêu đề không được sinh câu.
+
+    Đo được trước khi sửa: 9,5% "câu" trong corpus là tiêu đề mục
+    ("Tiểu sử", "Tham khảo") — không có dấu kết thúc.
+    """
+    doc = {
+        "doc_id": "doc_5",
+        "page_id": 5,
+        "clean_text": "Tiểu sử\n\nLê Lợi sinh năm 1385. Ông mất năm 1410.",
+        "headings": [{"level": 2, "title": "Tiểu sử"}],
+    }
+    paragraphs = build_paragraphs(doc["clean_text"], doc["headings"])
+    assert len(paragraphs) == 2
+    assert paragraphs[0]["heading"] is True
+
+    sentences = build_sentences(doc)
+    assert len(sentences) == 2
+    assert all("Tiểu sử" not in s["text"] for s in sentences)
+
+
+def test_paragraph_kind_is_propagated_to_sentences() -> None:
+    """Nhãn `prose` / `list_item` phải được truyền xuống câu."""
+    doc = {
+        "doc_id": "doc_6",
+        "page_id": 6,
+        "clean_text": "Đoạn văn xuôi bình thường.\n\nMột mục danh sách",
+        "headings": [],
+        "paragraph_kinds": ["prose", "list_item"],
+    }
+    sentences = build_sentences(doc)
+    assert [s["para_kind"] for s in sentences] == ["prose", "list_item"]
+
+
+def test_list_item_paragraph_produces_one_sentence() -> None:
+    """Mục danh sách là một đoạn riêng → một câu riêng."""
+    doc = {
+        "doc_id": "doc_7",
+        "page_id": 7,
+        "clean_text": "Đoạn văn xuôi bình thường.\n\nPhía đông giáp Bắc Ninh",
+        "headings": [],
+        "paragraph_kinds": ["prose", "list_item"],
+    }
+    sentences = build_sentences(doc)
+    assert len(sentences) == 2
+    assert sentences[1]["text"] == "Phía đông giáp Bắc Ninh"
+    assert sentences[1]["para_kind"] == "list_item"

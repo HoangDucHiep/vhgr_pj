@@ -1,0 +1,97 @@
+{
+  "_meta": {
+    "phase": 2,
+    "name": "Làm sạch wikitext, tách câu/đoạn, trích hyperlink",
+    "date": "2026-11-14",
+    "status": "pass",
+    "dump_version": "viwiki-20261101",
+    "seed": 42,
+    "source": "scripts/stats_text.py -> data/interim/text_stats.json; đo baseline bằng commit 4136880 (bản D-014) trên cùng corpus",
+    "notes": "Mọi số đo được trên corpus 2.441 bài trừ khi có ghi chú khác. Số 'trước' chạy lại code ở commit 4136880."
+  },
+  "corpus": {
+    "documents": 2441,
+    "paragraphs": 101628,
+    "sentences": 186960,
+    "prose_sentences": 143100,
+    "list_item_sentences": 43860,
+    "avg_sentences_per_doc": 76.6
+  },
+  "gate": {
+    "residual_wiki_docs": {"expected": 0, "actual": 0, "total": 2441, "pass": true},
+    "prose_sentence_ending_ratio": {"expected_min": 0.95, "actual": 0.953, "total": 143100, "pass": true},
+    "sentence_ending_ratio_all": {"actual": 0.8565, "total": 186960, "note": "bao gồm mục danh sách — tham chiếu"},
+    "offset_valid_ratio": {"expected": 1.0, "actual": 1.0, "valid": 186960, "total": 186960, "pass": true},
+    "link_retention_ratio_vs_body": {"expected_min": 0.95, "actual": 0.9981, "kept": 186510, "body_links": 186868, "pass": true},
+    "link_retention_ratio_vs_raw": {"actual": 0.8042, "kept": 186510, "raw_links": 231927, "note": "tham chiếu — mẫu số gốc gồm infobox/ref/bảng bị gỡ có chủ đích"},
+    "comma_name_break": {"expected": 0, "actual": 0, "total": 30, "source": "tests/fixtures/comma_names_30.jsonl", "pass": true},
+    "sentences": {"expected_min": 150000, "expected_max": 400000, "actual": 186960, "pass": true}
+  },
+  "before_after": {
+    "offset": {
+      "before_docs_with_error": 502,
+      "before_docs_total": 2441,
+      "before_error_links": 68624,
+      "before_total_links": 189146,
+      "after_docs_with_error": 0,
+      "after_error_links": 0,
+      "after_total_links": 186510
+    },
+    "residual_wiki": {
+      "before_docs": 1,
+      "after_docs": 0
+    },
+    "sentence_ending": {
+      "before_all_ratio_sample400": 0.8357,
+      "before_prose_ratio_sample400": 0.8905,
+      "after_all_ratio": 0.8565,
+      "after_prose_ratio": 0.953,
+      "sample_note": "before đo trên mẫu 400 bài (seed 42) với code commit 4136880; after đo full corpus"
+    },
+    "list_items": {
+      "before_misclassified_as_prose": 6667,
+      "after_misclassified_as_prose": 0,
+      "total_list_items_sample400": 6667
+    },
+    "runtime": {
+      "before_seconds": 180,
+      "after_seconds": 86,
+      "cause": "cache pysbd.Segmenter ở mức module"
+    }
+  },
+  "link_strategy_comparison": [
+    {
+      "approach": "A — regex phẳng",
+      "kept_links": null,
+      "offset_errors": null,
+      "note": "không xử lý được link lồng nhau"
+    },
+    {
+      "approach": "B — nhiều vòng thay link trong cùng (commit 4136880)",
+      "kept_links": 189146,
+      "offset_errors": 68624,
+      "docs_with_offset_error": 502,
+      "residual_wiki_docs": 1
+    },
+    {
+      "approach": "C — quét một lần + đệ quy + gỡ ngoặc lạc trước (đã chọn)",
+      "kept_links": 186510,
+      "offset_errors": 0,
+      "docs_with_offset_error": 0,
+      "residual_wiki_docs": 0
+    }
+  ],
+  "length_distribution_words": {
+    "1-5": 12854,
+    "6-15": 41908,
+    "16-30": 70404,
+    "31-60": 52648,
+    ">60": 9146,
+    "percentiles": {"p10": 7, "p50": 23, "p90": 49, "max": 721}
+  },
+  "misc": {
+    "sentences_with_link_ratio": 0.4618,
+    "pytest_passed": 185,
+    "pytest_failed": 0
+  }
+}

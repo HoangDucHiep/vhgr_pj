@@ -33,8 +33,10 @@ docs/10-nhat-ky/
 |---|---|---|---|
 | [`phase-00.md`](phase-00.md) | 0 — Bootstrap hạ tầng | 13/11/2026 | Quyết định lớp bảo vệ Neo4j chỉ-đọc · thay thế thư viện · lựa chọn cấu hình TS |
 | [`phase-01.md`](phase-01.md) | 1 — Lọc corpus 5 tầng T0–T5 | 13–14/11/2026 | Thang số liệu lọc nhiễu · vì sao thêm T5 · lỗi 5 lỗi & cách sửa |
+| [`phase-02.md`](phase-02.md) | 2 — Làm sạch wikitext, tách câu/đoạn, trích hyperlink | 14/11/2026 | 3 lỗi lớn (offset lệch 502 bài · vỡ câu do soft-wrap · `<ref>` nuốt text) · chốt mẫu số link & cách đo "câu hợp lệ" |
 | [`so-lieu/phase-00-mo-truong.json`](so-lieu/phase-00-mo-truong.json) | 0 | — | Phiên bản thư viện, cấu hình hạ tầng, so sánh phương án bảo vệ DB |
 | [`so-lieu/phase-01-bang-do-sanh.json`](so-lieu/phase-01-bang-do-sanh.json) | 1 | — | Thống kê corpus trước/sau T5 theo mọi chiều |
+| [`so-lieu/phase-02-text-stats.json`](so-lieu/phase-02-text-stats.json) | 2 | — | Số liệu văn bản Phase 2: trước/sau theo từng lỗi · so sánh 3 phương án xử lý wikilink |
 
 ## Cách dùng cho báo cáo / slide
 
@@ -43,8 +45,9 @@ docs/10-nhat-ky/
 | Slide "hạ tầng & quyết định kiến trúc" | `phase-00.md` § *Quyết định* + `so-lieu/phase-00-mo-truong.json` |
 | Slide "vì sao lọc như vậy" | `phase-01.md` § *Thang số liệu* |
 | Slide "chất lượng corpus" | `phase-01.md` § *Số liệu đo được* + `so-lieu/phase-01-bang-do-sanh.json` |
+| Slide "chất lượng văn bản" | `phase-02.md` § *Số liệu đo được* + `so-lieu/phase-02-text-stats.json` |
 | Slide "bài học kinh nghiệm" | `phase-01.md` § *Bài học* |
-| Slide "sai lệch so với kế hoạch" | `reports/deviations.md` (D-004 → D-014) |
+| Slide "sai lệch so với kế hoạch" | `reports/deviations.md` (D-004 → D-018) |
 | Số liệu tổng quan toàn dự án | `docs/PROGRESS.md` § *Chỉ số đo được* |
 
 ## Mẫu chuẩn cho phase sau
