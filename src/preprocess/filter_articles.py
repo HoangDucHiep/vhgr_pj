@@ -66,8 +66,28 @@ LOG_EVERY = 200_000
 #: Thứ tự ưu tiên khi một bài khớp nhiều tín hiệu.
 SIGNAL_PRIORITY = ["wikidata", "category", "infobox", "seed_expansion"]
 
-#: Regex nhận diện category "liên quan tới Việt Nam" (dùng cho T2/T3).
+#: Regex nhận diện category "liên quan tới Việt Nam" (dùng cho T2/T3/T5).
 VIET_CATEGORY_RE = re.compile(r"viet|dai viet")
+
+#: Tín hiệu Wikidata T0 đã chứng minh gắn với Việt Nam (P27/P19/P39/P17 → Q881).
+#: Các tín hiệu này **không** cần thêm kiểm tra category.
+VN_ANCHORED_SIGNALS = frozenset({"person", "place", "house"})
+
+#: Tín hiệu Wikidata T0 quá rộng (battle/dynasty/event trên toàn Wikidata).
+#: Bắt buộc phải có category trong phạm vi Việt Nam mới được giữ.
+BROAD_SIGNALS = frozenset({"battle", "dynasty", "event"})
+
+#: Category "nhà vua" — dùng để nhận diện phạm vi Việt Nam khi bài không
+#: có category chứa chữ "Việt" (vd bài "Lý Thái Tông" chỉ có
+#: "Người Bắc Ninh", "Vương tước nhà Lý").
+#:
+#: Khớp theo regex vì tên category biến thiên: "Nhà Lý", "Vương tước nhà Lý",
+#: "Hoàng tộc nhà Lý", "Nhà Lê sơ", "Nhà Lê Trung Hưng"…
+VN_HOUSE_RE = re.compile(
+    r"\b(nha|vuong tuoc|hoang gia|hoang toc)\b.*"
+    r"\b(ngo|dinh|tien le|ly|tran|ho|mac|le so|le trung hung|le trung huong|"
+    r"le|nguyen|tay son|hoang de)\b"
+)
 
 
 def _wiki_url(title: str) -> str:
@@ -196,22 +216,75 @@ def _has_year_in_range(
     return False
 
 
-def _has_vietnam_category(categories: list[str]) -> bool:
-    """Kiểm tra bài có category liên quan tới Việt Nam không.
+def _has_scope_category(categories: list[str]) -> bool:
+    """Kiểm tra bài có category **thuộc phạm vi Việt Nam** hay không.
 
-    Bài lịch sử Việt Nam luôn nằm trong ít nhất một category có chứa "Việt"
-    (vd "Vua Việt Nam", "Chiến tranh liên quan tới Việt Nam"). Điều kiện này
-    loại phần lớn bài trận đánh/địa danh nước ngoài có infobox trùng hình dạng.
+    Ngoài category chứa chữ "Việt",
+    còn chấp nhận các category "nhà vua" (Nhà Lý, Nhà Trần, Nhà Nguyễn…)
+    — vì nhiều bài nhân vật chỉ có category địa phương ("Người Bắc Ninh")
+    hoặc category triều đại, không có chữ "Việt".
 
     Args:
         categories: Danh sách category của bài.
 
     Returns:
-        ``True`` nếu có category liên quan Việt Nam.
+        ``True`` nếu có ít nhất một category thuộc phạm vi Việt Nam.
     """
-    return any(
-        VIET_CATEGORY_RE.search(normalize_name(category)) for category in categories
-    )
+    for category in categories:
+        normalized = normalize_name(category)
+        if VIET_CATEGORY_RE.search(normalized):
+            return True
+        if VN_HOUSE_RE.search(normalized):
+            return True
+    return False
+
+
+def _in_history_scope(
+    *,
+    keep_reason: str,
+    wikidata_signal: str | None,
+    categories: list[str],
+    in_seed_tree: bool,
+) -> bool:
+    """Kiểm tra bài có thực sự thuộc **phạm vi lịch sử Việt Nam** không.
+
+    Đo trên corpus 3.113 bài của lượt chạy đầu: ~35% bài rơi ra ngoài phạm vi
+    (Trận Stalingrad, Chiến tranh Afghanistan, Nhà Ptolemaios, Vương triều
+    Palaiologos…) vì tín hiệu Wikidata `battle`/`dynasty` lấy được **mọi** trận
+    đánh và triều đại có bài tiếng Việt, không giới hạn cho Việt Nam.
+
+    Quy tắc (T5 — chốt sau khi đo):
+
+    - Tín hiệu Wikidata **đã gắn Việt Nam** (`person`/`place`/`house` — tức
+      `P27`/`P19`/`P39`/`P17` → `Q881`) → giữ, không cần kiểm tra thêm.
+    - Tín hiệu Wikidata **quá rộng** (`battle`/`dynasty`/`event`) → chỉ giữ
+      khi bài có category liên quan Việt Nam.
+    - Tín hiệu `category` → bài phải vừa nằm trong cây category seed vừa có
+      category liên quan Việt Nam (cây seed có cả nhánh "Chiến tranh liên
+      quan tới Ba Lan" v.v. nên cần chặn thêm).
+    - Tín hiệu `infobox`/`seed_expansion` → đã có kiểm tra Việt Nam ở T2/T3,
+      giữ nguyên.
+
+    Args:
+        keep_reason: Tín hiệu đã khớp (`wikidata`/`category`/`infobox`/`seed_expansion`).
+        wikidata_signal: Tín hiệu Wikidata gốc (chỉ có với `keep_reason="wikidata"`).
+        categories: Danh sách category của bài.
+        in_seed_tree: Bài có nằm trong cây category seed hay không.
+
+    Returns:
+        ``True`` nếu bài thuộc phạm vi lịch sử Việt Nam.
+    """
+    in_scope = _has_scope_category(categories)
+
+    if keep_reason == "wikidata":
+        if wikidata_signal in VN_ANCHORED_SIGNALS:
+            return True
+        return in_scope
+
+    if keep_reason == "category":
+        return in_seed_tree and in_scope
+
+    return in_scope
 
 
 def _infobox_profile(page: DumpPage) -> tuple[str | None, set[str], dict[str, str]]:
@@ -296,7 +369,7 @@ def _classify(
         return None
     if not _has_year_in_range(params, history_year_min, history_year_max):
         return None
-    if not _has_vietnam_category(page.categories):
+    if not _has_scope_category(page.categories):
         return None
     return "infobox"
 
@@ -373,6 +446,20 @@ def _scan_candidates(
 
         if _is_excluded(
             page.title, page.categories, exclude_categories, exclude_prefixes
+        ):
+            continue
+
+        # T5 — chốt phạm vi lịch sử Việt Nam (xem `_in_history_scope`).
+        signal = (
+            seed_entries.get(page.title, {}).get("signal")
+            if keep_reason == "wikidata"
+            else None
+        )
+        if not _in_history_scope(
+            keep_reason=keep_reason,
+            wikidata_signal=signal,
+            categories=page.categories,
+            in_seed_tree=page.page_id in category_page_ids,
         ):
             continue
 
@@ -500,7 +587,15 @@ def _expand_bfs(
             continue
         if not _has_year_in_range(params, history_year_min, history_year_max):
             continue
-        if not _has_vietnam_category(page.categories):
+        if not _has_scope_category(page.categories):
+            continue
+        # T5 — bài mở rộng cũng phải nằm trong phạm vi lịch sử Việt Nam.
+        if not _in_history_scope(
+            keep_reason="seed_expansion",
+            wikidata_signal=None,
+            categories=page.categories,
+            in_seed_tree=False,
+        ):
             continue
         candidates[page.page_id] = {
             "page_id": page.page_id,
