@@ -7,13 +7,16 @@
 
 | Hạng mục | Trạng thái |
 |---|---|
-| Giai đoạn | Đặc tả xong, chưa viết code |
-| Phase hiện tại | **Phase 0 — Bootstrap** (chưa bắt đầu) |
+| Giai đoạn | **Đang triển khai** — Phase 0 xong 13/11/2026 |
+| Phase hiện tại | **Phase 1 — Tải dump + lọc bài** (sắp bắt đầu) |
 | Tài liệu | `docs/00` … `docs/09` đã hoàn thành |
-| Môi trường | Python 3.12.3, Docker 29.9.2, Node 24.15, RAM 23GB, đĩa trống 167GB, **không GPU local** |
-| Image Docker có sẵn | `neo4j:5-community` |
-| Kaggle | chưa cấu hình (cần GPU cho fine-tune) |
-| API key | chưa có trong `.env` (cần `GEMINI_API_KEY`, `GROQ_API_KEY`) |
+| Môi trường | Python 3.12.3, Docker 29.9.2, Node 24.15, RAM 23GB, đĩa 2.5TB, **không GPU local** |
+| Hạ tầng | `.venv` đã tạo + cài `requirements.txt` ✅ · Neo4j 5.26.32 Community ở `:7474`/`:7687` ✅ · user `reader` đã tạo ✅ |
+| Backend | FastAPI chạy ở `:8000` — `/api/health` → `{"status":"ok","neo4j":"up"}` ✅ |
+| Frontend | Vite + React 18 + TS — `npm run build` 0 lỗi ✅ |
+| Kaggle | `KAGGLE_USERNAME=hoangduchiep` + `KAGGLE_KEY` trong `.env` ✅ (auth bằng `Authorization: Bearer`) |
+| API key | `GEMINI_API_KEY`, `GROQ_API_KEY` trong `.env` ✅ |
+| Test | `pytest -q tests/` → **56 passed** |
 
 ## 2. Quyết định đã chốt (KHÔNG đổi nếu không có lý do ghi vào DECISIONS.md)
 
@@ -115,10 +118,15 @@ Chi tiết đầy đủ: `docs/04-schema-knowledge-graph.md`.
 | `mwparser` trên PyPI | Chỉ có bản `0.1` (bản `0.6.2` chưa publish) | Đọc dump bằng `lxml.etree.iterparse` (nhanh hơn, hỗ trợ streaming) |
 | `viwiki` dump | **Không có** file `redirects.xml.bz2` riêng (chỉ enwiki có) | Redirect nằm trong `pages-articles.xml.bz2` dưới thẻ `<redirect>` |
 | `neo4j` driver | `READ_ACCESS_MODE` không tồn tại → dùng `READ_ACCESS` | |
-| `pysbd` | Cài được trên Python 3.12 | Dùng `pysbd` cho tách câu; `underthesea` không bắt buộc |
+| `pysbd` | Cài được trên Python 3.12 | Dùng `pysbd` cho tách câu; `underthesea` **không** bắt buộc (D-005) |
+| `wikitextparser` | Bản 3.0.0 cài được | Dùng cùng `lxml` cho parse wikitext |
+| `transformers` | Bản 5.23.0 cài được | Dùng cho PhoBERT / BGE-M3 ở tầng offline |
 | Máy local | 8 core · 23 GB RAM · 2.5 TB đĩa · Docker 29.9 · Node 24 · **không GPU** · **không có Kaggle credentials** | Các bước nặng (fine-tune NER/RE, embedding BGE-M3, LLM bulk) **phải** chạy trên Kaggle GPU rồi tải artifact về — máy local chỉ đọc artifact |
 | Wikidata SPARQL | `query.wikidata.org` trả HTTP 200 với User-Agent định danh | Dùng làm nguồn auto-gold (độc lập với KG) |
 | Phiên bản dump viwiki | `20251101` là bản mới nhất tại `dumps.wikimedia.org/viwiki/` | Khớp `dump_version` mặc định trong `configs/default.yaml` |
+| `READ_ACCESS` chặn ghi | ✅ **Đã kiểm chứng 13/11/2026:** session `default_access_mode=READ_ACCESS` → đọc OK, `CREATE` bị từ chối bởi server với `Neo.ClientError.Statement.AccessMode` | Dùng làm cơ chế bảo vệ chính (D-002) |
+| Ngày âm lịch | ⚠️ Không quy đổi âm → dương trong code (D-007) | Chỉ nhận diện `is_lunar`; quy đổi tuyệt đối cần thư viện chuyên dụng + múi giờ |
+| Frontend build | ✅ Vite 5.4.21 + TS 5.6, `tsc --noEmit` 0 lỗi | Không dùng project reference (TS6310) — xem D-006 |
 
 ## 3. Chỉ số mục tiêu
 

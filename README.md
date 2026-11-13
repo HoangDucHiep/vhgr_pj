@@ -13,12 +13,22 @@ cat docs/CONTEXT.md        # quyết định đã chốt, QID, model
 cat docs/PROGRESS.md       # đang ở phase nào, việc tiếp theo
 
 # Phase 0 — bootstrap
-python3 -m venv .venv && source .venv/bin/activate
-pip install -r requirements.txt
+uv venv .venv && source .venv/bin/activate
+uv pip install -r requirements.txt
 cp .env.example .env      # điền GEMINI_API_KEY, GROQ_API_KEY, NEO4J_PASSWORD
 docker compose up -d neo4j
 uvicorn backend.app.main:app --reload --port 8000
 cd frontend && npm install && npm run dev
+```
+
+## Kiểm thử nhanh
+
+```bash
+pytest -q tests/                  # unit + contract test
+docker compose up -d neo4j        # DB
+python scripts/load_neo4j.py --batch 1000
+python scripts/validate_graph.py  # kiểm tra chất lượng KG
+python scripts/evaluate.py --all --out reports/   # đánh giá (sau phase 13)
 ```
 
 ## Tài liệu

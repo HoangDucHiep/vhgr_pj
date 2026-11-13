@@ -52,3 +52,47 @@
 - Ảnh hưởng: Không cài được dependency theo kế hoạch.
 - Xử lý: Dùng `lxml.etree.iterparse` để parse dump XML (streaming, nhanh hơn cho file 2GB+) + regex/wikitext-cleanup cho phần text.
 - Cập nhật file: `docs/CONTEXT.md` §2.7, `docs/PROGRESS.md`
+
+## D-004 — Bỏ `mwparser` khỏi `requirements.txt` (Phase 0)
+- Ngày: 2026-11-13
+- Phase: 0
+- Loại: công nghệ
+- Kế hoạch: Output contract Phase 0 liệt kê `mwparser` trong `requirements.txt`.
+- Thực tế: Dùng `lxml` + `wikitextparser` + `pysbd`; không cài `mwparser`.
+- Lý do: PyPI chỉ có bản `mwparser` 0.1 (bản 0.6.2 chưa publish) — đã ghi nhận ở D-003 và `docs/CONTEXT.md` §2.7.
+- Ảnh hưởng: Không ảnh hưởng contract; `requirements.txt` của Phase 1+ cũng dùng bộ thư viện này.
+- Xử lý: Cập nhật `requirements.txt` và ghi rõ lý do trong file.
+- Cập nhật file: `requirements.txt`, `reports/phase_00_report.md`
+
+## D-005 — Bỏ `underthesea`, dùng `pysbd` + regex tách đoạn (Phase 0)
+- Ngày: 2026-11-13
+- Phase: 0
+- Loại: công nghệ
+- Kế hoạch: Output contract Phase 0 liệt kê `underthesea` trong `requirements.txt`.
+- Thực tế: Không cài `underthesea`; dùng `pysbd` để tách câu và regex `\n\s*\n` để tách đoạn.
+- Lý do: Đúng mục "Lùi" của Phase 0 trong `docs/09-ke-hoach-thuc-thien.md` — `underthesea` không ổn định trên Python 3.12.
+- Ảnh hưởng: Chất lượng tách câu có thể thấp hơn `underthesea`; cần đo ở Gate Phase 2 (≥95% câu kết thúc bằng dấu câu).
+- Xử lý: Thêm `split_paragraphs` (regex) vào `src/common/text_utils.py`; ghi fallback vào `docs/CONTEXT.md` §2.7.
+- Cập nhật file: `requirements.txt`, `src/common/text_utils.py`, `reports/phase_00_report.md`
+
+## D-006 — `frontend/tsconfig.json` không dùng project reference (Phase 0)
+- Ngày: 2026-11-13
+- Phase: 0
+- Loại: kỹ thuật
+- Kế hoạch: Vite React TS template mặc định dùng `tsconfig.json` + `tsconfig.node.json` với `references`.
+- Thực tế: Gộp `vite.config.ts` vào cùng `include` của `tsconfig.json`, bỏ `tsconfig.node.json`.
+- Lý do: `composite: true` + `noEmit: true` xung đột → TypeScript báo lỗi TS6310 ("Referenced project may not disable emit").
+- Ảnh hưởng: Không ảnh hưởng chức năng; `npm run build` vẫn chạy `tsc --noEmit` trên toàn bộ mã nguồn.
+- Xử lý: Cài `@types/node` và dùng `loadEnv` từ Vite thay cho `process.env` trực tiếp trong `vite.config.ts`.
+- Cập nhật file: `frontend/tsconfig.json`, `frontend/vite.config.ts`, `frontend/package.json`
+
+## D-007 — Không quy đổi ngày âm lịch sang dương lịch (Phase 0)
+- Ngày: 2026-11-13
+- Phase: 0 (quyết định thiết kế trước khi làm Phase 3)
+- Loại: kỹ thuật
+- Kế hoạch: `docs/09` Phase 0 yêu cầu `src/common/normalize.py` có hàm chuẩn hóa ngày.
+- Thực tế: `src/common/normalize.py` chỉ *nhận diện* ngày âm lịch (`is_lunar_date`) và trả `precision` cho ngày dương; **không** quy đổi âm → dương.
+- Lý do: Bảng quy đổi âm lịch thủ công dễ sai và phụ thuộc múi giờ; quy đổi sai sẽ vi phạm nguyên tắc "không bịa" của dự án (quy tắc 3 trong `AGENTS.md` §5).
+- Ảnh hưởng: Phase 3 chỉ gắn cờ `is_lunar` trong bằng chứng thay vì quy ra ngày dương tuyệt đối. Nếu cần ngày dương tuyệt đối cho ngày âm thì phải dùng thư viện chuyên dụng ở Phase 3 (có thể ghi thêm deviation).
+- Xử lý: Ghi chú rõ trong docstring của `src/common/normalize.py`.
+- Cập nhật file: `src/common/normalize.py`, `reports/phase_00_report.md`

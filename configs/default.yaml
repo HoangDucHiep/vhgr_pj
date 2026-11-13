@@ -1,0 +1,134 @@
+seed: 42
+
+paths:
+  raw_dir: data/raw
+  interim_dir: data/interim
+  processed_dir: data/processed
+  kb_dir: data/knowledge_base
+  models_dir: models
+  reports_dir: reports
+  logs_dir: logs
+  splits_dir: data/splits
+  eval_dir: data/eval
+
+dump:
+  # Phiên bản dump viwiki dùng cố định (ghi vào mọi artifact).
+  dump_version: "20261101"
+  wiki_lang: vi
+  dump_base_url: "https://dumps.wikimedia.org/viwiki"
+  pages_articles: "viwiki-{dump_version}-pages-articles.xml.bz2"
+  pages_meta_current: "viwiki-{dump_version}-pages-meta-current.xml.bz2"
+  # viwiki KHÔNG có file redirects.xml.bz2 riêng; redirect nằm trong pages-articles (thẻ <redirect>).
+  has_redirects_file: false
+
+neo4j:
+  uri: ${NEO4J_URI:-bolt://localhost:7687}
+  user: ${NEO4J_USER:-neo4j}
+  password: ${NEO4J_PASSWORD:-neo4jpass}
+  database: ${NEO4J_DATABASE:-neo4j}
+  read_only_user: ${NEO4J_READER_USER:-reader}
+  read_only_password: ${NEO4J_READER_PASSWORD:-readerpass}
+  batch_size: 500
+  max_hops: 3
+  max_limit: 100
+  timeout_s: 10
+
+llm:
+  provider: gemini
+  model: gemini-3.5-flash-lite
+  fallback_provider: groq
+  fallback_model: openai/gpt-oss-20b
+  api_key_env: GEMINI_API_KEY
+  fallback_api_key_env: GROQ_API_KEY
+  temperature: 0.0
+  max_retries: 3
+  timeout_s: 60
+  rate_limit_per_min: 15
+  cache_path: data/interim/llm_cache.sqlite
+  bulk_extraction:
+    method: kaggle_gpu
+    model: Qwen/Qwen3-8B
+    quantization: 4bit
+    chunk_sentences_per_request: 15
+
+ner:
+  model_name: vinai/phobert-base
+  max_len: 256
+  batch_size: 32
+  silver_link_min_anchor_match: 0.8
+  labels: [PERSON, DYNASTY, EVENT, LOCATION, TIME, TITLE]
+
+re:
+  model_name: vinai/phobert-base
+  marker_style: typed_markers
+  max_len: 256
+  batch_size: 32
+
+link:
+  embedding_model: BAAI/bge-m3
+  dim: 1024
+  top_k: 20
+  context_weight:
+    alias: 1.0
+    context: 0.6
+    temporal: 0.5
+    dynasty: 0.5
+    type: 0.4
+    freq: 0.2
+
+pipeline:
+  stages: [A, B, C, D, E, F]
+  skip: []
+  entities_from: [infobox, wikidata]
+
+# 18 quan hệ đóng của schema KG (nguồn sự thật: docs/CONTEXT.md §2.5)
+relations:
+  - cha_cua
+  - me_cua
+  - vo_cua
+  - chong_cua
+  - anh_em_cua
+  - thuoc_trieu_dai
+  - ke_vi
+  - giu_chuc_vu
+  - lap_ra
+  - chi_huy_tran
+  - tham_gia_tran
+  - danh_bai
+  - dien_ra_tai
+  - sinh_tai
+  - mat_tai
+  - sinh_nam
+  - mat_nam
+  - dong_doi_tai
+
+# 9 triều đại đã verify (nguồn sự thật: docs/CONTEXT.md §2.6)
+dynasties:
+  ngo: Q703919
+  dinh: Q1372154
+  tien_le: Q1317884
+  ly: Q878309
+  tran: Q3111454
+  ho: Q1209047
+  le_so: Q878276
+  tai_son: Q1034173
+  nguyen: Q6500483
+
+# Lớp thực thể Wikidata đã verify
+wikidata_classes:
+  dynasty: Q164950
+  battle: Q178561
+  event: Q1656682
+  place: Q486972
+  person: Q5
+  monarch: Q116
+  temple_name: Q706208
+  posthumous_name: Q696100
+  era_name: Q256408
+  era_name_vn: Q2420465
+  position: Q4164871
+  clan: Q840178
+  country_vn: Q881
+  country_dai_viet: Q430309
+  country_dai_co_viet: Q10841085
+  historical_period: Q11514315
