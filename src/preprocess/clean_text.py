@@ -48,16 +48,17 @@ _REF_OPEN_RE = re.compile(r"<ref\b[^>]*>.*?(?=<ref\b|</ref>|$)", re.IGNORECASE |
 _COMMENT_RE = re.compile(r"<!--.*?-->", re.DOTALL)
 _HTML_TAG_RE = re.compile(r"</?[a-zA-Z][^>]*>")
 
-#: Link tới tập tin (namespace 6) — không phải bài viết.
-_FILE_LINK_RE = re.compile(
-    r"\[\[\s*(?:File|Tập tin|Image|Hình)\s*:[^\]]*\]\]", re.IGNORECASE
+#: Link tới tập tin (ns 6) hoặc thể loại (ns 14) — xoá hẳn khi thay link.
+_EXCLUDED_LINK_RE = re.compile(
+    r"^(?:File|Tập tin|Image|Hình|Thể loại)\s*:", re.IGNORECASE
 )
 
-#: Link tới category (namespace 14).
-_CATEGORY_LINK_RE = re.compile(r"\[\[\s*Thể\s*loại\s*:[^\]]*\]\]", re.IGNORECASE)
-
 #: Link nội bộ: `[[Đích|anchor]]` hoặc `[[Đích]]`, có thể kèm `#anchor`.
-_WIKILINK_RE = re.compile(r"\[\[([^\[\]\|]{1,300})(?:\|([^\[\]]*))?\]\]")
+#:
+#: Vì wikitext thật có **link lồng nhau**
+#: (vd `[[Tập tin:X.jpg|nhỏ|[[Đê sông Hồng]] và [[Dãy núi Ba Vì]]]]`),
+#: regex phẳng không xử lý được → dùng bộ quét cân bằng ngoặc.
+_WIKILINK_START_RE = re.compile(r"\[\[")
 
 #: Đầu dòng tiêu đề `== X ==` (2–4 dấu `=`).
 _HEADING_RE = re.compile(r"^\s*(={2,4})\s*(.+?)\s*\1\s*$", re.MULTILINE)
@@ -65,6 +66,18 @@ _HEADING_RE = re.compile(r"^\s*(={2,4})\s*(.+?)\s*\1\s*$", re.MULTILINE)
 #: Khoảng trắng liên tiếp.
 _MULTISPACE_RE = re.compile(r"[ \t ]+")
 _MULTINEWLINE_RE = re.compile(r"\n{3,}")
+
+#: Dấu in đậm/nghiêng của wikitext (2 hoặc nhiều dấu nháy đơn).
+_BOLD_ITALIC_RE = re.compile(r"'{2,}")
+
+#: Link ngoài: `[nhãn](http://...)` hoặc `[http://...]` — giữ phần nhãn.
+_EXTERNAL_LINK_RE = re.compile(r"\[([^\[\]]*?)\]\((?:https?:|//)[^()\s]+\)")
+
+#: Link ngoài dạng thô: `[http://...]` (không có nhãn).
+_BARE_URL_RE = re.compile(r"\[(https?://[^\[\]\s]+)\]")
+
+#: Anchor "mồ côi" của link hỏng: `|nhãn]]` (mở `[[` đã bị nuốt mất).
+_ORPHAN_ANCHOR_RE = re.compile(r"\|([^|\[\]\n]{1,120})\]\]")
 
 
 @dataclass(slots=True)
@@ -213,13 +226,70 @@ def _resolve_wikilink(raw_target: str, raw_anchor: str | None) -> tuple[str, str
     return target, anchor
 
 
+def _find_link_end(text: str, start: int) -> int:
+    """Tìm vị trí đóng `]]` của một link bắt đầu tại `start`.
+
+    Quét có đếm độ sâu `[[` để xử lý link lồng nhau.
+
+    Args:
+        text: Văn bản.
+        start: Vị trí bắt đầu (trỏ vào `[[`).
+
+    Returns:
+        Vị trí sau `]]` đóng, hoặc `-1` nếu không tìm thấy.
+    """
+    depth = 0
+    index = start
+    length = len(text)
+    while index < length - 1:
+        if text[index : index + 2] == "[[":
+            depth += 1
+            index += 2
+            continue
+        if text[index : index + 2] == "]]":
+            depth -= 1
+            index += 2
+            if depth == 0:
+                return index
+            continue
+        index += 1
+    return -1
+
+
+def _innermost_links(text: str) -> list[tuple[int, int, str]]:
+    """Tìm các link **không chứa** link khác bên trong.
+
+    Args:
+        text: Văn bản.
+
+    Returns:
+        Danh sách ``(start, end, raw)`` — ``raw`` là nội dung giữa `[[` và `]]`.
+    """
+    found: list[tuple[int, int, str]] = []
+    for match in _WIKILINK_START_RE.finditer(text):
+        if match.start() < 0:
+            continue
+        end = _find_link_end(text, match.start())
+        if end == -1:
+            continue
+        raw = text[match.start() + 2 : end - 2]
+        if "[[" in raw:
+            continue
+        found.append((match.start(), end, raw))
+    return found
+
+
 def _replace_wikilinks(text: str) -> tuple[str, list[dict[str, Any]]]:
     """Thay link nội bộ bằng anchor, đồng thời ghi lại thông tin link.
 
+    Wikitext thật có **link lồng nhau**
+    (vd `[[Tập tin:X.jpg|nhỏ|[[Đê sông Hồng]] và [[Dãy núi Ba Vì]]]]`), nên
+    bộ thay thế chạy nhiều vòng: mỗi vòng thay các link **trong cùng**
+    (không chứa link khác), lặp lại cho tới khi hết.
+
     Offset ghi trong `links` là offset **sau khi thay thế** — đó cũng là offset
-    trong `clean_text` cuối cùng (vì các bước còn lại chỉ xoá ký tự điều khiển
-    và chuẩn hóa whitespace ở cuối; để chắc chắn offset khớp, hàm này chạy
-    *sau* khi đã chuẩn hóa whitespace — xem `clean_document`).
+    trong `clean_text` cuối cùng (vì các bước còn lại chỉ cắt khoảng trắng đầu
+    cuối; hàm này chạy *sau* khi đã chuẩn hóa whitespace — xem `clean_document`).
 
     Args:
         text: Văn bản đã bỏ template/bảng/HTML.
@@ -228,28 +298,74 @@ def _replace_wikilinks(text: str) -> tuple[str, list[dict[str, Any]]]:
         Tuple ``(text_mới, links)``.
     """
     links: list[dict[str, Any]] = []
-    out: list[str] = []
-    cursor = 0
-    position = 0
-    for match in _WIKILINK_RE.finditer(text):
-        target, anchor = _resolve_wikilink(match.group(1), match.group(2))
-        if not target:
-            continue
-        out.append(text[cursor : match.start()])
-        position += len(out[-1])
-        out.append(anchor)
-        links.append(
-            {
-                "target": target,
-                "anchor": anchor,
-                "start": position,
-                "end": position + len(anchor),
-            }
-        )
-        position += len(anchor)
-        cursor = match.end()
-    out.append(text[cursor:])
-    return "".join(out), links
+
+    while True:
+        innermost = _innermost_links(text)
+        if not innermost:
+            break
+
+        out: list[str] = []
+        cursor = 0
+        position = 0
+        for start, end, raw in innermost:
+            parts = raw.split("|", 1)
+            target, anchor = _resolve_wikilink(
+                parts[0], parts[1] if len(parts) > 1 else None
+            )
+            # Link tới mục trong cùng bài (`[[#Mục|nhãn]]`) → chỉ giữ nhãn.
+            if not target and parts[0].lstrip().startswith("#"):
+                target = parts[0].lstrip()[1:].strip()
+            if not target:
+                target = anchor
+            if not target:
+                # Link rỗng → xoá hẳn.
+                out.append(text[cursor:start])
+                position += len(out[-1])
+                cursor = end
+                continue
+
+            # Link tới tập tin / thể loại: xoá hẳn.
+            if _EXCLUDED_LINK_RE.match(target):
+                out.append(text[cursor:start])
+                position += len(out[-1])
+                cursor = end
+                continue
+
+            out.append(text[cursor:start])
+            position += len(out[-1])
+            out.append(anchor)
+            links.append(
+                {
+                    "target": target,
+                    "anchor": anchor,
+                    "start": position,
+                    "end": position + len(anchor),
+                }
+            )
+            position += len(anchor)
+            cursor = end
+        out.append(text[cursor:])
+        text = "".join(out)
+
+    links.sort(key=lambda item: item["start"])
+    return _strip_stray_markers(text), links
+
+
+def _strip_stray_markers(text: str) -> str:
+    """Dọn nốt dấu ngoặc vuông còn sót từ wikitext hỏng.
+
+    Wikitext thật có link không cân bằng ngoặc (vd `[[23 tháng 9 năm 1945 …
+    thành lập [[Cộng hòa Tự trị Nam Kỳ|Nam Kỳ]]` — mở ngoài không đóng),
+    và có trường hợp mở `[[` bị nuốt khiến chỉ còn `|nhãn]]`.
+
+    Args:
+        text: Văn bản sau khi thay link.
+
+    Returns:
+        Văn bản không còn `[[` hay `]]`.
+    """
+    text = _ORPHAN_ANCHOR_RE.sub(r"\1", text)
+    return text.replace("[[", "").replace("]]", "")
 
 
 def _normalize_whitespace(text: str) -> str:
@@ -285,11 +401,15 @@ def clean_document(wikitext: str) -> CleanResult:
     text = _REF_BLOCK_RE.sub(" ", text)
     text = _REF_SELF_RE.sub(" ", text)
     text = _REF_OPEN_RE.sub(" ", text)
-    text = _FILE_LINK_RE.sub(" ", text)
-    text = _CATEGORY_LINK_RE.sub(" ", text)
+    # Link tập tin/thể loại được xoá trong `_replace_wikilinks` (bộ quét cân
+    # bằng ngoặc) — không dùng regex phẳng ở đây vì link lồng nhau sẽ bị cắt
+    # đôi và để lại ký tự `]]` rác.
     text = _remove_tables(text)
     text = _COMMENT_RE.sub(" ", text)
     text = _HTML_TAG_RE.sub(" ", text)
+    text = _EXTERNAL_LINK_RE.sub(r"\1", text)
+    text = _BARE_URL_RE.sub(r"\1", text)
+    text = _BOLD_ITALIC_RE.sub("", text)
 
     # Tiêu đề mục: giữ dòng, ghi vào danh sách headings.
     headings: list[dict[str, Any]] = []

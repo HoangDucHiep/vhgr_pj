@@ -6,11 +6,13 @@
 (cùng chuỗi mà `links` dùng) — Phase 4/5/6 đều dựa vào điều này để ánh xạ
 mention về đúng vị trí.
 
-## Vì sao dùng `pysbd` với `Language.MULTI`
+## Vì sao dùng `pysbd` với bộ quy tắc tiếng Anh
 
-`pysbd` có sẵn bộ quy tắc cho tiếng Việt (dấu câu tiếng Việt: `;`, `:`,
-ngoặc kép tiếng Việt). Dùng `Language.MULTI` vì bài Wikipedia tiếng Việt xen
-kẽ tiếng Anh/pháp ngữ.
+`pysbd` 0.3.4 (bản cài được trên Python 3.14) hỗ trợ 23 ngôn ngữ và **không
+có tiếng Việt**, cũng không có `Language.MULTI` — đó là API của bản khác.
+Bộ quy tắc tiếng Anh vẫn tách đúng tiếng Việt vì dấu kết thúc câu
+(`.`/`!`/`?`/`…`) là giống nhau, và tiếng Việt không có dấu phẩy trước
+khi kết thúc câu.
 
 Nếu `pysbd` lỗi, fallback sang regex với bảng ngoại lệ tên riêng trong
 `configs/name_exceptions.yaml` (mục "Lùi" của Phase 2 trong `docs/09`).
@@ -53,6 +55,9 @@ _NAME_EXCEPTIONS: tuple[str, ...] = (
 #: Dấu kết thúc câu hợp lệ (dùng cho thống kê).
 SENTENCE_ENDINGS = (".", "!", "?", "…")
 
+#: Ngôn ngữ truyền cho `pysbd.Segmenter`. `pysbd` 0.3.4 không có "multi".
+_PYSBD_LANGUAGE = "en"
+
 
 def _load_name_exceptions(path: Path) -> tuple[str, ...]:
     """Nạp danh sách tên riêng từ file YAML (nếu có).
@@ -88,7 +93,13 @@ def _segment(text: str) -> list[tuple[int, int]]:
     try:
         import pysbd
 
-        segmenter = pysbd.Segmenter(language=pysbd.Language.MULTI, clean=False)
+        # `pysbd` 0.3.4 **không có** `Language.MULTI` (đó là API của bản khác).
+        # Bản cài đặt chỉ hỗ trợ 23 ngôn ngữ, trong đó không có tiếng Việt;
+        # bộ quy tắc tiếng Anh vẫn tách đúng tiếng Việt vì dấu kết thúc câu
+        # (`.`/`!`/`?`/`…`) là giống nhau. Xem `reports/deviations.md` D-013.
+        segmenter = pysbd.Segmenter(
+            language=_PYSBD_LANGUAGE, clean=False, char_span=True
+        )
         for sentence in segmenter.segment(text):
             start = sentence.start
             end = sentence.end
