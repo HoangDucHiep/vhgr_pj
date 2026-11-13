@@ -1,0 +1,11 @@
+---
+description: Chặn Cursor sử dụng tiếng Trung trong câu trả lời và code
+alwaysApply: true
+---
+
+# Quy tắc ngôn ngữ / Language Rules
+
+- **NGUYÊN TẮC CỐT LÕI**: Tuyệt đối không sử dụng tiếng Trung (Giản thể hoặc Phồn thể - Simplified/Traditional Chinese) trong bất kỳ phản hồi, giải thích, tài liệu hay comment nào trong code.
+- **Ngôn ngữ được phép**: Chỉ sử dụng tiếng Việt hoặc tiếng Anh.
+- **Comment trong code**: Viết comment bằng tiếng Anh hoặc tiếng Việt, tuyệt đối không dịch sang tiếng Trung.
+- Nếu bạn tự động sinh code hoặc trích dẫn tài liệu có từ khóa tiếng Trung, hãy dịch hoặc giải thích bằng tiếng Việt/tiếng Anh.

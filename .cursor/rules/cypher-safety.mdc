@@ -1,0 +1,95 @@
+---
+description: An toàn khi sinh và thực thi Cypher trong dự án KG — chỉ đọc, chặn từ khóa ghi, bắt buộc LIMIT, timeout, tài khoản read-only
+globs: **/*.py,**/*.cypher,**/*.txt
+alwaysApply: false
+---
+
+# Cypher Safety
+
+Cypher trong dự án này được sinh **bởi LLM** từ câu hỏi tiếng Việt của người dùng → Không được tin cậy tuyệt đối.
+
+## Ba lớp bảo vệ (bắt buộc đủ cả 3)
+
+### Lớp 1 — Validator tĩnh (chặn trước khi gửi DB)
+
+`backend/app/services/cypher_validator.py` phải:
+
+- Chặn từ khóa (case-insensitive, **có xử lý string literal**): `CREATE`, `MERGE`, `DELETE`, `DETACH`, `SET`, `REMOVE`, `DROP`, `FOREACH`, `LOAD CSV`, `CALL`, `ALTER`, `GRANT`, `REVOKE`, `dbms.`, `apoc.`, `SHOW`.
+- Chỉ cho phép câu bắt đầu bằng: `MATCH`, `OPTIONAL MATCH`, `WITH`, `UNWIND`, `RETURN`.
+- Chặn `;` ngoài string literal (nối nhiều câu lệnh).
+- **Bắt buộc có `LIMIT`** — nếu thiếu: từ chối (không tự thêm, để mô hình tự sửa qua vòng retry).
+- Mọi quan hệ dùng trong câu phải nằm trong `RELATION_TYPES` (18 quan hệ) → nếu có quan hệ ngoài danh sách: từ chối.
+- Trả về `(ok: bool, reason: str)`. `reason` phải **không rò rỉ chi tiết nội bộ** ra client.
+
+### Lớp 2 — Session chỉ đọc ở tầng server Neo4j
+
+**Quan trọng (đã kiểm chứng 11/2026):** Neo4j **Community** không hỗ trợ RBAC.
+- `CREATE USER x SET ROLE reader` → lỗi cú pháp.
+- `GRANT MATCH ON GRAPH ... TO x` → lỗi cú pháp.
+- User `reader` tạo được nhưng **vẫn ghi được** vào DB.
+
+Cơ chế bảo vệ **thực sự hiệu lực** trên Community là **session READ access mode**:
+
+```python
+from neo4j import READ_ACCESS
+
+with driver.session(default_access_mode=READ_ACCESS) as session:
+    session.run(cypher)   # mọi lệnh ghi bị server từ chối
+```
+
+Đã kiểm chứng: server trả `Neo.ClientError.Statement.AccessMode` —
+*"Writing in read access mode not allowed"* — **kể cả khi dùng user `neo4j` (superuser)**.
+
+Vì vậy:
+- Backend **luôn** mở session với `default_access_mode=READ_ACCESS`.
+- User `neo4j` (ghi) chỉ dùng cho script nạp dữ liệu (`scripts/load_neo4j.py`).
+- Script `scripts/create_readonly_user.sh` tạo user `reader` (tách credential) **và**
+  kiểm chứng cơ chế `READ_ACCESS` chặn ghi.
+
+### Lớp 3 — Giới hạn runtime
+
+- Timeout **10 giây** cho mỗi truy vấn.
+- `LIMIT ≤ 100` (mặc định 50).
+- Giới hạn số truy vấn đồng thời.
+- Log mọi Cypher đã chạy: câu hỏi, Cypher, thời gian, số dòng → `logs/ask.log`.
+
+## Test bắt buộc
+
+`tests/test_cypher_validator.py` phải có:
+- **≥ 20 payload độc hại** → 100% bị chặn.
+- **≥ 10 Cypher hợp lệ** → 100% được pass.
+
+Ví dụ payload phải bị chặn:
+```cypher
+MATCH (n) DETACH DELETE n
+MATCH (n) SET n.hacked = true
+CREATE (n:Attack {x: 1})
+MATCH (n) REMOVE n.name
+CALL dbms.killTransaction('x')
+LOAD CSV FROM 'file:///etc/passwd' AS line RETURN line
+MATCH (n) WITH n LIMIT 1 DETACH DELETE n
+MATCH (n) RETURN n; MATCH (m) DETACH DELETE m
+```
+
+## Viết Cypher trong mã (không phải LLM)
+
+Cũng phải tuân thủ: luôn `LIMIT`, luôn dùng tham số `$param` cho giá trị người dùng nhập (không nội suy chuỗi → tránh Cypher injection).
+
+```python
+# ✅ Đúng
+session.run(
+    "MATCH (p:Person {entity_id: $eid}) RETURN p.name LIMIT 10",
+    eid=entity_id,
+)
+
+# ❌ Sai — Cypher injection
+session.run(f"MATCH (p:Person {{entity_id: '{entity_id}'}}) RETURN p")
+```
+
+## Trong prompt cho LLM
+
+Prompt phải nêu rõ:
+- Chỉ dùng `MATCH / OPTIONAL MATCH / WITH / UNWIND / RETURN / ORDER BY / LIMIT`.
+- **Không** dùng `CREATE / MERGE / DELETE / SET / REMOVE / CALL`.
+- Luôn kết thúc bằng `LIMIT` ≤ 100.
+- Không dùng `MATCH (n) RETURN n` không có điều kiện lọc.

@@ -1,0 +1,86 @@
+---
+description: Quy trình làm việc theo phase, cách tự kiểm thử, viết báo cáo phase và cập nhật PROGRESS — dành cho AI agent thực hiện đề tài
+alwaysApply: true
+---
+
+# Quy trình thực hiện theo Phase
+
+## Bắt buộc
+
+1. **Đọc trước khi làm:** `AGENTS.md` → `docs/CONTEXT.md` → `docs/PROGRESS.md` → phần phase tương ứng trong `docs/09-ke-hoach-thuc-thien.md`.
+2. **Chỉ làm 1 phase mỗi lần.** Không nhảy phase, không làm trước phase sau.
+3. **Tuân thủ Input/Output contract.** Không đổi tên trường, không thêm trường bắt buộc mới mà không cập nhật contract.
+4. **Chạy lệnh kiểm thử** ghi trong phase — không bỏ qua, không "chạy sau".
+5. **Đạt Gate** (checklist của phase) mới chuyển phase sau.
+6. **Ghi `reports/phase_XX_report.md`** ngay khi xong phase.
+7. **Cập nhật `docs/PROGRESS.md`** (trạng thái, ngày, số liệu, việc tiếp theo).
+
+## Cấu trúc một phase trong `docs/09-ke-hoach-thuc-thien.md`
+
+Mỗi phase có 6 phần bắt buộc:
+1. **Mục tiêu** — kết quả quan sát được.
+2. **Input contract** — dữ liệu vào, kiểm tra được trước khi bắt đầu.
+3. **Output contract** — format đầu ra chính xác.
+4. **Việc phải làm** — thứ tự công việc.
+5. **Lệnh kiểm thử** — lệnh chạy để tự kiểm tra.
+6. **Gate** — checklist có/không đạt + mục **Lùi** (fallback).
+
+## Định dạng báo cáo phase
+
+`reports/phase_XX_report.md`:
+```markdown
+# Phase XX — <tên>
+
+- Ngày: YYYY-MM-DD
+- Trạng thái: ✅ đạt Gate / ⚠️ đạt nhưng lệch / ❌ không đạt
+
+## Đã làm
+- ...
+
+## Lệnh đã chạy
+```bash
+<lệnh> → <kết quả tóm tắt>
+```
+
+## Số liệu đo được
+| Chỉ số | Kỳ vọng | Thực tế |
+|---|---|---|
+
+## Gate
+- [x] ...
+
+## Sai lệch so với kế hoạch
+(nếu có, ghi thêm vào `reports/deviations.md`)
+
+## Việc tiếp theo
+```
+
+## Khi không đạt Gate
+
+1. Đọc mục **Lùi** của phase đó → thực hiện fallback được đề xuất.
+2. Thử tối đa 2 lần.
+3. Vẫn không đạt → ghi `reports/deviations.md`, **hạ tiêu chí có kiểm soát** (nêu rõ số thực tế thay vì mục tiêu), báo cáo minh bạch. **Không** sửa số liệu để "đạt".
+4. Không tự ý đổi phạm vi dữ liệu hoặc schema → hỏi người dùng.
+
+## Khi cần quyết định
+
+Hỏi người dùng khi: thay đổi schema KG · thay đổi phạm vi dữ liệu · đổi tập quan hệ · ngưỡng chất lượng · chi phí LLM · xóa/thay đổi artifact đã sinh.
+
+Không cần hỏi khi: thêm test, sửa lỗi nội bộ, thêm log, refactor không đổi interface, viết tài liệu.
+
+## Về việc dùng subagent
+
+- Ưu tiên làm trực tiếp, tuần tự theo phase.
+- Dùng subagent (`explore`) chỉ khi cần tìm hiểu code lớn hoặc chạy 2 việc độc lập song song.
+- **Không** tự ý khởi động subagent khi người dùng chưa yêu cầu.
+
+## Tài liệu phải cập nhật kèm theo
+
+| Thay đổi | Cập nhật file |
+|---|---|
+| Quyết định kỹ thuật mới | `docs/DECISIONS.md` (+ mục mới) |
+| Đổi định dạng ID / trường bắt buộc | `AGENTS.md` §6-7, `.cursor/rules/data-contracts.mdc`, `docs/CONTEXT.md` |
+| Đổi tập quan hệ | `docs/04`, `src/common/schemas.py`, prompt, validator, test — **cùng lúc** |
+| Đổi model / quota | `docs/CONTEXT.md` §2.2, `.cursor/rules/llm-usage.mdc` |
+| Đổi kiến trúc | `docs/DECISIONS.md` + `docs/03` |
+| Lệch kế hoạch | `reports/deviations.md` + `docs/PROGRESS.md` |

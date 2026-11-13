@@ -1,0 +1,89 @@
+---
+description: Quy tắc gọi LLM — adapter Gemini/Groq, quota free tier, JSON output, bằng chứng substring, không bịa ngoài kết quả truy vấn
+globs: **/*.py,**/prompts/**,**/*.txt
+alwaysApply: false
+---
+
+# LLM Usage
+
+## Adapter duy nhất
+
+Mọi lời gọi LLM đi qua `src/common/llm_client.py` (pipeline) hoặc `backend/app/services/llm_client.py` (API) — **không gọi SDK trực tiếp ở nơi khác**.
+
+Interface:
+```python
+LLMClient.complete(
+    prompt: str,
+    system: str | None = None,
+    temperature: float = 0.0,
+    max_tokens: int = 2048,
+    json_mode: bool = False,
+) -> str
+```
+
+## Provider & quota (đã verify 11/2026)
+
+| Provider | Model | RPM | RPD |
+|---|---|---|---|
+| Gemini (chính) | `gemini-3.5-flash-lite` | 15 | 500 |
+| Groq (dự phòng) | `openai/gpt-oss-20b` | 30 | 1.000 |
+
+**Cấm dùng** (đã mất quota / deprecated / retire): `gemini-2.0-flash`, `gemini-2.5-flash`, `gemini-2.5-flash-lite`, Groq `llama-3.1-8b-instant`, Groq `llama-3.3-70b-versatile`.
+
+## Phân bổ quota (bắt buộc)
+
+Tổng quota free ≈ 3.500 request/ngày, corpus 150k–400k câu.
+
+| Mục đích | Công cụ |
+|---|---|
+| Trích xuất LLM trên **toàn corpus** | **Kaggle GPU**, model mở lượng tử hóa (`Qwen/Qwen3-8B` 4-bit) |
+| Baseline LLM đối chiếu | API, tập con ~1.500 câu |
+| Text-to-Cypher lúc demo | API |
+| LLM-judge (faithfulness) | API, 30 câu |
+
+**Không** dùng API để trích xuất toàn bộ corpus.
+
+## Hành vi bắt buộc của adapter
+
+- `temperature = 0.0` mặc định (task trích xuất cần tính lặp lại).
+- **Retry**: exponential backoff, tối đa 3 lần, chỉ retry lỗi 429/5xx/timeouts.
+- **Fallback provider**: Gemini lỗi 429 → chuyển Groq; ghi log cảnh báo.
+- **Rate limiter** theo RPM của từng provider.
+- **Cache**: SQLite `data/interim/llm_cache.sqlite`, key = `sha256(model + prompt + params)`. Cùng prompt → không gọi API lần 2.
+- **JSON mode**: khi prompt yêu cầu JSON → parse an toàn; parse lỗi → 1 lần retry với yêu cầu "trả về JSON hợp lệ"; còn lỗi → trả `None` và log.
+- **Không log giá trị API key** — chỉ log tên biến môi trường.
+
+## Quy tắc trích xuất quan hệ (D2)
+
+- Prompt ép output JSON: `{"triples":[{"subject","relation","object","evidence","confidence"}]}`.
+- **`evidence` phải là substring nguyên văn của câu đầu vào.** Sau khi nhận: kiểm tra `evidence in sentence` → nếu không, **loại triple** và đếm số lượt loại.
+- `relation` phải nằm trong `RELATION_TYPES` → nếu không, loại.
+- `confidence` phải ∈ [0,1] → nếu không, clamp.
+
+## Quy tắc sinh câu trả lời tự nhiên (G7)
+
+- Đưa **chỉ** `records` (kết quả Cypher) + câu hỏi cho LLM.
+- Prompt cấm rõ: không thêm thông tin ngoài `records`; không suy đoán.
+- Nếu `records` rỗng → **không gọi LLM**, trả thẳng "Không có trong dữ liệu." (G8).
+- Kiểm tra faithfulness bằng LLM-judge ở Phase 13 (mục tiêu ≥ 0.90).
+
+## Prompt file
+
+- Lưu prompt dạng file `.txt` trong `backend/app/prompts/` (không nhúng trong code) → dễ chỉnh mà không sửa logic.
+- Prompt phải **tiếng Việt**, nêu rõ nhãn entity / danh sách quan hệ hợp lệ, định dạng đầu ra, và các ràng buộc (chỉ đọc, LIMIT).
+- Kèm 8–12 few-shot đa dạng: một bước, đếm, đa bước, lọc năm, so sánh, bridge, không có dữ liệu.
+
+## Ví dụ
+
+```python
+# ✅ Đúng
+from src.common.llm_client import LLMClient
+
+client = LLMClient.from_config(config["llm"])
+result = client.complete(prompt, temperature=0.0, json_mode=True)
+triples = parse_triples(result, allowed_relations=RELATION_TYPES, source_sentence=sentence)
+
+# ❌ Sai
+import google.generativeai as genai   # gọi SDK trực tiếp, bypass rate limit/cache/fallback
+client = genai.GenerativeModel("gemini-2.0-flash")
+```

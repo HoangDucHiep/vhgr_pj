@@ -1,0 +1,108 @@
+---
+description: Hợp đồng dữ liệu bắt buộc cho artifact JSONL, định dạng ID và trường bắt buộc của triple trong dự án KG
+globs: **/*.py,**/*.jsonl,**/*.yaml
+alwaysApply: false
+---
+
+# Data Contracts
+
+Mọi phase giao tiếp qua **artifact JSONL**. Đổi format = đổi hợp đồng = phải cập nhật `docs/CONTEXT.md` + `docs/09` + tất cả phase liên quan trong **cùng một lần thay đổi**.
+
+## Định dạng chung
+
+- JSONL: 1 record mỗi dòng, UTF-8, **không BOM**, không dòng trống.
+- Mọi record có `run_id` (định dạng `r<YYYYMMDD-HHMMSS>`) để truy vết một lần chạy.
+- Ngày giờ: ISO-8601 (`2026-11-10T01:23:45+07:00`).
+
+## Định dạng ID (bất biến — không bao giờ đổi)
+
+| Đối tượng | Format | Ví dụ |
+|---|---|---|
+| `doc_id` | `doc_<page_id>` | `doc_12345` |
+| `sentence_id` | `s<page_id>_<para_idx>_<sent_idx>` | `s12345_0_3` |
+| `mention_id` | `m<sentence_id>_<idx>` | `ms12345_0_3_0` |
+| `entity_id` | `ent_<slug>_<hash8>` | `ent_le_loi_1a2b3c4d` |
+| `year_id` | `year_<năm>` | `year_1385` |
+| `nil_id` | `nil_<hash8>` | `nil_9f2c1a7b` |
+
+`hash8 = sha1(f"{type}|{name_normalized}")[:8]`, `slug` = tên bỏ dấu, ký tự không phải `[a-z0-9]` → `_`, cắt tối đa 40 ký tự.
+
+**Luôn dùng `make_entity_id()` / `make_year_id()` từ `src/common/ids.py`** — không tự viết chuỗi ID.
+
+## Offset
+
+- Offset luôn là **chỉ số ký tự Python** (0-based, `[start, end)`) trong chuỗi gốc của record đó.
+- Không dùng byte offset.
+- Luôn kiểm tra được: `text[start:end] == span_text`.
+
+## Trường bắt buộc của một triple
+
+```json
+{
+  "doc_id": "doc_12345",
+  "sentence_id": "s12345_0_3",
+  "subject": "ent_le_loi_1a2b3c4d",
+  "relation": "cha_cua",
+  "object": "ent_le_khanh_du_9f8e7d6c",
+  "evidence_sentence": "Lê Lợi (1385–1433) là con của Lê Khánh Dư.",
+  "source_url": "https://vi.wikipedia.org/wiki/Lê_Lợi",
+  "doc_title": "Lê Lợi",
+  "confidence": 0.97,
+  "method": "phobert_re",
+  "start_year": null,
+  "end_year": null,
+  "alt_evidence": []
+}
+```
+
+| Trường | Bắt buộc | Giá trị hợp lệ |
+|---|---|---|
+| `subject`, `object` | ✅ | `entity_id` hợp lệ |
+| `relation` | ✅ | thuộc `RELATION_TYPES` (18 quan hệ) |
+| `evidence_sentence` | ✅ | chuỗi không rỗng |
+| `source_url` | ✅ | URL Wikipedia |
+| `doc_id`, `sentence_id`, `doc_title` | ✅ | — |
+| `confidence` | ✅ | float ∈ [0,1] |
+| `method` | ✅ | `infobox` \| `distant_supervision` \| `phobert_re` \| `llm` \| `rule` |
+| `start_year`, `end_year` | ⬜ | int hoặc null |
+| `alt_evidence` | ⬜ | list[dict] cùng cấu trúc bằng chứng |
+
+**Triple thiếu bằng chứng → loại khỏi KG.** Không có ngoại lệ.
+
+## Trường bắt buộc của một entity
+
+```json
+{
+  "entity_id": "ent_le_loi_1a2b3c4d",
+  "name": "Lê Lợi",
+  "name_normalized": "le loi",
+  "type": "person",
+  "aliases": [{"alias": "Lê Thái Tổ", "type": "temple"}],
+  "aliases_normalized": ["le thai to"],
+  "wikidata_qid": "Q123456",
+  "wiki_url": "https://vi.wikipedia.org/wiki/Lê_Lợi",
+  "verified": true,
+  "mention_count": 42,
+  "source_method": "infobox"
+}
+```
+
+`type` ∈ `person` | `dynasty` | `event` | `place` | `title` | `year` | `article`.
+`source_method` ∈ `infobox` | `wikidata` | `link` | `llm` | `nil`.
+
+## Trường bắt buộc của một mention (NER)
+
+```json
+{"start": 0, "end": 10, "text": "Lê Lợi", "label": "PERSON",
+ "mention_id": "ms12345_0_3_0", "canonical_id": "ent_le_loi_1a2b3c4d",
+ "resolved_by": "explicit"}
+```
+
+`label` ∈ `PERSON` | `DYNASTY` | `EVENT` | `LOCATION` | `TIME` | `TITLE`.
+`resolved_by` ∈ `explicit` | `coref_pronoun` | `coref_honorific` | `article_subject` | `ambiguous` | `unlinked`.
+
+## Văn bản tiếng Việt
+
+- Giữ **có dấu** trong `name`, `evidence_sentence`, `text`.
+- `name_normalized` / `aliases_normalized` là bản **bỏ dấu** — chỉ dùng để tra cứu, không dùng hiển thị.
+- Không bao giờ dùng `name_normalized` làm giá trị hiển thị cho người dùng.

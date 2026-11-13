@@ -1,0 +1,82 @@
+---
+description: Quy tắc frontend React/TypeScript cho giao diện đồ thị lịch sử — Cytoscape, hiển thị bằng chứng, tiếng Việt
+globs: frontend/**/*.{ts,tsx}
+alwaysApply: false
+---
+
+# Frontend Standards
+
+## Stack
+
+React 18 + TypeScript + Vite + TanStack Query + Cytoscape.js (+ `cytoscape-dagre` cho cây gia phả, `react-leaflet` cho bản đồ, Recharts cho thống kê).
+
+## Cấu trúc
+
+```
+frontend/src/
+├── api/client.ts        # wrapper fetch, không gọi fetch rải rác trong component
+├── types/index.ts       # kiểu dữ liệu, khớp response của backend
+├── components/          # ChatPanel, GraphView, EntityCard, EvidencePanel, Legend, CypherBlock
+├── pages/               # Home, EntityPage, TimelinePage, StatsPage, AdminPage
+└── hooks/               # useAsk, useGraph, useSearch
+```
+
+## Bắt buộc
+
+- **TypeScript strict**. Không dùng `any` — nếu buộc phải dùng thì `unknown` + type guard.
+- Kiểu dữ liệu lấy từ `types/index.ts` **phải khớp** với response backend (`backend/app/schemas.py`).
+- **Mọi text hiển thị cho người dùng bằng tiếng Việt.**
+- Component có prop types rõ ràng; ưu tiên `interface` cho props, `type` cho union.
+- Fetch qua TanStack Query (`useQuery` / `useMutation`), không dùng `useEffect` + `fetch` thủ công.
+- Loading state bắt buộc: spinner + thông điệp tiếng Việt ("Đang tìm trong dữ liệu lịch sử…").
+- Lỗi: hiển thị thông điệp thân thiện tiếng Việt + mã lỗi; **không** hiện stack trace.
+
+## Đồ thị (Cytoscape)
+
+- Màu node theo `label` (`Person`, `Dynasty`, `Event`, `Place`, `Title`, `Year`), lấy từ hằng số dùng chung — **không** hard-code trong component.
+- Node chưa xác minh (`verified === false`) → viền đứt.
+- Có **legend** màu.
+- Giới hạn mở rộng láng giềng: ≤ 30 node mỗi lần.
+- Render 500+ node: bật `hideEdgesOnViewport`, giảm `nodeRepulsion`.
+- Component phải **dọn dẹp** (`cy.destroy()` trong `useEffect` cleanup) để không rò rỉ memory.
+
+## Bằng chứng (H4) — bắt buộc
+
+- Click cạnh → panel hiển thị `evidence_sentence`, `source_url`, `confidence`, `method`, `doc_title`.
+- Link bài Wikipedia mở **tab mới** (`target="_blank" rel="noopener noreferrer"`).
+- Panel bằng chứng **không được bao giờ trống** — nếu edge không có bằng chứng thì đó là bug dữ liệu, phải hiển thị cảnh báo thay vì im lặng.
+
+## Cypher hiển thị (H1)
+
+- Mặc định **thu gọn**; nút mở/ẩn; nút copy.
+- Không tự động thực thi Cypher do người dùng sửa — chỉ hiển thị.
+
+## Ví dụ
+
+```tsx
+// ✅ Đúng
+export function EvidencePanel({ edge }: { edge: GraphEdge }) {
+  return (
+    <aside className="evidence">
+      <p className="evidence__sentence">{edge.evidence_sentence}</p>
+      <dl>
+        <dt>Nguồn</dt>
+        <dd>
+          <a href={edge.source_url} target="_blank" rel="noopener noreferrer">
+            {edge.doc_title}
+          </a>
+        </dd>
+        <dt>Độ tin cậy</dt>
+        <dd>{(edge.confidence * 100).toFixed(0)}%</dd>
+        <dt>Phương pháp</dt>
+        <dd>{edge.method}</dd>
+      </dl>
+    </aside>
+  );
+}
+
+// ❌ Sai
+export function EvidencePanel({ edge }: { edge: any }) {
+  return <div>{edge.evidence_sentence}</div>;   // any + không hiển thị nguồn
+}
+```

@@ -1,0 +1,74 @@
+---
+description: Quy ước viết code Python cho pipeline và backend của dự án KG lịch sử Việt Nam
+globs: **/*.py
+alwaysApply: false
+---
+
+# Python Standards
+
+## Cấu trúc
+
+```
+src/<module>/<step>.py       # pipeline, chạy bằng `python -m src.<module>.<step>`
+src/common/                   # dùng chung: config, logger, seed, normalize, ids, schemas
+backend/app/<layer>/          # api / services / schemas / prompts
+scripts/<action>.py           # CLI một lần
+tests/<area>/test_<x>.py
+```
+
+## Bắt buộc
+
+- **Type hint** cho mọi hàm public. Docstring tiếng Việt, mô tả tham số + trả về.
+- **Không hard-code**: đường dẫn, số lượng, model name, ngưỡng → đọc từ `configs/*.yaml` qua `src/common/config.py`.
+- **Seed**: gọi `set_seed()` từ `src/common/seed.py` ở đầu mỗi script có ngẫu nhiên.
+- **Logging**: dùng `get_logger(__name__)`, không dùng `print()` trong code pipeline. `print` chỉ dùng trong `scripts/` cho output CLI.
+- **Error handling**: bắt exception cụ thể; log rồi raise hoặc trả về giá trị có kiểu; không nuốt exception im lặng.
+- **Type checking**: không dùng `Any` nếu tránh được; dùng `TypedDict`/`dataclass`/Pydantic cho record.
+
+## Ràng buộc hiệu năng
+
+- Xử lý Wikipedia dump theo **luồng** (generator), không `read()` toàn bộ file.
+- Vòng lặp nặng phải có log tiến trình (`tqdm` hoặc log mỗi N bản ghi).
+- Tránh `O(n²)`: dùng dict/set tra cứu thay vì list scan.
+- RAM target: < 4GB cho toàn bộ Module A.
+
+## Ví dụ
+
+```python
+# ✅ Đúng
+from src.common.config import load_config
+from src.common.logger import get_logger
+
+logger = get_logger(__name__)
+
+
+def normalize_name(raw: str) -> str:
+    """Chuẩn hóa tên để tra cứu: bỏ dấu, lowercase, gộp khoảng trắng.
+
+    Args:
+        raw: Tên gốc, ví dụ "Lê Thái Tổ".
+
+    Returns:
+        Tên đã chuẩn hóa, ví dụ "le thai to".
+    """
+    return " ".join(strip_accents(raw).lower().split())
+
+
+def main() -> None:
+    config = load_config("configs/default.yaml")
+    for doc in stream_documents(config["paths"]["interim_dir"]):
+        logger.info("xử lý %s", doc["doc_id"])
+
+
+# ❌ Sai
+def main():
+    data = json.load(open("data/interim/documents.jsonl"))   # nạp toàn bộ vào RAM
+    for d in data:
+        print(d["title"])                                  # không dùng logger
+```
+
+## Kiểm thử
+
+- Mỗi module mới phải có test tương ứng trong `tests/`.
+- Test chạy nhanh (< 5s tổng) — dùng fixture nhỏ trong `tests/fixtures/`, không phụ thuộc dữ liệu thật.
+- Test phải kiểm tra **contract** (đúng tên trường, đúng format), không chỉ kiểm tra "không crash".

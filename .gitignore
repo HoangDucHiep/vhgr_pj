@@ -1,0 +1,60 @@
+# ---- Python ----
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# ---- Node / frontend ----
+node_modules/
+dist/
+build/
+.vite/
+*.tsbuildinfo
+
+# ---- Secrets ----
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+
+# ---- Data (lớn, tái tạo được từ pipeline) ----
+data/raw/
+data/interim/
+data/processed/
+data/knowledge_base/*.npy
+data/knowledge_base/*.parquet
+data/splits/
+data/eval/to_annotate_*
+
+# ---- Models ----
+models/
+*.safetensors
+*.bin
+*.pt
+*.pth
+
+# ---- Logs & reports ----
+logs/
+*.log
+reports/*.json
+reports/eval_*.md
+
+# ---- Notebooks ----
+.ipynb_checkpoints/
+
+# ---- OS / editor ----
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.swp
+
+# ---- Kaggle ----
+.kaggle/
