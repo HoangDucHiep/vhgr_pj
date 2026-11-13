@@ -6,26 +6,25 @@
 # → KHÔNG dùng. Xem docs/05-du-lieu-va-nguon.md §2.4 và reports/deviations.md.
 
 # --- T1: category seed (khớp chính xác tên, không phải tiền tố) ---
+# Đã verify tên trên `linktarget.sql.gz` của dump viwiki 20261101 ngày 13/11/2026.
+# Category "Nhân vật thời Lê" KHÔNG tồn tại → dùng "Nhân vật thời Lê sơ" + "Nhân vật thời Nguyễn".
 category_seeds:
   - "Vua Việt Nam"
   - "Địa danh Việt Nam"
   - "Người Việt Nam"
-  - "Nhân vật thời Lê"
-  - "Nhân vật thời Nguyễn"
-  - "Nhân vật thời Trần"
-  - "Nhân vật thời Lý"
+  - "Chiến tranh Việt Nam"
+  - "Thành cổ Việt Nam"
+  - "Lăng tẩm"
+  - "Lịch sử Việt Nam"
   - "Nhân vật thời Ngô"
   - "Nhân vật thời Đinh"
+  - "Nhân vật thời Tiền Lê"
+  - "Nhân vật thời Lý"
+  - "Nhân vật thời Trần"
   - "Nhân vật thời Hồ"
+  - "Nhân vật thời Lê sơ"
   - "Nhân vật thời Tây Sơn"
-  - "Chiến tranh Việt Nam"
-  - "Trận đánh ở Việt Nam"
-  - "Địa danh Hà Nội"
-  - "Địa danh Huế"
-  - "Lăng tẩm"
-  - "Cung điện Huế"
-  - "Thành cổ Việt Nam"
-  - "Di sản Kiến trúc ở Việt Nam"
+  - "Nhân vật thời Nguyễn"
 
 # Độ sâu mở rộng đệ quy subcategory (T1) — xây từ pages-meta-current
 category_max_depth: 3
@@ -43,6 +42,21 @@ infobox_whitelist:
 # Bài có infobox đầy đủ nhưng mọi mốc năm nằm ngoài cửa sổ này → loại.
 history_year_min: 850
 history_year_max: 1945
+
+# Ngưỡng năm sinh tối đa cho nhân vật (T0). Nhà Nguyễn kết thúc 1945 nhưng
+# phần lớn nhân vật thời Nguyễn sinh trước 1900 → cắt ở 1900 để loại
+# nhân vật thế kỷ 20 (hiện đại) vốn chiếm đa số bài có infobox đầy đủ.
+person_year_max: 1900
+
+# Số trường lịch sử tối thiểu trong infobox, theo từng loại node (T2).
+# `person` cần nhiều hơn vì bài "người nổi tiếng" hiện đại cũng có infobox
+# đầy đủ; `battle`/`event` chỉ cần 1 (ngày).
+infobox_min_history_fields:
+  person: 3
+  place: 2
+  dynasty: 2
+  battle: 1
+  event: 1
 
 # Các trường infobox được tính là "trường lịch sử" (đủ 2 là đạt T2)
 history_fields:

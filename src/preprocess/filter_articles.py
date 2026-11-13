@@ -6,18 +6,19 @@
 |---|---|---|---|
 | T0 | Wikidata: người / trận đánh / triều đại / sự kiện / địa danh trong phạm vi lịch sử VN | SPARQL QLever (cache đĩa) → `wikidata_seed_articles.json` | `wikidata` |
 | T1 | Category khớp seed + mở rộng đệ quy subcategory (độ sâu ≤ 3) | `categorylinks.sql.gz` → `category_members.json` | `category` |
-| T2 | Infobox thuộc whitelist **hoặc** ≥ 2 trường lịch sử trong infobox | wikitext (parse đúng khối template) | `infobox` |
-| T3 | BFS hyperlink nội bộ từ seed, chiều sâu ≤ 2 | wikitext | `seed_expansion` |
+| T2 | Infobox thuộc whitelist **và** đủ trường lịch sử **và** có mốc năm trong cửa sổ lịch sử **và** liên quan Việt Nam | wikitext (parse đúng khối template) | `infobox` |
+| T3 | BFS hyperlink nội bộ từ ứng viên đã có, nới ngưỡng trường lịch sử | wikitext | `seed_expansion` |
 | T4 | Loại trừ (category + tiền tố tiêu đề) | wikitext | — |
 
 ## Kiến trúc 3 lượt quét dump (kiểm soát RAM < 4 GB)
 
 Lượt 1 — **quét toàn bộ dump**, giữ metadata nhẹ của mọi ứng viên
-(`page_id`, `title`, `revision_id`, `categories`, `infobox_type`, `links`).
-Không giữ `wikitext` (40k bài × 20 KB ≈ 800 MB → vượt ngân sách).
+(`page_id`, `title`, `revision_id`, `categories`, `links`).
+Không giữ `wikitext` (3.000 bài × 20 KB ≈ 60 MB → vẫn an toàn, nhưng ta
+vẫn ghi trực tiếp ra đĩa ở lượt 3 để tiết kiệm RAM).
 
-Lượt 2 — **BFS theo từng chiều sâu**: với mỗi biên, quét lại dump để lấy
-`links` của các bài biên. Mỗi chiều sâu = 1 lượt quét.
+Lượt 2 — **T3 BFS**: quét lại dump, xét các bài là đích hyperlink của
+ứng viên; giữ bài nào thỏa điều kiện "nới ngưỡng T2".
 
 Lượt 3 — **ghi output**: quét lại dump, ghi thẳng `wikitext` ra
 `documents.jsonl` (streaming) — không tích lại vào RAM.
@@ -65,6 +66,9 @@ LOG_EVERY = 200_000
 #: Thứ tự ưu tiên khi một bài khớp nhiều tín hiệu.
 SIGNAL_PRIORITY = ["wikidata", "category", "infobox", "seed_expansion"]
 
+#: Regex nhận diện category "liên quan tới Việt Nam" (dùng cho T2/T3).
+VIET_CATEGORY_RE = re.compile(r"viet|dai viet")
+
 
 def _wiki_url(title: str) -> str:
     """Dựng URL bài Wikipedia từ tiêu đề.
@@ -103,14 +107,14 @@ def _load_seed_signals(interim_dir: Path) -> tuple[dict[str, dict[str, Any]], se
     return entries, qids
 
 
-def _load_category_members(interim_dir: Path) -> set[str]:
+def _load_category_members(interim_dir: Path) -> set[int]:
     """Nạp tập page_id thuộc category seed (T1).
 
     Args:
         interim_dir: Thư mục `data/interim`.
 
     Returns:
-        Tập `page_id` (dạng chuỗi).
+        Tập `page_id` (dạng số nguyên).
     """
     path = interim_dir / "category_members.json"
     if not path.exists():
@@ -120,9 +124,9 @@ def _load_category_members(interim_dir: Path) -> set[str]:
         )
         return set()
     payload = json.loads(path.read_text(encoding="utf-8"))
-    page_ids: set[str] = set()
+    page_ids: set[int] = set()
     for pages in payload.values():
-        page_ids.update(pages)
+        page_ids.update(int(page) for page in pages)
     logger.info("T1 — %d bài thuộc category seed", len(page_ids))
     return page_ids
 
@@ -149,7 +153,10 @@ def _load_qid_map(interim_dir: Path) -> dict[str, str]:
 
 
 def _is_excluded(
-    title: str, categories: list[str], exclude_categories: set[str], exclude_prefixes: list[str]
+    title: str,
+    categories: list[str],
+    exclude_categories: set[str],
+    exclude_prefixes: list[str],
 ) -> bool:
     """Kiểm tra bài có thuộc nhóm loại trừ (T4) không.
 
@@ -166,65 +173,6 @@ def _is_excluded(
         return True
     normalized = {normalize_name(category) for category in categories}
     return any(normalize_name(excluded) in normalized for excluded in exclude_categories)
-
-
-def _classify(
-    page: DumpPage,
-    *,
-    seed_titles: set[str],
-    seed_qids: set[str],
-    qid_map: dict[str, str],
-    category_page_ids: set[str],
-    infobox_whitelist: set[str],
-    history_year_min: int,
-    history_year_max: int,
-) -> str | None:
-    """Xác định `keep_reason` của một bài, hoặc ``None`` nếu không giữ.
-
-    T0 khớp theo **QID** (đáng tin cậy hơn tên bài vì tên có thể trùng), sau đó
-    mới thử tới tên bài. T2 yêu cầu infobox có loại nằm trong whitelist **và**
-    có ít nhất 2 trường lịch sử **và** ít nhất 1 mốc năm nằm trong cửa sổ lịch
-    sử — điều này loại phần lớn nhân vật thế kỷ 20 vốn có infobox đầy đủ.
-
-    Args:
-        page: Trang dump.
-        seed_titles: Tập tiêu đề seed T0.
-        seed_qids: Tập QID seed T0.
-        qid_map: Ánh xạ `page_id → QID`.
-        category_page_ids: Tập page_id thuộc category seed (T1).
-        infobox_whitelist: Tập loại node được phép (T2).
-        history_year_min: Năm nhỏ nhất trong cửa sổ lịch sử.
-        history_year_max: Năm lớn nhất trong cửa sổ lịch sử.
-
-    Returns:
-        ``keep_reason`` hoặc ``None``.
-    """
-    page_key = str(page.page_id)
-    qid = qid_map.get(page_key, "")
-    if qid and qid in seed_qids:
-        return "wikidata"
-    if page.title in seed_titles:
-        return "wikidata"
-
-    if page_key in category_page_ids:
-        return "category"
-
-    infobox = parse_infobox(page.wikitext)
-    if infobox is None:
-        return None
-    node_type = normalize_infobox_type(infobox.loai)
-    if node_type not in infobox_whitelist:
-        return None
-    fields = history_fields(infobox)
-    if len(fields) < 2:
-        return None
-    # Yêu cầu ít nhất một mốc năm trong cửa sổ lịch sử để loại nội dung
-    # hiện đại (vốn chiếm đa số các bài có infobox đầy đủ).
-    if not _has_year_in_range(
-        infobox.params, history_year_min, history_year_max
-    ):
-        return None
-    return "infobox"
 
 
 def _has_year_in_range(
@@ -248,18 +196,126 @@ def _has_year_in_range(
     return False
 
 
+def _has_vietnam_category(categories: list[str]) -> bool:
+    """Kiểm tra bài có category liên quan tới Việt Nam không.
+
+    Bài lịch sử Việt Nam luôn nằm trong ít nhất một category có chứa "Việt"
+    (vd "Vua Việt Nam", "Chiến tranh liên quan tới Việt Nam"). Điều kiện này
+    loại phần lớn bài trận đánh/địa danh nước ngoài có infobox trùng hình dạng.
+
+    Args:
+        categories: Danh sách category của bài.
+
+    Returns:
+        ``True`` nếu có category liên quan Việt Nam.
+    """
+    return any(
+        VIET_CATEGORY_RE.search(normalize_name(category)) for category in categories
+    )
+
+
+def _infobox_profile(page: DumpPage) -> tuple[str | None, set[str], dict[str, str]]:
+    """Trích thông tin infobox của một bài.
+
+    Args:
+        page: Trang dump.
+
+    Returns:
+        Tuple ``(node_type, history_field_names, params)``.
+    """
+    infobox = parse_infobox(page.wikitext)
+    if infobox is None:
+        return None, set(), {}
+    return (
+        normalize_infobox_type(infobox.loai),
+        history_fields(infobox),
+        infobox.params,
+    )
+
+
+def _classify(
+    page: DumpPage,
+    *,
+    seed_titles: set[str],
+    seed_qids: set[str],
+    seed_entries: dict[str, dict[str, Any]],
+    qid_map: dict[str, str],
+    category_page_ids: set[int],
+    infobox_whitelist: set[str],
+    infobox_min_fields: dict[str, int],
+    history_year_min: int,
+    history_year_max: int,
+    person_year_max: int,
+) -> str | None:
+    """Xác định `keep_reason` của một bài, hoặc ``None`` nếu không giữ.
+
+    T0 khớp theo **QID** (đáng tin cậy hơn tên bài vì tên có thể trùng), sau đó
+    mới thử tới tên bài. T2 yêu cầu infobox có loại nằm trong whitelist **và**
+    đủ số trường lịch sử **và** có ít nhất một mốc năm nằm trong cửa sổ lịch
+    sử **và** có category liên quan Việt Nam.
+
+    Args:
+        page: Trang dump.
+        seed_titles: Tập tiêu đề seed T0.
+        seed_qids: Tập QID seed T0.
+        seed_entries: Thông tin seed T0 theo tiêu đề.
+        qid_map: Ánh xạ `page_id → QID`.
+        category_page_ids: Tập page_id thuộc category seed (T1).
+        infobox_whitelist: Tập loại node được phép (T2).
+        infobox_min_fields: Số trường lịch sử tối thiểu theo loại node (T2).
+        history_year_min: Năm nhỏ nhất trong cửa sổ lịch sử.
+        history_year_max: Năm lớn nhất trong cửa sổ lịch sử.
+        person_year_max: Năm sinh tối đa của nhân vật (T0).
+
+    Returns:
+        `keep_reason` hoặc ``None``.
+    """
+    page_key = str(page.page_id)
+    qid = qid_map.get(page_key, "")
+    if (qid and qid in seed_qids) or page.title in seed_titles:
+        entry = seed_entries.get(page.title)
+        if entry is None:
+            return "wikidata"
+        year = entry.get("year")
+        if year is None:
+            return "wikidata"
+        limit = (
+            person_year_max
+            if entry.get("signal") == "person"
+            else history_year_max
+        )
+        return "wikidata" if year <= limit else None
+
+    if page.page_id in category_page_ids:
+        return "category"
+
+    node_type, fields, params = _infobox_profile(page)
+    if node_type is None or node_type not in infobox_whitelist:
+        return None
+    if len(fields) < int(infobox_min_fields.get(node_type, 2)):
+        return None
+    if not _has_year_in_range(params, history_year_min, history_year_max):
+        return None
+    if not _has_vietnam_category(page.categories):
+        return None
+    return "infobox"
+
+
 def _scan_candidates(
     dump_path: Path,
     *,
     seed_titles: set[str],
     seed_qids: set[str],
+    seed_entries: dict[str, dict[str, Any]],
     qid_map: dict[str, str],
-    category_page_ids: set[str],
+    category_page_ids: set[int],
     infobox_whitelist: set[str],
+    infobox_min_fields: dict[str, int],
     exclude_categories: set[str],
     exclude_prefixes: list[str],
     history_year_min: int,
     history_year_max: int,
+    person_year_max: int,
 ) -> tuple[dict[int, dict[str, Any]], int]:
     """Lượt 1 — quét dump, chốt tập ứng viên (chỉ giữ metadata nhẹ).
 
@@ -267,13 +323,16 @@ def _scan_candidates(
         dump_path: Đường dẫn `pages-articles.xml.bz2`.
         seed_titles: Tập tiêu đề seed T0.
         seed_qids: Tập QID seed T0.
+        seed_entries: Thông tin seed T0 theo tiêu đề.
         qid_map: Ánh xạ `page_id → QID`.
         category_page_ids: Tập page_id thuộc category seed.
         infobox_whitelist: Tập loại node được phép.
+        infobox_min_fields: Số trường lịch sử tối thiểu theo loại node.
         exclude_categories: Tập category loại trừ.
         exclude_prefixes: Tiền tố tiêu đề loại trừ.
         history_year_min: Năm nhỏ nhất trong cửa sổ lịch sử.
         history_year_max: Năm lớn nhất trong cửa sổ lịch sử.
+        person_year_max: Năm sinh tối đa của nhân vật.
 
     Returns:
         Tuple ``(candidates, total_pages)``.
@@ -300,11 +359,14 @@ def _scan_candidates(
             page,
             seed_titles=seed_titles,
             seed_qids=seed_qids,
+            seed_entries=seed_entries,
             qid_map=qid_map,
             category_page_ids=category_page_ids,
             infobox_whitelist=infobox_whitelist,
+            infobox_min_fields=infobox_min_fields,
             history_year_min=history_year_min,
             history_year_max=history_year_max,
+            person_year_max=person_year_max,
         )
         if keep_reason is None:
             continue
@@ -338,22 +400,35 @@ def _expand_bfs(
     *,
     seed_titles: set[str],
     max_depth: int,
+    infobox_whitelist: set[str],
+    history_year_min: int,
+    history_year_max: int,
+    exclude_categories: set[str],
+    exclude_prefixes: list[str],
 ) -> int:
     """T3 — mở rộng BFS theo hyperlink nội bộ.
 
-    Mỗi chiều sâu là **một lượt quét lại dump** để lấy `links` của biên hiện
-    tại. Cách này giữ RAM thấp (chỉ giữ tiêu đề, không giữ wikitext).
+    Mỗi chiều sâu là **một lượt quét lại dump**: lấy `links` của các bài ở
+    biên hiện tại, rồi đánh giá bài đích. Bài đích được giữ nếu có infobox
+    loại được phép, có ≥ 1 trường lịch sử, có mốc năm trong cửa sổ lịch sử và
+    có category liên quan Việt Nam — tức là T2 với ngưỡng trường **nới lỏng**
+    (đây là lý do gọi là "mở rộng": bắt được nhân vật/địa danh có infobox
+    thiếu trường nhưng chắc chắn thuộc lịch sử Việt Nam).
 
     Args:
         dump_path: Đường dẫn `pages-articles.xml.bz2`.
         candidates: Dict ứng viên (được cập nhật tại chỗ).
         seed_titles: Tập tiêu đề seed gốc.
         max_depth: Chiều sâu tối đa.
+        infobox_whitelist: Tập loại node được phép.
+        history_year_min: Năm nhỏ nhất trong cửa sổ lịch sử.
+        history_year_max: Năm lớn nhất trong cửa sổ lịch sử.
+        exclude_categories: Tập category loại trừ.
+        exclude_prefixes: Tiền tố tiêu đề loại trừ.
 
     Returns:
         Số bài đã thêm mới.
     """
-    # Bản đồ tiêu đề (chữ thường) → page_id của ứng viên đã biết.
     title_to_page_id = {
         record["title"].lower(): record["page_id"] for record in candidates.values()
     }
@@ -389,22 +464,18 @@ def _expand_bfs(
                 next_frontier.add(link)
 
         logger.info(
-            "T3 — độ sâu %d: +%d bài (tổng %d tiêu đề đã thấy)",
+            "T3 — độ sâu %d: +%d tiêu đề đích (tổng %d đã thấy)",
             depth,
             len(next_frontier),
             len(seen_titles),
         )
         frontier = next_frontier
 
-    # Lượt quét cuối: lấy metadata đầy đủ của các bài mới tìm được.
-    new_titles = {
-        title for title in frontier if title.lower() not in title_to_page_id
-    }
-    if not new_titles:
+    if not frontier:
         return added
 
-    logger.info("T3 — lấy metadata cho %d bài mở rộng", len(new_titles))
-    wanted = {title.lower() for title in new_titles}
+    logger.info("T3 — đánh giá %d bài đích", len(frontier))
+    wanted = {title.lower() for title in frontier}
     total = 0
     for page in iter_dump_pages(dump_path):
         total += 1
@@ -416,6 +487,21 @@ def _expand_bfs(
             continue
         if page.page_id in candidates:
             continue
+        if len(page.wikitext) < MIN_WIKITEXT_LEN:
+            continue
+        if _is_excluded(
+            page.title, page.categories, exclude_categories, exclude_prefixes
+        ):
+            continue
+        node_type, fields, params = _infobox_profile(page)
+        if node_type is None or node_type not in infobox_whitelist:
+            continue
+        if not fields:
+            continue
+        if not _has_year_in_range(params, history_year_min, history_year_max):
+            continue
+        if not _has_vietnam_category(page.categories):
+            continue
         candidates[page.page_id] = {
             "page_id": page.page_id,
             "title": page.title,
@@ -426,6 +512,7 @@ def _expand_bfs(
         }
         added += 1
 
+    logger.info("T3 — thêm %d bài", added)
     return added
 
 
@@ -633,29 +720,44 @@ def main(argv: list[str] | None = None) -> int:
     qid_map = _load_qid_map(interim_dir)
 
     infobox_whitelist = set(seed_config["infobox_whitelist"])
+    infobox_min_fields = {
+        str(key): int(value)
+        for key, value in dict(
+            seed_config.get("infobox_min_history_fields", {})
+        ).items()
+    }
     exclude_categories = set(seed_config["exclude_categories"])
     exclude_prefixes = list(seed_config["exclude_title_prefixes"])
     history_year_min = int(seed_config.get("history_year_min", 850))
     history_year_max = int(seed_config.get("history_year_max", 1945))
+    person_year_max = int(seed_config.get("person_year_max", 1900))
 
     candidates, total_pages = _scan_candidates(
         dump_path,
         seed_titles=seed_titles,
         seed_qids=seed_qids,
+        seed_entries=seed_entries,
         qid_map=qid_map,
         category_page_ids=category_page_ids,
         infobox_whitelist=infobox_whitelist,
+        infobox_min_fields=infobox_min_fields,
         exclude_categories=exclude_categories,
         exclude_prefixes=exclude_prefixes,
         history_year_min=history_year_min,
         history_year_max=history_year_max,
+        person_year_max=person_year_max,
     )
 
     added = _expand_bfs(
         dump_path,
         candidates,
         seed_titles=seed_titles,
-        max_depth=int(seed_config["bfs_max_depth"]),
+        max_depth=int(seed_config.get("bfs_max_depth", 2)),
+        infobox_whitelist=infobox_whitelist,
+        history_year_min=history_year_min,
+        history_year_max=history_year_max,
+        exclude_categories=exclude_categories,
+        exclude_prefixes=exclude_prefixes,
     )
     logger.info("Tổng sau T3: %d bài (+%d từ BFS)", len(candidates), added)
 

@@ -11,20 +11,24 @@ rộng đệ quy subcategory mà không phải đọc lại dump.
 
 ```
 page(page_id, page_namespace, page_title, ...)
-    │  page_namespace = 14 → trang category
-    │  page_namespace = 0  → bài viết
+    │  page_namespace = 0 → bài viết
     ▼
 categorylinks(cl_from, cl_sortkey, cl_timestamp, cl_sortkey_prefix,
-              cl_type, cl_namespace, cl_title)
+              cl_type, cl_collation_id, cl_target_id)
+    │  cl_from      = page_id của trang nguồn (bài viết hoặc trang category)
+    │  cl_target_id = lt_id trong bảng `linktarget`  ← KHÔNG phải cat_id/page_id
+    │  cl_type      ∈ {page, subcat, file}
+    ▼
+linktarget(lt_id, lt_namespace, lt_title)
+    │  lt_namespace = 14 → trang category
+    ▼
+category(cat_id, cat_title, cat_pages, cat_subcats, cat_files)
 ```
 
-- `cl_from` = **page_id** của trang nguồn (bài viết hoặc category cha).
-- `cl_title` = **page_id** của trang category đích (KHÔNG phải `cat_id`).
-- `cl_type` ∈ {`page`, `subcat`, `file`}.
-
-`cl_title` là `page_id` của *trang* category, còn bảng `category` dùng `cat_id`
-— hai định danh **khác nhau**. Vì vậy ta ánh xạ `page_id` → tên category
-qua bảng `page` (namespace 14), không dùng bảng `category`.
+**Bẫy đã kiểm chứng 13/11/2026:** `cl_target_id` **không** phải `cat_id`
+(cũng không phải `page_id`) mà là `lt_id` của bảng `linktarget`. Nếu dùng nhầm
+`cat_id`, "Vua Việt Nam" (cat_id 23389) sẽ không khớp bài nào; nếu dùng nhầm
+`page_id`, lại gán nhầm "Friedrich Paulus" vào "Vua Việt Nam".
 
 ## Sản phẩm
 
@@ -53,11 +57,17 @@ logger = get_logger(__name__)
 #: ``(page_id,page_namespace,'page_title',...)``.
 _PAGE_ROW_RE = re.compile(r"^\(\s*(\d+)\s*,\s*(\d+)\s*,\s*'((?:[^'\\]|\\.|'')*)'")
 
+#: Regex tuple của bảng `linktarget`:
+#: ``(lt_id,lt_namespace,'lt_title')``.
+_LINKTARGET_ROW_RE = re.compile(
+    r"^\(\s*(\d+)\s*,\s*(\d+)\s*,\s*'((?:[^'\\]|\\.|'')*)'\s*\)"
+)
+
 #: Regex tuple của bảng `categorylinks`. `cl_sortkey` là chuỗi binary và
 #: `cl_sortkey_prefix` có thể khác rỗng → chỉ khớp **phần đuôi** của tuple
-#: (cột `cl_type`, `cl_namespace`, `cl_title`) cùng `cl_from` ở đầu.
+#: (cột `cl_type`, `cl_collation_id`, `cl_target_id`) cùng `cl_from` ở đầu.
 _CATEGORYLINK_ROW_RE = re.compile(
-    r"^\(\s*(\d+)\s*,.*,\s*'(page|subcat|file)'\s*,\s*(\d+)\s*,\s*(\d+)\s*\)\s*,?\s*$"
+    r"^\(\s*(\d+)\s*,.*,\s*'(page|subcat|file)'\s*,\s*(\d+)\s*,\s*(\d+)\s*\)\s*[;,]?\s*$"
 )
 
 
@@ -73,16 +83,16 @@ def _unescape_sql(value: str) -> str:
     return value.replace("''", "'").replace("\\'", "'").replace("\\\\", "\\")
 
 
-def parse_page_titles(sql_path: Path) -> dict[int, str]:
-    """Parse bảng `page` → `{page_id: title}` cho **mọi** namespace.
+def parse_article_page_ids(sql_path: Path) -> set[int]:
+    """Parse bảng `page` → tập `page_id` của bài viết (namespace 0).
 
     Args:
         sql_path: Đường dẫn `page.sql.gz`.
 
     Returns:
-        Dict ánh xạ page_id → tên trang (gạch dưới đã đổi thành khoảng trắng).
+        Tập page_id của bài viết.
     """
-    mapping: dict[int, str] = {}
+    page_ids: set[int] = set()
     logger.info("Đọc %s ...", sql_path.name)
     with gzip.open(sql_path, "rt", encoding="utf-8", errors="replace") as handle:
         for line in handle:
@@ -91,9 +101,62 @@ def parse_page_titles(sql_path: Path) -> dict[int, str]:
             match = _PAGE_ROW_RE.match(line)
             if match is None:
                 continue
-            page_id, _namespace, title = match.groups()
-            mapping[int(page_id)] = _unescape_sql(title).replace("_", " ")
-    logger.info("page: %d trang", len(mapping))
+            page_id, namespace, _title = match.groups()
+            if namespace == "0":
+                page_ids.add(int(page_id))
+    logger.info("page: %d bài viết (ns 0)", len(page_ids))
+    return page_ids
+
+
+def parse_category_page_ids(sql_path: Path) -> dict[int, str]:
+    """Parse bảng `page` → `{page_id: title}` cho trang category (ns 14).
+
+    Args:
+        sql_path: Đường dẫn `page.sql.gz`.
+
+    Returns:
+        Dict ánh xạ page_id → tên trang category.
+    """
+    mapping: dict[int, str] = {}
+    logger.info("Đọc %s (ns 14) ...", sql_path.name)
+    with gzip.open(sql_path, "rt", encoding="utf-8", errors="replace") as handle:
+        for line in handle:
+            if not line.startswith("("):
+                continue
+            match = _PAGE_ROW_RE.match(line)
+            if match is None:
+                continue
+            page_id, namespace, title = match.groups()
+            if namespace == "14":
+                mapping[int(page_id)] = _unescape_sql(title).replace("_", " ")
+    logger.info("page: %d trang category (ns 14)", len(mapping))
+    return mapping
+
+
+def parse_linktarget(sql_path: Path) -> dict[int, tuple[int, str]]:
+    """Parse bảng `linktarget` → `{lt_id: (namespace, title)}`.
+
+    Args:
+        sql_path: Đường dẫn `linktarget.sql.gz`.
+
+    Returns:
+        Dict ánh xạ lt_id → (namespace, title).
+    """
+    mapping: dict[int, tuple[int, str]] = {}
+    logger.info("Đọc %s ...", sql_path.name)
+    with gzip.open(sql_path, "rt", encoding="utf-8", errors="replace") as handle:
+        for line in handle:
+            if not line.startswith("("):
+                continue
+            match = _LINKTARGET_ROW_RE.match(line)
+            if match is None:
+                continue
+            lt_id, namespace, title = match.groups()
+            mapping[int(lt_id)] = (
+                int(namespace),
+                _unescape_sql(title).replace("_", " "),
+            )
+    logger.info("linktarget: %d mục", len(mapping))
     return mapping
 
 
@@ -107,8 +170,8 @@ def parse_categorylinks(
 
     Returns:
         Tuple ``(members, subcats)``:
-        - `members`: `{page_id: [cat_page_id, ...]}` — bài viết thuộc category nào.
-        - `subcats`: `{cat_page_id: [cat_page_id, ...]}` — category cha chứa subcat nào.
+        - `members`: `{page_id: [lt_id, ...]}` — bài viết thuộc category nào.
+        - `subcats`: `{lt_id: [lt_id, ...]}` — category cha chứa subcat nào.
     """
     members: dict[int, list[int]] = {}
     subcats: dict[int, list[int]] = {}
@@ -120,15 +183,15 @@ def parse_categorylinks(
             match = _CATEGORYLINK_ROW_RE.match(line)
             if match is None:
                 continue
-            cl_from, cl_type, _namespace, cl_title = match.groups()
+            cl_from, cl_type, _collation, cl_target = match.groups()
             source = int(cl_from)
-            target = int(cl_title)
+            target = int(cl_target)
             if cl_type == "subcat":
                 subcats.setdefault(source, []).append(target)
             elif cl_type == "page":
                 members.setdefault(source, []).append(target)
     logger.info(
-        "categorylinks: %d trang có category, %d category cha có subcategory",
+        "categorylinks: %d nguồn có category, %d nguồn có subcategory",
         len(members),
         len(subcats),
     )
@@ -137,46 +200,41 @@ def parse_categorylinks(
 
 def expand_categories(
     seeds: list[str],
-    cat_page_to_title: dict[int, str],
-    parent_to_children: dict[int, list[int]],
+    title_to_lt_id: dict[str, int],
+    parent_to_children: dict[str, list[str]],
     max_depth: int = 3,
 ) -> set[str]:
     """Mở rộng đệ quy tập category seed theo cây subcategory.
 
     Args:
         seeds: Danh sách tên category seed.
-        cat_page_to_title: Ánh xạ page_id của trang category → tên category.
-        parent_to_children: Ánh xạ page_id category cha → danh sách page_id con.
+        title_to_lt_id: Ánh xạ tên category (đã chuẩn hóa) → lt_id.
+        parent_to_children: Ánh xạ tên category cha → danh sách tên con.
         max_depth: Độ sâu mở rộng tối đa.
 
     Returns:
-        Tập tên category (đã chuẩn hóa) sau khi mở rộng.
+        Tập tên category (đã chuẩn hóa) sau mở rộng.
     """
-    title_to_id: dict[str, int] = {}
-    for page_id, title in cat_page_to_title.items():
-        title_to_id.setdefault(normalize_name(title), page_id)
-
     expanded: set[str] = set()
-    frontier: list[int] = []
+    frontier: list[str] = []
     for seed in seeds:
-        cat_id = title_to_id.get(normalize_name(seed))
-        if cat_id is None:
+        key = normalize_name(seed)
+        if key not in title_to_lt_id:
             logger.warning("Category seed không tồn tại: %s", seed)
             continue
-        expanded.add(normalize_name(seed))
-        frontier.append(cat_id)
+        if key in expanded:
+            continue
+        expanded.add(key)
+        frontier.append(key)
 
     for depth in range(1, max_depth + 1):
-        next_frontier: list[int] = []
-        for cat_id in frontier:
-            for child in parent_to_children.get(cat_id, []):
-                child_title = cat_page_to_title.get(child)
-                if not child_title:
+        next_frontier: list[str] = []
+        for parent in frontier:
+            for child in parent_to_children.get(parent, []):
+                child_key = normalize_name(child)
+                if child_key in expanded:
                     continue
-                key = normalize_name(child_title)
-                if key in expanded:
-                    continue
-                expanded.add(key)
+                expanded.add(child_key)
                 next_frontier.append(child)
         logger.info(
             "  mở rộng độ sâu %d: %d category mới (tổng %d)",
@@ -212,66 +270,100 @@ def main(argv: list[str] | None = None) -> int:
     interim_dir = REPO_ROOT / str(config["paths"]["interim_dir"])
 
     page_path = raw_dir / f"viwiki-{dump_version}-page.sql.gz"
+    linktarget_path = raw_dir / f"viwiki-{dump_version}-linktarget.sql.gz"
     links_path = raw_dir / f"viwiki-{dump_version}-categorylinks.sql.gz"
-    for path in (page_path, links_path):
+    for path in (page_path, linktarget_path, links_path):
         if not path.exists():
             logger.error("Không tìm thấy %s", path)
             return 1
 
-    page_titles = parse_page_titles(page_path)
+    article_page_ids = parse_article_page_ids(page_path)
+    category_page_ids = parse_category_page_ids(page_path)
+    linktarget = parse_linktarget(linktarget_path)
     members, subcats = parse_categorylinks(links_path)
 
-    # Trang category = page_id có namespace 14.
-    cat_page_to_title: dict[int, str] = {}
-    for page_id, title in page_titles.items():
-        cat_page_to_title[page_id] = title
-    logger.info("Tổng số trang đã đọc: %d", len(page_titles))
+    # lt_id → tên category (chỉ lt_namespace = 14).
+    lt_to_category_title: dict[int, str] = {}
+    for lt_id, (namespace, title) in linktarget.items():
+        if namespace == 14:
+            lt_to_category_title[lt_id] = title
+
+    # Bảng `category` không còn cần: tên category lấy từ `linktarget`.
+    # `cl_from` là page_id: bài viết (ns 0) hoặc trang category (ns 14).
+    valid_members = {
+        page_id: [lt for lt in lts if lt in lt_to_category_title]
+        for page_id, lts in members.items()
+        if page_id in article_page_ids
+    }
+    # `valid_subcats` khóa theo **page_id** của trang category (ns 14), còn
+    # giá trị là **lt_id** của category con. Đổi sang khóa theo *tên* category
+    # để `expand_categories` đi theo cây subcategory (bug: trước đây cha
+    # được tra theo lt_id nên không tìm thấy con nào → cây rỗng).
+    parent_to_children: dict[str, list[str]] = {}
+    for parent_page_id, child_lts in subcats.items():
+        parent_title = category_page_ids.get(parent_page_id)
+        if not parent_title:
+            continue
+        children = [
+            lt_to_category_title[lt]
+            for lt in child_lts
+            if lt in lt_to_category_title
+        ]
+        if children:
+            parent_to_children.setdefault(
+                normalize_name(parent_title), []
+            ).extend(children)
+    logger.info(
+        "Sau khi lọc: %d bài viết có category, %d category cha có subcategory",
+        len(valid_members),
+        len(parent_to_children),
+    )
+
+    # Tên category → lt_id, dùng để tìm seed và để đảo chiều.
+    title_to_lt_id: dict[str, int] = {}
+    for lt_id, title in lt_to_category_title.items():
+        title_to_lt_id.setdefault(normalize_name(title), lt_id)
 
     expanded = expand_categories(
         list(seed_config["category_seeds"]),
-        cat_page_to_title,
-        subcats,
+        title_to_lt_id,
+        parent_to_children,
         max_depth=int(seed_config.get("category_max_depth", 3)),
     )
     logger.info("Tập category sau mở rộng: %d", len(expanded))
 
-    # Đảo chiều: cat_page_id → danh sách page_id thành viên.
-    members_by_cat: dict[int, list[int]] = {}
-    for page_id, cat_ids in members.items():
-        for cat_id in cat_ids:
-            members_by_cat.setdefault(cat_id, []).append(page_id)
-
-    expanded_ids = {
-        page_id
-        for page_id, title in cat_page_to_title.items()
+    expanded_lts = {
+        lt_id
+        for lt_id, title in lt_to_category_title.items()
         if normalize_name(title) in expanded
     }
-    logger.info("Tập category sau mở rộng: %d trang category", len(expanded_ids))
+    logger.info("Tập category sau mở rộng: %d mục category", len(expanded_lts))
+
+    # Đảo chiều: lt_id → danh sách page_id thành viên.
+    members_by_cat: dict[int, list[int]] = {}
+    for page_id, lts in valid_members.items():
+        for lt_id in lts:
+            members_by_cat.setdefault(lt_id, []).append(page_id)
 
     category_members: dict[str, list[int]] = {}
-    for cat_id in expanded_ids:
-        title = cat_page_to_title.get(cat_id)
+    for lt_id in expanded_lts:
+        title = lt_to_category_title.get(lt_id)
         if not title:
             continue
-        pages = sorted(members_by_cat.get(cat_id, []))
+        pages = sorted(members_by_cat.get(lt_id, []))
         if pages:
             category_members[normalize_name(title)] = pages
 
     # Cây phân cấp (tên → tên con) cho các category trong tập mở rộng.
     hierarchy: dict[str, list[str]] = {}
-    for parent_id, child_ids in subcats.items():
-        if parent_id not in expanded_ids:
+    for parent_title, children in parent_to_children.items():
+        if parent_title not in expanded:
             continue
-        parent_title = cat_page_to_title.get(parent_id)
-        if not parent_title:
-            continue
-        children = sorted(
-            cat_page_to_title[child]
-            for child in child_ids
-            if child in expanded_ids and child in cat_page_to_title
+        kept = sorted(
+            normalize_name(child) for child in children if normalize_name(child) in expanded
         )
-        if children:
-            hierarchy[normalize_name(parent_title)] = children
+        if kept:
+            hierarchy[parent_title] = kept
 
     interim_dir.mkdir(parents=True, exist_ok=True)
     members_path = interim_dir / "category_members.json"
