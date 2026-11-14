@@ -1,0 +1,2401 @@
+# Bảng map lớp Wikidata → nhãn NER (Phase 4 — B2.1)
+#
+# File này được SINH TỰ ĐỘNG bởi `scripts/build_type_map.py` từ:
+#   - `data/interim/class_hierarchy.json`  (đồ thị phân cấp lớp P279)
+#   - `data/interim/class_labels.json`     (nhãn lớp từ Wikidata)
+#
+# Cấu trúc:
+#   direct:   tên lớp P31 tự nó khớp từ khoá → nhãn (độ tin cậy cao)
+#   ancestor: tên lớp P31 không khớp, nhưng lớp cha khớp → nhãn
+
+direct:
+  Q5: PERSON  #  5337 QID · human
+  Q2389082: LOCATION  #   731 QID · commune of vietnam
+  Q577: TIME  #   689 QID · year
+  Q3186692: TIME  #   447 QID · calendar year
+  Q2582669: LOCATION  #   445 QID · district
+  Q687188: LOCATION  #   316 QID · ward of vietnam
+  Q1549591: LOCATION  #   243 QID · big city
+  Q3024240: LOCATION  #   172 QID · historical country
+  Q3624078: LOCATION  #   126 QID · sovereign state
+  Q6256: LOCATION  #   125 QID · country
+  Q4164871: TITLE  #   120 QID · position
+  Q178561: EVENT  #   117 QID · battle
+  Q2112349: LOCATION  #   104 QID · district-level town of vietnam
+  Q515: LOCATION  #   101 QID · city
+  Q1070942: LOCATION  #    95 QID · commune-level town of vietnam
+  Q3249005: LOCATION  #    86 QID · provincial city of vietnam
+  Q19828: TIME  #    74 QID · leap year
+  Q4022: LOCATION  #    66 QID · river
+  Q355567: TITLE  #    65 QID · noble title
+  Q56061: LOCATION  #    64 QID · administrative territorial entity
+  Q748149: LOCATION  #    64 QID · prefecture-level city
+  Q23442: LOCATION  #    53 QID · island
+  Q11514315: TIME  #    52 QID · historical period
+  Q1093829: LOCATION  #    50 QID · city in the united states
+  Q235673: TIME  #    50 QID · common year starting and ending on saturday
+  Q6644510: LOCATION  #    50 QID · urban district
+  Q235676: TIME  #    49 QID · common year starting and ending on wednesday
+  Q235687: TIME  #    49 QID · common year starting and ending on monday
+  Q235690: TIME  #    49 QID · common year starting and ending on thursday
+  Q486972: LOCATION  #    49 QID · human settlement
+  Q235670: TIME  #    48 QID · common year starting and ending on sunday
+  Q235684: TIME  #    48 QID · common year starting and ending on tuesday
+  Q645883: EVENT  #    48 QID · military operation
+  Q1289426: LOCATION  #    47 QID · county of china
+  Q235680: TIME  #    47 QID · common year starting and ending on friday
+  Q51929311: LOCATION  #    46 QID · largest city
+  Q50068795: LOCATION  #    40 QID · historical chinese state
+  Q35657: LOCATION  #    39 QID · u.s. state
+  Q484170: LOCATION  #    37 QID · commune of france
+  Q198: EVENT  #    36 QID · war
+  Q294414: TITLE  #    36 QID · public office
+  Q62049: LOCATION  #    34 QID · county seat
+  Q14846918: LOCATION  #    31 QID · district of cambodia
+  Q42744322: LOCATION  #    31 QID · urban municipality in germany
+  Q1065118: LOCATION  #    29 QID · district of china
+  Q164950: DYNASTY  #    29 QID · dynasty
+  Q1070990: LOCATION  #    28 QID · county-level city of china
+  Q108178728: LOCATION  #    28 QID · national capital
+  Q1187811: LOCATION  #    27 QID · college town
+  Q56019: TITLE  #    27 QID · military rank
+  Q112099: LOCATION  #    24 QID · island country
+  Q19953632: LOCATION  #    24 QID · former administrative territorial entity
+  Q2264924: LOCATION  #    24 QID · port city
+  Q831663: EVENT  #    24 QID · military campaign
+  Q10831626: LOCATION  #    23 QID · province of south vietnam
+  Q5283521: LOCATION  #    23 QID · district of laos
+  Q12857432: DYNASTY  #    22 QID · chinese dynasty
+  Q7252589: LOCATION  #    21 QID · province of cambodia
+  Q123480: LOCATION  #    20 QID · landlocked country
+  Q1615742: LOCATION  #    20 QID · province of china
+  Q29964144: TIME  #    19 QID · year bc
+  Q8502: LOCATION  #    19 QID · mountain
+  Q1620908: LOCATION  #    18 QID · historical region
+  Q217036: TIME  #    18 QID · leap year starting on friday and ending on saturday
+  Q3502482: LOCATION  #    18 QID · cultural region
+  Q902814: LOCATION  #    18 QID · border city
+  Q131569: EVENT  #    17 QID · treaty
+  Q15642541: LOCATION  #    17 QID · human-geographic territorial entity
+  Q217041: TIME  #    17 QID · leap year starting on sunday and ending on monday
+  Q74817647: LOCATION  #    17 QID · aspect in a geographic region
+  Q217015: TIME  #    16 QID · leap year starting on wednesday and ending on thursday
+  Q836688: LOCATION  #    16 QID · ancient chinese state
+  Q114962596: TITLE  #    15 QID · historical position
+  Q124734: EVENT  #    15 QID · rebellion
+  Q179164: LOCATION  #    15 QID · unitary state
+  Q208511: LOCATION  #    15 QID · global city
+  Q217024: TIME  #    15 QID · leap year starting on monday and ending on tuesday
+  Q3199915: EVENT  #    15 QID · massacre
+  Q13218391: LOCATION  #    14 QID · charter city
+  Q217019: TIME  #    14 QID · leap year starting on thursday and ending on friday
+  Q217034: TIME  #    14 QID · leap year starting on tuesday and ending on wednesday
+  Q23397: LOCATION  #    14 QID · lake
+  Q417175: LOCATION  #    14 QID · kingdom
+  Q578: TIME  #    14 QID · century
+  Q15239622: LOCATION  #    13 QID · disputed territory
+  Q15661340: LOCATION  #    13 QID · ancient city
+  Q180673: LOCATION  #    13 QID · ceremonial county of england
+  Q216353: TITLE  #    13 QID · title
+  Q217026: TIME  #    13 QID · leap year starting on saturday and ending on sunday
+  Q46831: LOCATION  #    13 QID · mountain range
+  Q10831631: LOCATION  #    12 QID · province of french indochina
+  Q2074737: LOCATION  #    12 QID · municipality of spain
+  Q50198: LOCATION  #    12 QID · province of thailand
+  Q21070568: DYNASTY  #    11 QID · nguoi ma su ton tai bi tranh luan
+  Q235729: TIME  #    11 QID · common year
+  Q257391: LOCATION  #    11 QID · federal capital
+  Q45382: EVENT  #    11 QID · coup d'etat
+  Q11815167: LOCATION  #    10 QID · archipelagic state
+  Q707813: LOCATION  #    10 QID · hanseatic city
+  Q127693126: LOCATION  #     9 QID · successor state
+  Q15673297: LOCATION  #     9 QID · province of laos
+  Q20643955: PERSON  #     9 QID · human biblical figure
+  Q3320743: TITLE  #     9 QID · danh hieu vinh du
+  Q3957: LOCATION  #     9 QID · town
+  Q51576574: LOCATION  #     9 QID · mediterranean country
+  Q11271835: LOCATION  #     8 QID · state capital
+  Q1261499: EVENT  #     8 QID · naval battle
+  Q134626: LOCATION  #     8 QID · district capital
+  Q2221906: LOCATION  #     8 QID · geographic location
+  Q27554677: LOCATION  #     8 QID · former capital
+  Q50337: LOCATION  #     8 QID · prefecture of japan
+  Q625298: EVENT  #     8 QID · peace treaty
+  Q7930989: LOCATION  #     8 QID · city or town
+  Q10931: EVENT  #     7 QID · revolution
+  Q136649946: TITLE  #     7 QID · type of position
+  Q1402592: LOCATION  #     7 QID · island group
+  Q140892892: LOCATION  #     7 QID · country sometimes considered transcontinental
+  Q1749269: LOCATION  #     7 QID · city designated by government ordinance
+  Q494721: LOCATION  #     7 QID · city of japan
+  Q5098: LOCATION  #     7 QID · province of indonesia
+  Q5119: LOCATION  #     7 QID · capital city
+  Q532: LOCATION  #     7 QID · village
+  Q8465: EVENT  #     7 QID · civil war
+  Q925381: LOCATION  #     7 QID · city with powiat rights in poland
+  Q129268952: LOCATION  #     6 QID · former national capital
+  Q15063586: LOCATION  #     6 QID · state of malaysia
+  Q165: LOCATION  #     6 QID · sea
+  Q63791824: LOCATION  #     6 QID · country bordering the baltic sea
+  Q65589340: LOCATION  #     6 QID · prefectural capital of japan
+  Q769603: LOCATION  #     6 QID · non-metropolitan county
+  Q1357964: LOCATION  #     5 QID · county town
+  Q14784328: LOCATION  #     5 QID · state capital in germany
+  Q161243: LOCATION  #     5 QID · dependent territory
+  Q17279032: TITLE  #     5 QID · elective office
+  Q17544377: LOCATION  #     5 QID · history of a country or state
+  Q20162172: PERSON  #     5 QID · human language
+  Q28872924: LOCATION  #     5 QID · designation for an administrative territorial entity of a single country
+  Q39911: TIME  #     5 QID · decade
+  Q6266: LOCATION  #     5 QID · nation
+  Q10711424: LOCATION  #     4 QID · state with limited recognition
+  Q109473326: LOCATION  #     4 QID · country in world war ii
+  Q11088057: LOCATION  #     4 QID · administrative territorial entity of the ming dynasty
+  Q12131624: LOCATION  #     4 QID · city in ukraine
+  Q124867660: EVENT  #     4 QID · type of war
+  Q13539802: LOCATION  #     4 QID · place with town rights and privileges
+  Q2327515: LOCATION  #     4 QID · city district in baden-wurttemberg
+  Q25906438: EVENT  #     4 QID · attempted coup d'etat
+  Q270791: LOCATION  #     4 QID · state-owned enterprise
+  Q480319: TITLE  #     4 QID · title of authority
+  Q5153359: LOCATION  #     4 QID · municipality of the czech republic
+  Q619610: LOCATION  #     4 QID · social state
+  Q6428674: TIME  #     4 QID · era
+  Q6949213: PERSON  #     4 QID · mythological king
+  Q70208: LOCATION  #     4 QID · municipality of switzerland
+  Q85631896: LOCATION  #     4 QID · urban district of bavaria
+  Q85635630: LOCATION  #     4 QID · urban district of north rhine-westphalia
+  Q98676607: LOCATION  #     4 QID · state level institution
+  Q99541706: LOCATION  #     4 QID · historical unrecognized state
+  Q106389302: LOCATION  #     3 QID · city/town in russia
+  Q1066538: LOCATION  #     3 QID · national central city
+  Q1070290: EVENT  #     3 QID · prisoner-of-war camp
+  Q108691705: TIME  #     3 QID · century common year
+  Q11422368: LOCATION  #     3 QID · city for international conferences and tourism
+  Q115857096: LOCATION  #     3 QID · aspect of history in a geographic region
+  Q12479773: LOCATION  #     3 QID · first-level administrative country subdivision in indonesia
+  Q125092269: EVENT  #     3 QID · type of conflict
+  Q1266818: LOCATION  #     3 QID · independent city in the united states
+  Q1352230: LOCATION  #     3 QID · territory of the united states
+  Q13691: LOCATION  #     3 QID · artificial island
+  Q1371288: LOCATION  #     3 QID · vassal state
+  Q137186904: LOCATION  #     3 QID · transcontinental region
+  Q137640468: LOCATION  #     3 QID · provincial capital
+  Q15978299: LOCATION  #     3 QID · municipality with town privileges in the czech republic
+  Q16631188: TITLE  #     3 QID · military position
+  Q1691434: EVENT  #     3 QID · united nations treaty
+  Q2324556: LOCATION  #     3 QID · state media
+  Q24841413: LOCATION  #     3 QID · pla military region
+  Q24902509: DYNASTY  #     3 QID · hoat đong cua con nguoi
+  Q2560047: LOCATION  #     3 QID · administrative county
+  Q2577883: LOCATION  #     3 QID · occupied territory
+  Q2671787: TITLE  #     3 QID · substantive title
+  Q29045252: LOCATION  #     3 QID · city of south korea
+  Q333542: LOCATION  #     3 QID · overseas province of portugal
+  Q408804: LOCATION  #     3 QID · borough of new york city
+  Q4946461: LOCATION  #     3 QID · spa town
+  Q5327704: LOCATION  #     3 QID · special ward of japan
+  Q54935504: LOCATION  #     3 QID · city of switzerland
+  Q57362: LOCATION  #     3 QID · autonomous region of china
+  Q5737899: TITLE  #     3 QID · hereditary title
+  Q574376: PERSON  #     3 QID · human impact on the environment
+  Q667509: LOCATION  #     3 QID · municipality of austria
+  Q67515288: LOCATION  #     3 QID · cinema by country or region
+  Q6934728: EVENT  #     3 QID · multilateral treaty
+  Q849866: LOCATION  #     3 QID · communist state
+  Q1006311: EVENT  #     2 QID · war of national liberation
+  Q103495: EVENT  #     2 QID · world war
+  Q104782082: LOCATION  #     2 QID · territory outside rcm in quebec
+  Q10551526: LOCATION  #     2 QID · confessional state
+  Q108569710: LOCATION  #     2 QID · city of ohio
+  Q1088391: LOCATION  #     2 QID · rump state
+  Q113136497: LOCATION  #     2 QID · state of the german confederation 1815–1848 & 1850–1866
+  Q1133961: LOCATION  #     2 QID · commercial district
+  Q1138279: LOCATION  #     2 QID · associated state
+  Q1138494: LOCATION  #     2 QID · historic county of england
+  Q11452125: TITLE  #     2 QID · east asian government position
+  Q1156073: DYNASTY  #     2 QID · royal house
+  Q1161185: LOCATION  #     2 QID · volcanic island
+  Q116741026: EVENT  #     2 QID · constitutive treaty
+  Q117430963: LOCATION  #     2 QID · diaspora or migration by origin country/region/continent
+  Q12102963: LOCATION  #     2 QID · city specifically designated in the state plan
+  Q1241568: EVENT  #     2 QID · war cemetery
+  Q12443800: LOCATION  #     2 QID · state of india
+  Q125470455: LOCATION  #     2 QID · customs territory of china
+  Q13218690: LOCATION  #     2 QID · town in hungary
+  Q137018865: LOCATION  #     2 QID · type of place
+  Q137022846: LOCATION  #     2 QID · type of region
+  Q138024519: TITLE  #     2 QID · roman catholic episcopal title
+  Q1384277: EVENT  #     2 QID · military expedition
+  Q141763519: LOCATION  #     2 QID · city of the united kingdom
+  Q15974307: LOCATION  #     2 QID · unitary municipality in germany
+  Q16884952: LOCATION  #     2 QID · country house
+  Q1707610: EVENT  #     2 QID · war cemetery
+  Q1973404: LOCATION  #     2 QID · adjacent sea
+  Q20127274: PERSON  #     2 QID · certain aspects of a person's life
+  Q21114371: TITLE  #     2 QID · episcopal title
+  Q21272231: LOCATION  #     2 QID · county council area
+  Q21869758: LOCATION  #     2 QID · delegated commune
+  Q2202509: LOCATION  #     2 QID · roman city
+  Q2225003: LOCATION  #     2 QID · special municipality
+  Q2324916: LOCATION  #     2 QID · state visit
+  Q24834073: EVENT  #     2 QID · ministry of war
+  Q261543: LOCATION  #     2 QID · federal state of austria
+  Q26879769: LOCATION  #     2 QID · state in the confederation of the rhine
+  Q2716259: LOCATION  #     2 QID · metropolitan municipality in turkey
+  Q27676416: LOCATION  #     2 QID · city or town of quebec
+  Q3199141: LOCATION  #     2 QID · city of indonesia
+  Q48349: LOCATION  #     2 QID · empire
+  Q48352: LOCATION  #     2 QID · head of state
+  Q4925355: LOCATION  #     2 QID · province of south korea
+  Q498162: LOCATION  #     2 QID · census-designated place in the united states
+  Q537250: LOCATION  #     2 QID · federal city
+  Q548611: LOCATION  #     2 QID · district of the czech republic
+  Q575759: EVENT  #     2 QID · war memorial
+  Q580112: LOCATION  #     2 QID · military district
+  Q5852411: LOCATION  #     2 QID · state of australia
+  Q5888666: LOCATION  #     2 QID · home rule municipality of pennsylvania
+  Q61297932: LOCATION  #     2 QID · neighborhood of manhattan
+  Q61708099: LOCATION  #     2 QID · urban district in saxony
+  Q61856863: LOCATION  #     2 QID · urban district in schleswig-holstein
+  Q630830: TIME  #     2 QID · era
+  Q66724388: LOCATION  #     2 QID · autonomous country within the kingdom of denmark
+  Q705296: LOCATION  #     2 QID · district of taiwan
+  Q726870: DYNASTY  #     2 QID · doanh nghiep “gach vua”
+  Q750215: DYNASTY  #     2 QID · giet nguoi hang loat
+  Q752783: DYNASTY  #     2 QID · chuyen bay vu tru co con nguoi
+  Q76514543: LOCATION  #     2 QID · municipality of georgia
+  Q7819319: LOCATION  #     2 QID · czech municipality with expanded powers
+  Q7841907: LOCATION  #     2 QID · municipality with authorized municipal office
+  Q785260: DYNASTY  #     2 QID · giai đoan cua đoi nguoi
+  Q7883019: EVENT  #     2 QID · undeclared war
+  Q828803: TITLE  #     2 QID · job title
+  Q842332: EVENT  #     2 QID · war front
+  Q85632032: LOCATION  #     2 QID · urban district of rhineland-palatinate
+  Q85635929: LOCATION  #     2 QID · urban district of lower saxony
+  Q857833: LOCATION  #     2 QID · state crime
+  Q98374631: LOCATION  #     2 QID · transport by country or region
+  Q98966309: DYNASTY  #     2 QID · phan loai cac khu đinh cu cua con nguoi
+  Q1005420: TITLE  #     1 QID · federal office
+  Q1008803: LOCATION  #     1 QID · federal territory of malaysia
+  Q1021645: TITLE  #     1 QID · office building
+  Q1025961: LOCATION  #     1 QID · capital of japan
+  Q1044880: LOCATION  #     1 QID · subprefecture-level city
+  Q104666804: LOCATION  #     1 QID · rail transport by country or region
+  Q105370834: EVENT  #     1 QID · war phase
+  Q105742499: LOCATION  #     1 QID · judicial capital
+  Q105897950: LOCATION  #     1 QID · agriculture by country or territory
+  Q106517174: LOCATION  #     1 QID · option municipality
+  Q107390: LOCATION  #     1 QID · federated state
+  Q1075106: LOCATION  #     1 QID · state university system
+  Q108454666: LOCATION  #     1 QID · big city of south korea
+  Q108454687: LOCATION  #     1 QID · half million city
+  Q10876480: LOCATION  #     1 QID · capital of the republic of china
+  Q1089515: DYNASTY  #     1 QID · conquest dynasty
+  Q10922837: LOCATION  #     1 QID · administrative territorial entity of the tang dynasty
+  Q10925959: LOCATION  #     1 QID · public institution directly owned by state council
+  Q110071194: LOCATION  #     1 QID · city of illinois
+  Q110071217: LOCATION  #     1 QID · village of illinois
+  Q110390579: LOCATION  #     1 QID · city of united kingdom
+  Q112074700: LOCATION  #     1 QID · proposed state merger
+  Q112077164: PERSON  #     1 QID · title of the monarch of spain
+  Q112684326: LOCATION  #     1 QID · municipality of india
+  Q11396118: LOCATION  #     1 QID · divided territory
+  Q11418818: LOCATION  #     1 QID · commercial capital city
+  Q114401982: LOCATION  #     1 QID · independent city in berlin
+  Q114496982: LOCATION  #     1 QID · political city
+  Q11484275: TITLE  #     1 QID · government office
+  Q11499984: LOCATION  #     1 QID · educational town
+  Q1151405: LOCATION  #     1 QID · client state
+  Q1162817: LOCATION  #     1 QID · geographical small region of hungary
+  Q116291578: LOCATION  #     1 QID · holy city of christianity
+  Q116457956: LOCATION  #     1 QID · municipality without town privileges in germany
+  Q116621859: LOCATION  #     1 QID · greater district town in baden-wurttemberg
+  Q117430967: LOCATION  #     1 QID · diaspora or migration by origin and host country
+  Q11881845: LOCATION  #     1 QID · city
+  Q12031379: LOCATION  #     1 QID · capital of region
+  Q124313007: LOCATION  #     1 QID · metropolitan prefecture
+  Q124320539: TITLE  #     1 QID · christian religious position
+  Q124515690: TITLE  #     1 QID · anglican episcopal title
+  Q124652943: TITLE  #     1 QID · jma meteorological office
+  Q125684839: LOCATION  #     1 QID · economic capital city
+  Q1265353: EVENT  #     1 QID · war crimes trial
+  Q129319205: LOCATION  #     1 QID · de facto national capital
+  Q129676344: LOCATION  #     1 QID · large city
+  Q130533870: LOCATION  #     1 QID · geographic concept
+  Q1309121: LOCATION  #     1 QID · hermit kingdom
+  Q13226541: PERSON  #     1 QID · human spaceflight program
+  Q132753319: LOCATION  #     1 QID · region associated with claims of anomalous or paranormal events
+  Q13416557: LOCATION  #     1 QID · royal city in polish-lithuanian commonwealth
+  Q1343246: LOCATION  #     1 QID · english country house
+  Q134445478: LOCATION  #     1 QID · cultural capital
+  Q134587884: LOCATION  #     1 QID · town in myanmar
+  Q1348385: EVENT  #     1 QID · war of succession
+  Q1349648: LOCATION  #     1 QID · municipality of greece
+  Q137547946: LOCATION  #     1 QID · forest city
+  Q1375749: LOCATION  #     1 QID · european city
+  Q138010797: LOCATION  #     1 QID · city of texas
+  Q1392581: LOCATION  #     1 QID · cycling city
+  Q141162078: LOCATION  #     1 QID · independent city in virginia
+  Q145665: DYNASTY  #     1 QID · nguoi man
+  Q1469680: LOCATION  #     1 QID · state party
+  Q1469686: EVENT  #     1 QID · perpetual war
+  Q14762300: LOCATION  #     1 QID · single-tier municipality
+  Q14846916: LOCATION  #     1 QID · provincial municipality of cambodia
+  Q14921981: LOCATION  #     1 QID · administrative territorial entity of belarus
+  Q15221304: LOCATION  #     1 QID · first-class city
+  Q15253706: LOCATION  #     1 QID · city
+  Q15273785: LOCATION  #     1 QID · belgian municipality with the title of city
+  Q15379753: LOCATION  #     1 QID · british dependent territory
+  Q15401633: TIME  #     1 QID · archaeological period
+  Q15647906: LOCATION  #     1 QID · city of portugal
+  Q15840617: LOCATION  #     1 QID · planned national capital
+  Q15848826: LOCATION  #     1 QID · city palace
+  Q1589492: PERSON  #     1 QID · king of the gods
+  Q15897752: LOCATION  #     1 QID · administrative territorial entity of qing dynasty
+  Q16127605: LOCATION  #     1 QID · populated place in syria
+  Q16138154: LOCATION  #     1 QID · ceremonial head of state
+  Q162620: LOCATION  #     1 QID · province of spain
+  Q1637706: LOCATION  #     1 QID · million city
+  Q1710033: LOCATION  #     1 QID · autonomous region with special statute
+  Q17143371: LOCATION  #     1 QID · county of south korea
+  Q17305522: LOCATION  #     1 QID · data set of a specific country
+  Q17315624: LOCATION  #     1 QID · state of myanmar
+  Q1752412: LOCATION  #     1 QID · nation-building
+  Q17566318: PERSON  #     1 QID · human rights award
+  Q1757209: LOCATION  #     1 QID · sea lane
+  Q1759167: TITLE  #     1 QID · home office
+  Q1780389: LOCATION  #     1 QID · special municipality association of germany
+  Q1852859: LOCATION  #     1 QID · cadastral populated place in the netherlands
+  Q18534049: LOCATION  #     1 QID · county of north korea
+  Q1867820: LOCATION  #     1 QID · đia vi city tai vuong quoc lien hiep anh va bac ireland
+  Q1920810: PERSON  #     1 QID · human rights organization
+  Q1980736: TIME  #     1 QID · new year celebrations
+  Q202509: DYNASTY  #     1 QID · pho nguoi hoa
+  Q20687684: DYNASTY  #     1 QID · ho nguoi man chau
+  Q2145277: DYNASTY  #     1 QID · house of representatives
+  Q21518270: LOCATION  #     1 QID · state or insular area capital of the united states
+  Q21994376: EVENT  #     1 QID · war of independence
+  Q223832: LOCATION  #     1 QID · dominion of the british empire
+  Q22807280: LOCATION  #     1 QID · flag of a country subdivision
+  Q22927616: LOCATION  #     1 QID · commune of france with specific status
+  Q2304081: TITLE  #     1 QID · courtesy title
+  Q230937: LOCATION  #     1 QID · state function
+  Q2325038: LOCATION  #     1 QID · state church
+  Q2325086: LOCATION  #     1 QID · state model
+  Q2401485: EVENT  #     1 QID · expedition
+  Q2516866: DYNASTY  #     1 QID · nguoi xuat ban
+  Q2551394: LOCATION  #     1 QID · sea rescue organization
+  Q2616791: LOCATION  #     1 QID · urban municipality of poland
+  Q262882: LOCATION  #     1 QID · statutory city of austria
+  Q2634521: TITLE  #     1 QID · title of jesus
+  Q2666904: PERSON  #     1 QID · human fertilization
+  Q2778649: TITLE  #     1 QID · dynastic title
+  Q27916659: LOCATION  #     1 QID · former place
+  Q28070554: LOCATION  #     1 QID · region of sudan
+  Q28659128: LOCATION  #     1 QID · city of north korea
+  Q2912045: LOCATION  #     1 QID · summer capital
+  Q29791211: LOCATION  #     1 QID · sport in a geographic region
+  Q299191: DYNASTY  #     1 QID · bien the co vua
+  Q29946056: LOCATION  #     1 QID · highly urbanized city
+  Q30941574: LOCATION  #     1 QID · diversions of the yellow river
+  Q3098609: LOCATION  #     1 QID · administrative territorial entity of papua new guinea
+  Q3303230: LOCATION  #     1 QID · pariah state
+  Q3408368: LOCATION  #     1 QID · form of address in the united kingdom
+  Q3529618: TITLE  #     1 QID · danh hieu hoc thuat
+  Q35989030: LOCATION  #     1 QID · passport to your national parks cancellation location
+  Q3685476: LOCATION  #     1 QID · abolished municipality in italy
+  Q3976641: LOCATION  #     1 QID · administrative territorial entity of kenya
+  Q4056396: LOCATION  #     1 QID · sub-provincial autonomous prefecture
+  Q4115680: LOCATION  #     1 QID · italian city-state
+  Q4146825: LOCATION  #     1 QID · state committee of the soviet union
+  Q41537118: LOCATION  #     1 QID · emotional state
+  Q4176199: EVENT  #     1 QID · cold war
+  Q42045197: TITLE  #     1 QID · hereditary position
+  Q4294273: LOCATION  #     1 QID · constituent department of the state council
+  Q43197: LOCATION  #     1 QID · river delta
+  Q4375074: TIME  #     1 QID · calendar era
+  Q4442912: LOCATION  #     1 QID · capital of russia
+  Q4465563: PERSON  #     1 QID · general history
+  Q4588528: LOCATION  #     1 QID · sacred place
+  Q464122: PERSON  #     1 QID · coronation of the british monarch
+  Q467745: LOCATION  #     1 QID · union territory of india
+  Q46865913: LOCATION  #     1 QID · geography of geographic location
+  Q4688003: LOCATION  #     1 QID · aerial bombing of a city
+  Q46997958: LOCATION  #     1 QID · climate of geographic location
+  Q47018478: TIME  #     1 QID · calendar month of a given year
+  Q482821: LOCATION  #     1 QID · metropolitan city of south korea
+  Q493522: LOCATION  #     1 QID · municipality of belgium
+  Q496539: LOCATION  #     1 QID · state of south sudan
+  Q49775: PERSON  #     1 QID · general strike
+  Q499073: LOCATION  #     1 QID · direct-controlled municipality
+  Q51883617: LOCATION  #     1 QID · proposed state of the united states
+  Q5284036: LOCATION  #     1 QID · divided region
+  Q5500203: LOCATION  #     1 QID · free city
+  Q55237813: LOCATION  #     1 QID · village of new york
+  Q558330: LOCATION  #     1 QID · municipality of cuba
+  Q56036687: LOCATION  #     1 QID · municipality of mozambique
+  Q56291528: LOCATION  #     1 QID · state order
+  Q56389217: TIME  #     1 QID · current year
+  Q56557504: LOCATION  #     1 QID · city of iran
+  Q57318: LOCATION  #     1 QID · free imperial city
+  Q57766005: LOCATION  #     1 QID · united states census region
+  Q6027980: LOCATION  #     1 QID · industrial region
+  Q60458065: LOCATION  #     1 QID · city in british columbia
+  Q6056746: EVENT  #     1 QID · campaign
+  Q6083496: LOCATION  #     1 QID · island group of the philippines
+  Q6107280: EVENT  #     1 QID · revolt
+  Q61793478: LOCATION  #     1 QID · district independent city of brandenburg
+  Q61980648: LOCATION  #     1 QID · urban district of hesse
+  Q63313685: LOCATION  #     1 QID · history of a geographic region
+  Q6341928: LOCATION  #     1 QID · rift lake
+  Q63440326: LOCATION  #     1 QID · city of oregon
+  Q640364: LOCATION  #     1 QID · municipality of romania
+  Q64515521: LOCATION  #     1 QID · municipality of south vietnam
+  Q64801076: LOCATION  #     1 QID · education in country or region
+  Q6501749: PERSON  #     1 QID · general secretary
+  Q65178087: LOCATION  #     1 QID · internal sea
+  Q6593141: LOCATION  #     1 QID · freedom of religion by country
+  Q66715753: TITLE  #     1 QID · wikimedia list of persons by position held
+  Q67123843: LOCATION  #     1 QID · town divided by border
+  Q6754979: LOCATION  #     1 QID · special-level city in north korea
+  Q676050: LOCATION  #     1 QID · old town
+  Q6784672: LOCATION  #     1 QID · municipality of slovakia
+  Q681277: LOCATION  #     1 QID · city with county rights
+  Q6882870: LOCATION  #     1 QID · designated spa town
+  Q691960: LOCATION  #     1 QID · satellite city
+  Q692581: LOCATION  #     1 QID · holy city
+  Q69358181: LOCATION  #     1 QID · human rights by country or territory
+  Q6936404: LOCATION  #     1 QID · municipality of the state of palestine
+  Q701321: EVENT  #     1 QID · japanese war crimes
+  Q71870742: LOCATION  #     1 QID · renewable energy by country
+  Q71875404: LOCATION  #     1 QID · climate change by country or territory
+  Q718893: EVENT  #     1 QID · theater of war
+  Q7251007: LOCATION  #     1 QID · prostitution by region
+  Q7309306: LOCATION  #     1 QID · region of victoria
+  Q7396640: LOCATION  #     1 QID · sacerdotal state
+  Q76007695: LOCATION  #     1 QID · administrative district of czech municipality with expanded powers
+  Q76009696: LOCATION  #     1 QID · administrative district of czech municipality with authorized municipal office
+  Q79323854: LOCATION  #     1 QID · city of oblast subordinance
+  Q7991064: DYNASTY  #     1 QID · imperial and noble rank of the qing dynasty
+  Q828359: LOCATION  #     1 QID · commuter town
+  Q83020: LOCATION  #     1 QID · provincial city
+  Q83057: LOCATION  #     1 QID · region of belgium
+  Q83856136: TITLE  #     1 QID · legal position
+  Q842112: LOCATION  #     1 QID · socialist state
+  Q843886: LOCATION  #     1 QID · prefecture of the central african republic
+  Q8452914: LOCATION  #     1 QID · district town
+  Q8501237: LOCATION  #     1 QID · large city
+  Q85636199: LOCATION  #     1 QID · urban district of hamburg
+  Q871419: LOCATION  #     1 QID · district of austria
+  Q9019918: LOCATION  #     1 QID · endorheic lake
+  Q918240: LOCATION  #     1 QID · territorial evolution of the british empire
+  Q9247597: DYNASTY  #     1 QID · house of commons
+  Q924827: PERSON  #     1 QID · human from star trek
+  Q986764: LOCATION  #     1 QID · list of militaries by country
+  Q99527323: LOCATION  #     1 QID · architecture of geographic location
+  Q997267: EVENT  #     1 QID · skirmish
+
+ancestor:
+  Q4167410: PERSON  #   494 QID · wikimedia disambiguation page
+  Q14795564: LOCATION  #   366 QID · point in time with respect to recurrent timeframe
+  Q7725634: PERSON  #   125 QID · literary work
+  Q13406463: PERSON  #    87 QID · wikimedia list article
+  Q41710: DYNASTY  #    82 QID · ethnic group
+  Q105543609: PERSON  #    66 QID · musical work/composition
+  Q15056993: PERSON  #    65 QID · aircraft family
+  Q43229: PERSON  #    61 QID · organization
+  Q34442: LOCATION  #    57 QID · road
+  Q137325529: LOCATION  #    54 QID · former provinces of vietnam
+  Q4830453: PERSON  #    53 QID · business
+  Q47461344: PERSON  #    51 QID · written work
+  Q7278: PERSON  #    51 QID · political party
+  Q82794: LOCATION  #    51 QID · vung
+  Q3918: PERSON  #    49 QID · university
+  Q11424: PERSON  #    48 QID · film
+  Q11862829: PERSON  #    47 QID · academic discipline
+  Q10748583: PERSON  #    46 QID · buddhist temple in vietnam
+  Q176799: DYNASTY  #    43 QID · military unit
+  Q12737077: TITLE  #    36 QID · occupation
+  Q28640: TITLE  #    35 QID · profession
+  Q1288568: PERSON  #    33 QID · modern language
+  Q163740: PERSON  #    32 QID · nonprofit organization
+  Q200250: LOCATION  #    32 QID · metropolis
+  Q22808320: PERSON  #    31 QID · wikimedia human name disambiguation page
+  Q5398426: PERSON  #    31 QID · television series
+  Q215380: PERSON  #    30 QID · musical group
+  Q124078422: PERSON  #    29 QID · weapon type
+  Q2824648: LOCATION  #    29 QID · provinces of vietnam
+  Q327333: PERSON  #    27 QID · government agency
+  Q174844: LOCATION  #    26 QID · megacity
+  Q891723: PERSON  #    26 QID · public company
+  Q3146899: LOCATION  #    24 QID · diocese of the catholic church
+  Q33506: LOCATION  #    23 QID · museum
+  Q33742: PERSON  #    23 QID · natural language
+  Q482994: PERSON  #    23 QID · album
+  Q112193867: PERSON  #    22 QID · type of disease
+  Q35127: LOCATION  #    22 QID · website
+  Q1047113: PERSON  #    21 QID · field of study
+  Q34770: PERSON  #    21 QID · language
+  Q839954: LOCATION  #    21 QID · archaeological site
+  Q135432460: LOCATION  #    20 QID · ministry of vietnam
+  Q618779: PERSON  #    20 QID · award
+  Q6881511: PERSON  #    20 QID · enterprise
+  Q100709275: PERSON  #    18 QID · combat vehicle family
+  Q1110794: PERSON  #    18 QID · daily newspaper
+  Q16560: PERSON  #    18 QID · palace
+  Q94993988: PERSON  #    18 QID · commercial traffic aerodrome
+  Q16334295: DYNASTY  #    17 QID · group of humans
+  Q23002054: PERSON  #    17 QID · private not-for-profit educational institution
+  Q4671286: PERSON  #    17 QID · academic major
+  Q484652: PERSON  #    17 QID · international organization
+  Q772547: DYNASTY  #    17 QID · armed forces
+  Q79007: PERSON  #    17 QID · street
+  Q11032: PERSON  #    16 QID · newspaper
+  Q1248784: PERSON  #    16 QID · airport
+  Q15142894: PERSON  #    16 QID · weapon model
+  Q16917: PERSON  #    16 QID · hospital
+  Q18127: PERSON  #    16 QID · record label
+  Q27020041: LOCATION  #    16 QID · sports season
+  Q902104: PERSON  #    16 QID · private university
+  Q193622: PERSON  #    15 QID · order
+  Q2085381: PERSON  #    15 QID · publishing house
+  Q41298: PERSON  #    15 QID · magazine
+  Q5393308: PERSON  #    15 QID · buddhist temple
+  Q875538: PERSON  #    15 QID · public university
+  Q100710213: PERSON  #    14 QID · combat vehicle model
+  Q137645460: PERSON  #    14 QID · high school for the gifted
+  Q22704163: PERSON  #    14 QID · firearm model
+  Q7210356: PERSON  #    14 QID · political organization
+  Q1002697: PERSON  #    13 QID · periodical
+  Q10916116: PERSON  #    13 QID · history book
+  Q184358: LOCATION  #    13 QID · reef
+  Q189533: TITLE  #    13 QID · academic degree
+  Q2267705: PERSON  #    13 QID · field of study
+  Q245065: PERSON  #    13 QID · intergovernmental organization
+  Q253030: LOCATION  #    13 QID · major regional center
+  Q45400320: PERSON  #    13 QID · open-access publisher
+  Q12280: LOCATION  #    12 QID · bridge
+  Q44539: LOCATION  #    12 QID · temple
+  Q46169: LOCATION  #    12 QID · national park
+  Q467011: EVENT  #    12 QID · invasion
+  Q47018901: LOCATION  #    12 QID · calendar month
+  Q644371: PERSON  #    12 QID · international airport
+  Q9826: LOCATION  #    12 QID · high school
+  Q1200957: LOCATION  #    11 QID · tourist destination
+  Q12357832: LOCATION  #    11 QID · second-level administrative division
+  Q1307214: PERSON  #    11 QID · form of government
+  Q13417114: PERSON  #    11 QID · noble family
+  Q15238777: LOCATION  #    11 QID · legislative term
+  Q15925165: PERSON  #    11 QID · specialized agency of the united nations
+  Q17524420: PERSON  #    11 QID · aspect of history
+  Q233591: PERSON  #    11 QID · communist party
+  Q2738074: DYNASTY  #    11 QID · political movement
+  Q4508: DYNASTY  #    11 QID · navy
+  Q475061: LOCATION  #    11 QID · amphoe
+  Q62078547: PERSON  #    11 QID · public research university
+  Q695850: PERSON  #    11 QID · airbase
+  Q747074: LOCATION  #    11 QID · đo thi cua y
+  Q88291: LOCATION  #    11 QID · citadel
+  Q134999516: LOCATION  #    10 QID · đac khu cua viet nam
+  Q15936437: PERSON  #    10 QID · research university
+  Q16970: LOCATION  #    10 QID · church building
+  Q2465832: PERSON  #    10 QID · nhanh khoa hoc
+  Q250811: LOCATION  #    10 QID · thanh pho pho tinh
+  Q29430681: LOCATION  #    10 QID · triad
+  Q31855: PERSON  #    10 QID · vien nghien cuu
+  Q38723: PERSON  #    10 QID · to chuc giao duc đai hoc
+  Q3914: PERSON  #    10 QID · truong hoc
+  Q46970: PERSON  #    10 QID · airline
+  Q4989906: PERSON  #    10 QID · monument
+  Q8142: PERSON  #    10 QID · currency
+  Q9174: PERSON  #    10 QID · ton giao
+  Q96888669: PERSON  #    10 QID · nha xuat ban hoc thuat
+  Q133156: LOCATION  #     9 QID · thuoc đia
+  Q133442: LOCATION  #     9 QID · thanh bang
+  Q1336099: LOCATION  #     9 QID · huyen tu tri trung quoc
+  Q1381899: LOCATION  #     9 QID · cities in vietnam
+  Q1445650: LOCATION  #     9 QID · ngay le
+  Q186516: PERSON  #     9 QID · quoc ky
+  Q190652: PERSON  #     9 QID · ban chap hanh trung uong
+  Q22687: PERSON  #     9 QID · bank
+  Q2472587: DYNASTY  #     9 QID · nhan dan
+  Q29517555: PERSON  #     9 QID · natural writing system
+  Q33837: LOCATION  #     9 QID · quan đao
+  Q3455658: LOCATION  #     9 QID · vung viet nam
+  Q39594: LOCATION  #     9 QID · bay
+  Q61883: DYNASTY  #     9 QID · air force
+  Q627436: PERSON  #     9 QID · field of work
+  Q7897276: LOCATION  #     9 QID · unparished area
+  Q79226802: PERSON  #     9 QID · animal from the chinese zodiac
+  Q1066984: LOCATION  #     8 QID · financial center
+  Q107655869: PERSON  #     8 QID · group of awards
+  Q10864048: LOCATION  #     8 QID · first-level administrative division
+  Q1153191: LOCATION  #     8 QID · online newspaper
+  Q1194093: PERSON  #     8 QID · to chuc phi chinh phu quoc te
+  Q1197685: LOCATION  #     8 QID · ngay le cong cong
+  Q1250464: LOCATION  #     8 QID · vuong quoc
+  Q13218357: LOCATION  #     8 QID · thanh pho cua california
+  Q15221623: PERSON  #     8 QID · bilateral relation
+  Q1762059: PERSON  #     8 QID · film production company
+  Q1931388: PERSON  #     8 QID · nguyen nhan chet
+  Q23002039: PERSON  #     8 QID · public educational institution of the united states
+  Q245016: PERSON  #     8 QID · can cu quan su
+  Q29428403: LOCATION  #     8 QID · so 5
+  Q36784: LOCATION  #     8 QID · vung cua phap
+  Q41176: PERSON  #     8 QID · building
+  Q476028: PERSON  #     8 QID · association football club
+  Q476068: PERSON  #     8 QID · act of congress in the united states
+  Q49773: DYNASTY  #     8 QID · social movement
+  Q517267: LOCATION  #     8 QID · commandery
+  Q53536964: PERSON  #     8 QID · royal palace
+  Q54114: LOCATION  #     8 QID · boulevard
+  Q6465: LOCATION  #     8 QID · department of france
+  Q7188: PERSON  #     8 QID · government
+  Q751876: PERSON  #     8 QID · chateau
+  Q910252: LOCATION  #     8 QID · cac bo hanh chinh lien bang hoa ky
+  Q968159: DYNASTY  #     8 QID · trao luu nghe thuat
+  Q135427824: PERSON  #     7 QID · government agency of vietnam
+  Q158454: LOCATION  #     7 QID · biosphere reserve
+  Q162875: PERSON  #     7 QID · mausoleum
+  Q179461: PERSON  #     7 QID · van ban ton giao
+  Q19563204: LOCATION  #     7 QID · quan khu quan đoi nhan dan viet nam
+  Q2001676: EVENT  #     7 QID · tan cong quan su
+  Q35798: LOCATION  #     7 QID · quyen hanh phap
+  Q37726: DYNASTY  #     7 QID · luc quan
+  Q381885: PERSON  #     7 QID · ngoi mo
+  Q4004706: PERSON  #     7 QID · unicase alphabet
+  Q414147: PERSON  #     7 QID · academy of sciences
+  Q44782: PERSON  #     7 QID · port
+  Q4504495: PERSON  #     7 QID · award ceremony
+  Q483110: PERSON  #     7 QID · stadium
+  Q5107: LOCATION  #     7 QID · continent
+  Q56055944: PERSON  #     7 QID · type of arts
+  Q561068: PERSON  #     7 QID · specialty channel
+  Q56242215: LOCATION  #     7 QID · catholic cathedral
+  Q746549: PERSON  #     7 QID · mon an
+  Q781132: DYNASTY  #     7 QID · quan chung
+  Q839328: LOCATION  #     7 QID · fu
+  Q859563: LOCATION  #     7 QID · quoc gia the tuc
+  Q879146: PERSON  #     7 QID · giao phai kito giao
+  Q110295396: PERSON  #     6 QID · type of musical instrument
+  Q1127126: DYNASTY  #     6 QID · military alliance
+  Q113145171: PERSON  #     6 QID · type of chemical entity
+  Q113813711: PERSON  #     6 QID · coin type
+  Q11396960: PERSON  #     6 QID · production company
+  Q118733587: PERSON  #     6 QID · type of meteorological phenomenon
+  Q1188663: PERSON  #     6 QID · colonial colleges
+  Q123129246: PERSON  #     6 QID · christian denominational family
+  Q124056273: PERSON  #     6 QID · artillery model
+  Q1254874: PERSON  #     6 QID · mang truyen hinh
+  Q129510955: PERSON  #     6 QID · type of value
+  Q1326966: TITLE  #     6 QID · kinh ngu
+  Q15087423: PERSON  #     6 QID · tieu chuan iso
+  Q15617994: LOCATION  #     6 QID · loai đon vi hanh chinh
+  Q174782: LOCATION  #     6 QID · square
+  Q18487055: PERSON  #     6 QID · missile model
+  Q188055: EVENT  #     6 QID · cuoc vay ham
+  Q189445: LOCATION  #     6 QID · co quan lap phap luong vien
+  Q192283: PERSON  #     6 QID · hang thong tan
+  Q207694: LOCATION  #     6 QID · bao tang nghe thuat
+  Q220659: PERSON  #     6 QID · archaeological artefact
+  Q2385804: PERSON  #     6 QID · co so giao duc
+  Q2418896: LOCATION  #     6 QID · chau luc
+  Q2755753: LOCATION  #     6 QID · area of london
+  Q31629: PERSON  #     6 QID · mon the thao
+  Q3301053: LOCATION  #     6 QID · quan-thanh pho thong nhat
+  Q3305213: PERSON  #     6 QID · buc tranh
+  Q3647172: LOCATION  #     6 QID · đon vi đo khoi luong
+  Q3953107: PERSON  #     6 QID · logographic writing system
+  Q39614: LOCATION  #     6 QID · cemetery
+  Q40357: PERSON  #     6 QID · prison
+  Q431289: PERSON  #     6 QID · brand
+  Q47566: PERSON  #     6 QID · united states presidential election
+  Q5767753: TITLE  #     6 QID · style
+  Q618123: LOCATION  #     6 QID · geographical feature
+  Q6838244: LOCATION  #     6 QID · chinese aaaaa-rated tourist attraction
+  Q75520: LOCATION  #     6 QID · cao nguyen
+  Q79913: PERSON  #     6 QID · non-governmental organization
+  Q8473: DYNASTY  #     6 QID · military
+  Q1070912: LOCATION  #     5 QID · zhou
+  Q1081138: LOCATION  #     5 QID · historic site
+  Q1097949: PERSON  #     5 QID · literary language
+  Q11114344: LOCATION  #     5 QID · points of the compass
+  Q112872396: PERSON  #     5 QID · type of educational institution
+  Q120560: LOCATION  #     5 QID · tieu vuong cung thanh đuong
+  Q1208802: LOCATION  #     5 QID · thanh pho truc thuoc trung uong
+  Q123705: LOCATION  #     5 QID · khu pho
+  Q1260524: LOCATION  #     5 QID · thoi gian trong ngay
+  Q135010: PERSON  #     5 QID · toi ac chien tranh
+  Q1371562: LOCATION  #     5 QID · unit of area
+  Q15056995: PERSON  #     5 QID · aircraft model
+  Q1509831: PERSON  #     5 QID · tuoc hieu cua đuc maria
+  Q15169167: PERSON  #     5 QID · execution method
+  Q15284: LOCATION  #     5 QID · khu tu quan
+  Q15632617: PERSON  #     5 QID · nhan vat hu cau
+  Q1616075: PERSON  #     5 QID · television station
+  Q162244: DYNASTY  #     5 QID · hero
+  Q169534: DYNASTY  #     5 QID · military division
+  Q171441: LOCATION  #     5 QID · enclave
+  Q17149090: DYNASTY  #     5 QID · armed organization
+  Q1752939: PERSON  #     5 QID · independent agency of the united states government
+  Q183366: LOCATION  #     5 QID · lanh tho
+  Q1855859: DYNASTY  #     5 QID · popular front
+  Q187588: DYNASTY  #     5 QID · giai cap
+  Q189004: PERSON  #     5 QID · truong cao đang
+  Q190752: TITLE  #     5 QID · toa an toi cao
+  Q192350: LOCATION  #     5 QID · bo chinh phu
+  Q1978718: LOCATION  #     5 QID · đon vi đo chieu dai
+  Q202686: LOCATION  #     5 QID · vuong quoc khoi thinh vuong chung
+  Q222516: PERSON  #     5 QID · school of buddhism
+  Q2235308: PERSON  #     5 QID · ship type
+  Q23691: PERSON  #     5 QID · quoc ca
+  Q2643280: LOCATION  #     5 QID · decad
+  Q2915955: DYNASTY  #     5 QID · phong trao triet hoc
+  Q34763: LOCATION  #     5 QID · ban đao
+  Q34876: LOCATION  #     5 QID · tinh
+  Q399495: PERSON  #     5 QID · standard language
+  Q42314054: PERSON  #     5 QID · ammunition model
+  Q4671277: PERSON  #     5 QID · academic institution
+  Q47728: PERSON  #     5 QID · hobby
+  Q47913: PERSON  #     5 QID · intelligence agency
+  Q49848: PERSON  #     5 QID · document
+  Q5003624: LOCATION  #     5 QID · memorial
+  Q5341295: PERSON  #     5 QID · educational organization
+  Q55488: LOCATION  #     5 QID · railway station
+  Q618618: LOCATION  #     5 QID · temple of confucius
+  Q625994: DYNASTY  #     5 QID · convention
+  Q6957341: PERSON  #     5 QID · major religious group
+  Q7366: PERSON  #     5 QID · bai hat
+  Q7755: PERSON  #     5 QID · hien phap
+  Q842402: LOCATION  #     5 QID · hindu temple
+  Q9248092: DYNASTY  #     5 QID · infantry division
+  Q10351538: LOCATION  #     4 QID · intercardinal direction
+  Q105390172: LOCATION  #     4 QID · roman catholic metropolitan archdiocese
+  Q108586636: PERSON  #     4 QID · form of event
+  Q10904438: LOCATION  #     4 QID · twelve vassals
+  Q11076354: LOCATION  #     4 QID · provincial administration commission
+  Q116505632: PERSON  #     4 QID · loai qua trinh
+  Q11828004: LOCATION  #     4 QID · tinh bang canada
+  Q1191035: PERSON  #     4 QID · kinh đien đai thua
+  Q121132955: PERSON  #     4 QID · type of mass media
+  Q1221156: LOCATION  #     4 QID · bang cua đuc
+  Q12284: PERSON  #     4 QID · kenh đao
+  Q12340140: PERSON  #     4 QID · tuan san
+  Q123615496: LOCATION  #     4 QID · vung cua hoa ky
+  Q12518: PERSON  #     4 QID · thap
+  Q12759805: LOCATION  #     4 QID · sultanate
+  Q131681: LOCATION  #     4 QID · ho chua nuoc
+  Q131986827: PERSON  #     4 QID · residence of the british royal family
+  Q1323642: LOCATION  #     4 QID · quoc gia lien luc đia
+  Q1351282: LOCATION  #     4 QID · crown colony
+  Q137325575: LOCATION  #     4 QID · former subdivisions of vietnam
+  Q14350: PERSON  #     4 QID · đai phat thanh
+  Q14770218: LOCATION  #     4 QID · thu phu bang cua thuy si
+  Q14911880: PERSON  #     4 QID · catholic seminary
+  Q15285626: PERSON  #     4 QID · to chuc do lien hop quoc thanh lap
+  Q1530022: PERSON  #     4 QID · to chuc ton giao
+  Q15416: PERSON  #     4 QID · chuong trinh truyen hinh
+  Q1589009: PERSON  #     4 QID · privately held company
+  Q16077796: PERSON  #     4 QID · vice-ministerial level university
+  Q162633: PERSON  #     4 QID · academy
+  Q16317911: LOCATION  #     4 QID · positive integer
+  Q16335899: PERSON  #     4 QID · watercraft type
+  Q164142: LOCATION  #     4 QID · protectorate
+  Q17018380: LOCATION  #     4 QID · bight
+  Q17232649: LOCATION  #     4 QID · news website
+  Q17431399: LOCATION  #     4 QID · national museum
+  Q17737: PERSON  #     4 QID · theory
+  Q1790144: LOCATION  #     4 QID · đon vi thoi gian
+  Q179049: LOCATION  #     4 QID · khu bao ton thien nhien
+  Q18328097: PERSON  #     4 QID · giai thuong dung cam
+  Q18511725: LOCATION  #     4 QID · cho huyen
+  Q189819: PERSON  #     4 QID · nghi thuc
+  Q1941779: PERSON  #     4 QID · fashion house
+  Q1966910: PERSON  #     4 QID · hoc vien quoc gia
+  Q19832712: LOCATION  #     4 QID · khu vuc hanh chinh cu
+  Q2001305: PERSON  #     4 QID · kenh truyen hinh
+  Q20642011: DYNASTY  #     4 QID · guerrilla organization
+  Q208164: LOCATION  #     4 QID · chinh phu bu nhin
+  Q2087181: LOCATION  #     4 QID · bao tang ngoi nha lich su
+  Q20901295: LOCATION  #     4 QID · bo ngoai giao
+  Q209225: PERSON  #     4 QID · national liberation movement
+  Q21286738: PERSON  #     4 QID · wikimedia permanent duplicate item
+  Q2198855: DYNASTY  #     4 QID · cultural movement
+  Q23002037: PERSON  #     4 QID · public educational institution
+  Q24529780: LOCATION  #     4 QID · mui đat
+  Q2748296: PERSON  #     4 QID · varieties of chinese
+  Q2977: LOCATION  #     4 QID · nha tho chinh toa
+  Q317623: PERSON  #     4 QID · tieu chuan ky thuat
+  Q321839: PERSON  #     4 QID · hiep đinh
+  Q3238337: LOCATION  #     4 QID · đia điem than thoai
+  Q33829: DYNASTY  #     4 QID · dan cu
+  Q35509: LOCATION  #     4 QID · hang
+  Q3559093: LOCATION  #     4 QID · thanh pho tru an
+  Q35749: LOCATION  #     4 QID · nghi vien
+  Q4161959: TITLE  #     4 QID · vietnamese communal house
+  Q43263: LOCATION  #     4 QID · federal subject of russia
+  Q43702: LOCATION  #     4 QID · federation
+  Q462778: LOCATION  #     4 QID · insular area of the united states
+  Q4686866: DYNASTY  #     4 QID · advisory board
+  Q494230: PERSON  #     4 QID · medical school
+  Q50707: LOCATION  #     4 QID · composite number
+  Q5741069: PERSON  #     4 QID · rock band
+  Q59281: PERSON  #     4 QID · provisional government
+  Q615150: PERSON  #     4 QID · land-grant university
+  Q640506: LOCATION  #     4 QID · cabinet
+  Q6576792: LOCATION  #     4 QID · online community
+  Q66344: PERSON  #     4 QID · central bank
+  Q7275: LOCATION  #     4 QID · nha nuoc
+  Q728937: LOCATION  #     4 QID · tuyen đuong sat
+  Q730038: PERSON  #     4 QID · credit institution
+  Q757292: TITLE  #     4 QID · cua khau
+  Q778129: PERSON  #     4 QID · tau tuan duong hang nhe
+  Q778575: PERSON  #     4 QID · tap đoan
+  Q783794: PERSON  #     4 QID · cong ty
+  Q786820: PERSON  #     4 QID · automobile manufacturer
+  Q788104: LOCATION  #     4 QID · chau tu tri
+  Q7889: PERSON  #     4 QID · tro choi video
+  Q811102: PERSON  #     4 QID · type of building
+  Q811979: PERSON  #     4 QID · built structure
+  Q8436: DYNASTY  #     4 QID · family
+  Q98658352: PERSON  #     4 QID · co so giao duc đai hoc truc thuoc bo giao duc cong hoa nhan dan trung hoa
+  Q104212151: EVENT  #     3 QID · series of wars
+  Q10794275: LOCATION  #     3 QID · northern, central and southern vietnam
+  Q10870555: PERSON  #     3 QID · report
+  Q109288825: DYNASTY  #     3 QID · male duo
+  Q110315658: LOCATION  #     3 QID · elected legislative house
+  Q111972893: PERSON  #     3 QID · type of structure
+  Q11204: LOCATION  #     3 QID · legislature
+  Q1126006: PERSON  #     3 QID · public broadcaster
+  Q115456878: PERSON  #     3 QID · legislative branch agency
+  Q115859704: TITLE  #     3 QID · honorific suffix
+  Q116476516: PERSON  #     3 QID · kich ban
+  Q117467246: PERSON  #     3 QID · animated television series
+  Q119892838: PERSON  #     3 QID · type of mixture of chemical entities
+  Q12039044: LOCATION  #     3 QID · tran
+  Q122395435: LOCATION  #     3 QID · vuon quoc gia tai viet nam
+  Q122754124: PERSON  #     3 QID · ambiguous wikidata item
+  Q1233637: LOCATION  #     3 QID · cua song
+  Q124054676: PERSON  #     3 QID · firearm family
+  Q124315169: PERSON  #     3 QID · vehicle functional class
+  Q1269299: PERSON  #     3 QID · type of business entity
+  Q129492653: PERSON  #     3 QID · defunct military organization
+  Q1307777: DYNASTY  #     3 QID · united front
+  Q13217644: LOCATION  #     3 QID · huyen cua bo đao nha
+  Q1322134: LOCATION  #     3 QID · vinh bien
+  Q1323212: EVENT  #     3 QID · noi day
+  Q133056: LOCATION  #     3 QID · đeo
+  Q13366104: LOCATION  #     3 QID · so chan
+  Q134556: PERSON  #     3 QID · đia đon
+  Q1345691: PERSON  #     3 QID · to chuc tai chinh quoc te
+  Q1370598: PERSON  #     3 QID · structure of worship
+  Q137183855: PERSON  #     3 QID · perfume brand
+  Q137786897: PERSON  #     3 QID · organization or unit established by the chinese communist party
+  Q137863866: PERSON  #     3 QID · type of prison facility
+  Q138796: PERSON  #     3 QID · resistance movement
+  Q139312011: PERSON  #     3 QID · united nations programmes and funds
+  Q1393724: DYNASTY  #     3 QID · political faction
+  Q1401304: PERSON  #     3 QID · economic theory
+  Q141145821: PERSON  #     3 QID · global systemically important bank
+  Q1414991: LOCATION  #     3 QID · area
+  Q1464916: PERSON  #     3 QID · tuyen ngon đoc lap
+  Q1517777: PERSON  #     3 QID · tac pham van hoc lich su phi hu cau
+  Q15265344: PERSON  #     3 QID · đai phat thanh truyen hinh
+  Q154547: LOCATION  #     3 QID · cong quoc
+  Q1547289: LOCATION  #     3 QID · lutherstadt
+  Q15590336: PERSON  #     3 QID · dich vu phat nhac truc tuyen
+  Q15627509: DYNASTY  #     3 QID · to chuc quan đoi
+  Q15899789: PERSON  #     3 QID · principal organ of the united nations
+  Q15911314: DYNASTY  #     3 QID · association
+  Q15911738: LOCATION  #     3 QID · hydroelectric power station
+  Q16335296: TITLE  #     3 QID · historical profession
+  Q166118: PERSON  #     3 QID · archives
+  Q167346: LOCATION  #     3 QID · botanical garden
+  Q1684600: PERSON  #     3 QID · news magazine
+  Q17127659: PERSON  #     3 QID · terrorist organization
+  Q175331: DYNASTY  #     3 QID · demonstration
+  Q1785071: PERSON  #     3 QID · đon
+  Q1785733: PERSON  #     3 QID · environmental organization
+  Q178706: PERSON  #     3 QID · thiet che xa hoi
+  Q1788716: PERSON  #     3 QID · giai thuong quan su
+  Q179805: PERSON  #     3 QID · triet hoc chinh tri
+  Q181648: PERSON  #     3 QID · chinh sach ngoai giao
+  Q18388277: PERSON  #     3 QID · cong ty cong nghe
+  Q18487018: PERSON  #     3 QID · missile family
+  Q18564543: DYNASTY  #     3 QID · hoi nghi quoc te
+  Q188686: EVENT  #     3 QID · chiem đong quan su
+  Q1898047: PERSON  #     3 QID · ton kinh đuc maria
+  Q1901835: LOCATION  #     3 QID · seat of government
+  Q1907114: LOCATION  #     3 QID · vung đo thi
+  Q1935049: LOCATION  #     3 QID · military school
+  Q1945590: DYNASTY  #     3 QID · native indonesians
+  Q19842652: PERSON  #     3 QID · ton giao đoc than
+  Q19860854: PERSON  #     3 QID · destroyed building or structure
+  Q20027953: PERSON  #     3 QID · aircraft functional class
+  Q20181813: LOCATION  #     3 QID · colonial power
+  Q202866: PERSON  #     3 QID · phim hoat hinh
+  Q208109: DYNASTY  #     3 QID · cum tap đoan quan
+  Q20829075: PERSON  #     3 QID · type of language
+  Q20857065: PERSON  #     3 QID · co quan cua chinh quyen lien bang hoa ky
+  Q212805: LOCATION  #     3 QID · thu vien so
+  Q214339: PERSON  #     3 QID · social role
+  Q219577: PERSON  #     3 QID · holding company
+  Q22698: LOCATION  #     3 QID · park
+  Q22746: PERSON  #     3 QID · urban park
+  Q22806: PERSON  #     3 QID · national library
+  Q2305295: PERSON  #     3 QID · weekly newspaper
+  Q23413: PERSON  #     3 QID · castle
+  Q24354: PERSON  #     3 QID · nha hat
+  Q24746: LOCATION  #     3 QID · tinh cua philippines
+  Q2493450: PERSON  #     3 QID · juvenile political organisation
+  Q2558684: LOCATION  #     3 QID · ngay le quoc te
+  Q26213387: LOCATION  #     3 QID · olympic delegation
+  Q2716508: PERSON  #     3 QID · political international
+  Q27318: PERSON  #     3 QID · test
+  Q27686: PERSON  #     3 QID · hotel
+  Q27949697: PERSON  #     3 QID · wikibase reason for deprecated rank
+  Q28653: PERSON  #     3 QID · dong khat thuc
+  Q28739697: LOCATION  #     3 QID · huyen co đai cua trung quoc
+  Q28819924: TITLE  #     3 QID · political alignment
+  Q2973801: LOCATION  #     3 QID · defense line
+  Q3139516: TITLE  #     3 QID · ecclesiastical occupation
+  Q32090: DYNASTY  #     3 QID · loi song
+  Q3238445: PERSON  #     3 QID · co quan an ninh
+  Q3257686: LOCATION  #     3 QID · locality
+  Q3336843: LOCATION  #     3 QID · cac quoc gia cua vuong quoc lien hiep anh
+  Q3354859: PERSON  #     3 QID · collegiate university
+  Q335806: PERSON  #     3 QID · abugida
+  Q350604: EVENT  #     3 QID · xung đot vu trang
+  Q3562482: TITLE  #     3 QID · ecclesiastical address
+  Q368716: LOCATION  #     3 QID · ukrainian historical regions
+  Q373899: PERSON  #     3 QID · bang xep hang am nhac
+  Q378427: PERSON  #     3 QID · giai thuong van hoc
+  Q3882219: DYNASTY  #     3 QID · am sat
+  Q3958441: PERSON  #     3 QID · economic sector
+  Q40080: LOCATION  #     3 QID · beach
+  Q4209223: LOCATION  #     3 QID · rechtsstaat
+  Q42523: LOCATION  #     3 QID · atoll
+  Q4287745: PERSON  #     3 QID · medical organization
+  Q4358176: DYNASTY  #     3 QID · council
+  Q436240: PERSON  #     3 QID · ancient language
+  Q465613: PERSON  #     3 QID · people's republic
+  Q46622: LOCATION  #     3 QID · controlled-access highway
+  Q48204: PERSON  #     3 QID · voluntary association
+  Q5009242: PERSON  #     3 QID · cable channel
+  Q5135744: PERSON  #     3 QID · catholic religious institute
+  Q518261: LOCATION  #     3 QID · cultural area
+  Q537127: LOCATION  #     3 QID · road bridge
+  Q5379090: TITLE  #     3 QID · enlisted rank
+  Q54050: LOCATION  #     3 QID · hill
+  Q57831: LOCATION  #     3 QID · fortress
+  Q591942: LOCATION  #     3 QID · distributary
+  Q59825643: LOCATION  #     3 QID · online music database
+  Q60075825: LOCATION  #     3 QID · christian holy day
+  Q6058157: DYNASTY  #     3 QID · god
+  Q63188683: TITLE  #     3 QID · christian religious occupation
+  Q63188808: TITLE  #     3 QID · catholic vocation
+  Q6589202: LOCATION  #     3 QID · interior ministry
+  Q678146: EVENT  #     3 QID · bombardment
+  Q690109: PERSON  #     3 QID · branch of service
+  Q7055: PERSON  #     3 QID · buddha
+  Q727002: PERSON  #     3 QID · hien chuong
+  Q735428: LOCATION  #     3 QID · tran
+  Q783733: LOCATION  #     3 QID · lanh tho chua hop nhat cua hoa ky
+  Q7893188: DYNASTY  #     3 QID · united states special operations forces
+  Q8187769: PERSON  #     3 QID · economic activity
+  Q8192: PERSON  #     3 QID · writing system
+  Q820655: PERSON  #     3 QID · statute
+  Q83828: DYNASTY  #     3 QID · ethnic groups in indonesia
+  Q8513: PERSON  #     3 QID · database
+  Q852190: LOCATION  #     3 QID · shipwreck
+  Q855697: LOCATION  #     3 QID · subcontinent
+  Q860572: PERSON  #     3 QID · photo agency
+  Q864737: EVENT  #     3 QID · cac đieu uoc bat binh đang
+  Q9319988: LOCATION  #     3 QID · tinh
+  Q9430: LOCATION  #     3 QID · đai duong
+  Q9639292: PERSON  #     3 QID · giai thuong hoa binh
+  Q977690: DYNASTY  #     3 QID · anh hung van hoa
+  Q1006644: PERSON  #     2 QID · federal government
+  Q10300916: LOCATION  #     2 QID · cultural heritage of china
+  Q10429667: PERSON  #     2 QID · car brand
+  Q1046088: PERSON  #     2 QID · hall of fame
+  Q1048835: LOCATION  #     2 QID · political territorial entity
+  Q105074756: LOCATION  #     2 QID · municipal corporation of west bengal
+  Q105499501: DYNASTY  #     2 QID · united states navy fleet
+  Q1061197: PERSON  #     2 QID · radio network
+  Q10689397: PERSON  #     2 QID · television production company
+  Q1073535: LOCATION  #     2 QID · economic and technological development zone
+  Q1074150: PERSON  #     2 QID · shogunate
+  Q10742: LOCATION  #     2 QID · autonomous community of spain
+  Q1075664: PERSON  #     2 QID · port of entry
+  Q1078001: LOCATION  #     2 QID · territorial dispute
+  Q1080794: PERSON  #     2 QID · public school
+  Q108102018: PERSON  #     2 QID · romanisation system
+  Q10874708: DYNASTY  #     2 QID · chinese salvationist religion
+  Q10948212: PERSON  #     2 QID · confucian royal ancestral shrine
+  Q109551565: PERSON  #     2 QID · sub-set of literature
+  Q109607: PERSON  #     2 QID · ruins
+  Q11059241: PERSON  #     2 QID · chinese script style
+  Q1115575: LOCATION  #     2 QID · civil parish
+  Q112144412: PERSON  #     2 QID · esports discipline
+  Q11229656: PERSON  #     2 QID · tank landing ship
+  Q11303: PERSON  #     2 QID · skyscraper
+  Q113065939: PERSON  #     2 QID · embassy of the united states
+  Q11371169: LOCATION  #     2 QID · incident
+  Q1139665: DYNASTY  #     2 QID · political murder
+  Q11410: PERSON  #     2 QID · game
+  Q11422536: PERSON  #     2 QID · international sport governing body
+  Q11422631: PERSON  #     2 QID · united nations depository library
+  Q11436: PERSON  #     2 QID · aircraft
+  Q11448906: PERSON  #     2 QID · science award
+  Q1149626: PERSON  #     2 QID · written language
+  Q115154402: LOCATION  #     2 QID · independent museum
+  Q1154710: PERSON  #     2 QID · association football venue
+  Q115859699: TITLE  #     2 QID · honorific prefix
+  Q1160573: PERSON  #     2 QID · horse breed
+  Q1167393: PERSON  #     2 QID · chi so kinh te
+  Q12046615: PERSON  #     2 QID · feature type
+  Q1220959: TITLE  #     2 QID · building of public administration
+  Q1225300: LOCATION  #     2 QID · thanh bo
+  Q1227249: LOCATION  #     2 QID · international incident
+  Q122759350: LOCATION  #     2 QID · user-generated content platform
+  Q12292478: PERSON  #     2 QID · estate
+  Q124056256: PERSON  #     2 QID · artillery family
+  Q124098638: LOCATION  #     2 QID · giao tinh cong giao
+  Q1243341: LOCATION  #     2 QID · bo thuong mai
+  Q1244442: LOCATION  #     2 QID · nha truong
+  Q125161275: PERSON  #     2 QID · type of intelligence
+  Q1255828: PERSON  #     2 QID · tranh cai
+  Q125824188: PERSON  #     2 QID · ecosystem type
+  Q1266087: PERSON  #     2 QID · meteorological service organization
+  Q127701543: DYNASTY  #     2 QID · direct reporting unit
+  Q130303173: PERSON  #     2 QID · service type
+  Q130735522: LOCATION  #     2 QID · online film database
+  Q130753312: PERSON  #     2 QID · symptom type
+  Q1310214: PERSON  #     2 QID · utensil
+  Q13136: PERSON  #     2 QID · reference work
+  Q131733833: PERSON  #     2 QID · type of architectural structure
+  Q1320047: PERSON  #     2 QID · nha xuat ban sach
+  Q13212489: LOCATION  #     2 QID · quan cua california
+  Q1322198: PERSON  #     2 QID · ngon ngu noi
+  Q1328899: PERSON  #     2 QID · to chuc tieu chuan
+  Q133311: DYNASTY  #     2 QID · bo lac
+  Q133449656: PERSON  #     2 QID · loai tac pham
+  Q1336152: LOCATION  #     2 QID · phien vuong quoc
+  Q133997300: LOCATION  #     2 QID · einheitsgemeinde of lower saxony
+  Q134496690: PERSON  #     2 QID · facility type
+  Q1353040: LOCATION  #     2 QID · coast guard
+  Q135408445: PERSON  #     2 QID · men's national association football team
+  Q135892289: PERSON  #     2 QID · branch of linguistics
+  Q1364302: LOCATION  #     2 QID · ministry of agriculture
+  Q136532437: DYNASTY  #     2 QID · pla branch
+  Q137189275: PERSON  #     2 QID · type of economic system
+  Q137290726: PERSON  #     2 QID · language-based geopolitical organization
+  Q1376651: LOCATION  #     2 QID · foreign concession in china
+  Q1378975: PERSON  #     2 QID · convention center
+  Q138348131: TITLE  #     2 QID · male occupation
+  Q14083: PERSON  #     2 QID · dollar
+  Q1413677: LOCATION  #     2 QID · justice ministry
+  Q14212: TITLE  #     2 QID · thu tuong
+  Q143467: DYNASTY  #     2 QID · unified combatant command
+  Q1475062: PERSON  #     2 QID · joint resolution
+  Q1497375: LOCATION  #     2 QID · quan the kien truc
+  Q1500350: LOCATION  #     2 QID · huong
+  Q153562: PERSON  #     2 QID · nha hat opera
+  Q15633582: LOCATION  #     2 QID · wiki mediawiki
+  Q1572070: PERSON  #     2 QID · youth organization
+  Q15987302: PERSON  #     2 QID · legal profession
+  Q15991303: PERSON  #     2 QID · association football league
+  Q16017119: DYNASTY  #     2 QID · collective pseudonym
+  Q16103215: PERSON  #     2 QID · boat type
+  Q16519632: PERSON  #     2 QID · scientific organization
+  Q168247: LOCATION  #     2 QID · famine
+  Q16831714: TITLE  #     2 QID · government building
+  Q170156: LOCATION  #     2 QID · confederation
+  Q1707847: PERSON  #     2 QID · role
+  Q1709894: PERSON  #     2 QID · journalism prize
+  Q17197366: PERSON  #     2 QID · type of organization
+  Q17272482: LOCATION  #     2 QID · time zone named for a utc offset
+  Q17343829: LOCATION  #     2 QID · unincorporated community
+  Q174736: PERSON  #     2 QID · destroyer
+  Q1752346: PERSON  #     2 QID · assembly
+  Q1760704: EVENT  #     2 QID · withdrawal
+  Q1767829: PERSON  #     2 QID · comprehensive university
+  Q1781039: PERSON  #     2 QID · murti
+  Q1784293: LOCATION  #     2 QID · cordon
+  Q1788820: LOCATION  #     2 QID · bo quoc phong
+  Q1789476: PERSON  #     2 QID · co so du lieu thu muc
+  Q179671: LOCATION  #     2 QID · quoc gia dan toc
+  Q180592: PERSON  #     2 QID · triet hoc xa hoi
+  Q180684: LOCATION  #     2 QID · xung đot
+  Q1825472: LOCATION  #     2 QID · cau mai che
+  Q183342: LOCATION  #     2 QID · thanh pho lien bang cua nga
+  Q185113: LOCATION  #     2 QID · mui đat
+  Q1851368: PERSON  #     2 QID · waterfront
+  Q188497: DYNASTY  #     2 QID · quan đoan
+  Q188976: DYNASTY  #     2 QID · van hoa phan khang
+  Q189970: PERSON  #     2 QID · đia vi xa hoi
+  Q190: DYNASTY  #     2 QID · thien chua
+  Q19020: PERSON  #     2 QID · giai oscar
+  Q190928: PERSON  #     2 QID · shipyard
+  Q19097: DYNASTY  #     2 QID · mon phai
+  Q192611: LOCATION  #     2 QID · khu vuc bau cu
+  Q192914: PERSON  #     2 QID · sung bai ca nhan
+  Q1968435: LOCATION  #     2 QID · am thuc theo quoc gia
+  Q199451: PERSON  #     2 QID · thap
+  Q19958368: LOCATION  #     2 QID · van hoa cua mot vung
+  Q202216: LOCATION  #     2 QID · tinh hai ngoai
+  Q2023214: PERSON  #     2 QID · political party in germany
+  Q204310: DYNASTY  #     2 QID · hien binh
+  Q2065227: PERSON  #     2 QID · cong bao
+  Q20679540: DYNASTY  #     2 QID · chuoi rap chieu phim
+  Q20739124: PERSON  #     2 QID · entertainment company
+  Q20858006: PERSON  #     2 QID · federal law enforcement agency of the united states
+  Q21010817: LOCATION  #     2 QID · thanh pho cua pennsylvania
+  Q2114972: PERSON  #     2 QID · dinh tong thong
+  Q211503: DYNASTY  #     2 QID · thi toc
+  Q212434: PERSON  #     2 QID · mon the thao olympic
+  Q2143781: PERSON  #     2 QID · drama school
+  Q21484471: PERSON  #     2 QID · wikimedia article covering multiple topics
+  Q216048: PERSON  #     2 QID · team sport
+  Q2182919: PERSON  #     2 QID · alphabetic writing system
+  Q22222786: PERSON  #     2 QID · government program
+  Q2269756: PERSON  #     2 QID · ministry of education
+  Q22811234: PERSON  #     2 QID · branch of philosophy
+  Q2288051: PERSON  #     2 QID · party conference
+  Q22923920: LOCATION  #     2 QID · territorial collectivity of france with special status
+  Q23015928: TITLE  #     2 QID · postgraduate degree
+  Q231002: DYNASTY  #     2 QID · nationality
+  Q234497: DYNASTY  #     2 QID · special forces
+  Q2355426: PERSON  #     2 QID · distress signal
+  Q2366457: PERSON  #     2 QID · bo phan
+  Q2408310: PERSON  #     2 QID · bao luc tinh duc trong chien tranh
+  Q24764: LOCATION  #     2 QID · đo thi tu tri cua philippines
+  Q250858: PERSON  #     2 QID · pluricentric language
+  Q2511322: LOCATION  #     2 QID · lycee
+  Q25235: LOCATION  #     2 QID · gio
+  Q252550: EVENT  #     2 QID · hiep đinh thuong mai
+  Q253555: PERSON  #     2 QID · tau san bay ho tong
+  Q25403900: PERSON  #     2 QID · food ingredient
+  Q2570643: LOCATION  #     2 QID · vien nguyen lao
+  Q2618461: PERSON  #     2 QID · legislative election
+  Q26208812: DYNASTY  #     2 QID · corps of vietnam people's army
+  Q26236686: PERSON  #     2 QID · east india company
+  Q265662: PERSON  #     2 QID · national university
+  Q2668072: PERSON  #     2 QID · collection
+  Q2680845: LOCATION  #     2 QID · chinese temple
+  Q2713379: LOCATION  #     2 QID · papal basilica
+  Q276548: PERSON  #     2 QID · secret society
+  Q27665152: PERSON  #     2 QID · military project
+  Q2772772: PERSON  #     2 QID · military museum
+  Q28097443: PERSON  #     2 QID · hour system
+  Q28598684: PERSON  #     2 QID · branch of biology
+  Q28692623: DYNASTY  #     2 QID · tong quan
+  Q29431432: LOCATION  #     2 QID · nhom hai
+  Q30277550: PERSON  #     2 QID · sach lich su
+  Q30301495: PERSON  #     2 QID · legendary bird
+  Q30920856: PERSON  #     2 QID · hich
+  Q3184121: LOCATION  #     2 QID · đo thi cua brasil
+  Q3220391: LOCATION  #     2 QID · dich vu mang xa hoi
+  Q3233636: PERSON  #     2 QID · bi tich cua giao hoi cong giao
+  Q3311614: TIME  #     2 QID · nam nhuan the ky
+  Q3326717: DYNASTY  #     2 QID · phong trao van hoc
+  Q3331189: PERSON  #     2 QID · phien ban, an ban, hoac ban dich
+  Q3337001: LOCATION  #     2 QID · nationality for sports
+  Q334383: LOCATION  #     2 QID · abbey church
+  Q34038: LOCATION  #     2 QID · thac
+  Q3406098: PERSON  #     2 QID · prayer in the catholic church
+  Q348120: LOCATION  #     2 QID · chien tranh đo bo
+  Q3543043: PERSON  #     2 QID · quay
+  Q3551775: PERSON  #     2 QID · đai hoc o phap
+  Q355304: LOCATION  #     2 QID · dong song
+  Q358: LOCATION  #     2 QID · di san
+  Q358078: LOCATION  #     2 QID · road network
+  Q3586152: PERSON  #     2 QID · giao hoi giam nhiem
+  Q37002670: LOCATION  #     2 QID · co quan lap phap nhat vien
+  Q37484: PERSON  #     2 QID · su thi
+  Q375355: LOCATION  #     2 QID · harshad number
+  Q3771738: PERSON  #     2 QID · historical document
+  Q386724: PERSON  #     2 QID · tac pham
+  Q391009: PERSON  #     2 QID · dong tu cong giao
+  Q391414: PERSON  #     2 QID · architectural element
+  Q3917681: PERSON  #     2 QID · đai su quan
+  Q3947: PERSON  #     2 QID · house
+  Q39725049: PERSON  #     2 QID · type of publication
+  Q4120211: LOCATION  #     2 QID · regional organization
+  Q41825: LOCATION  #     2 QID · day of the week
+  Q4204501: DYNASTY  #     2 QID · historical ethnic group
+  Q431603: PERSON  #     2 QID · advocacy group
+  Q43501: LOCATION  #     2 QID · zoo
+  Q4356073: PERSON  #     2 QID · spectator sport
+  Q44342: PERSON  #     2 QID · legend
+  Q4504549: TITLE  #     2 QID · religious role
+  Q46195901: LOCATION  #     2 QID · paralympics delegation
+  Q471855: PERSON  #     2 QID · jurisdiction
+  Q47272186: DYNASTY  #     2 QID · headquarters
+  Q473972: LOCATION  #     2 QID · protected area
+  Q474090: PERSON  #     2 QID · narrative poetry
+  Q476190: DYNASTY  #     2 QID · united states congressional committee
+  Q477544: DYNASTY  #     2 QID · new religious movement
+  Q481289: PERSON  #     2 QID · official residence
+  Q4835091: LOCATION  #     2 QID · vung lanh tho
+  Q494978: LOCATION  #     2 QID · special economic zone
+  Q507619: DYNASTY  #     2 QID · retail chain
+  Q51041800: PERSON  #     2 QID · religious administrative entity
+  Q511866: EVENT  #     2 QID · mutiny
+  Q5162954: PERSON  #     2 QID · conservation designation
+  Q51977: DYNASTY  #     2 QID · field army
+  Q5312628: LOCATION  #     2 QID · protectorate
+  Q545779: LOCATION  #     2 QID · pejorative
+  Q546113: PERSON  #     2 QID · public policy
+  Q54982412: DYNASTY  #     2 QID · songwriting team
+  Q559856: PERSON  #     2 QID · online video platform
+  Q56190453: LOCATION  #     2 QID · memorial complex
+  Q5687161: PERSON  #     2 QID · branch of agriculture
+  Q57598: LOCATION  #     2 QID · national day
+  Q5760634: LOCATION  #     2 QID · hectad
+  Q582525: LOCATION  #     2 QID · ethnic township
+  Q58483083: PERSON  #     2 QID · dramatico-musical work
+  Q58927801: PERSON  #     2 QID · ethical theory
+  Q59152282: PERSON  #     2 QID · video streaming service
+  Q610038: PERSON  #     2 QID · silver coin
+  Q6138528: DYNASTY  #     2 QID · political coalition
+  Q620615: PERSON  #     2 QID · mobile app
+  Q6313217: PERSON  #     2 QID · time standard
+  Q6456916: LOCATION  #     2 QID · national economy
+  Q650241: PERSON  #     2 QID · financial institution
+  Q66715801: TITLE  #     2 QID · musical profession
+  Q67185949: LOCATION  #     2 QID · last day of february
+  Q678116: PERSON  #     2 QID · government-in-exile
+  Q6813432: DYNASTY  #     2 QID · military staff
+  Q683992: PERSON  #     2 QID · military prison
+  Q6857706: TITLE  #     2 QID · military profession
+  Q702492: LOCATION  #     2 QID · urban area
+  Q702842: LOCATION  #     2 QID · municipal arrondissement of france
+  Q7075: PERSON  #     2 QID · library
+  Q7138926: TITLE  #     2 QID · parliament building
+  Q7272488: TITLE  #     2 QID · political systems of imperial china
+  Q7311342: PERSON  #     2 QID · religious controversy
+  Q73187956: LOCATION  #     2 QID · day of the gregorian calendar
+  Q732948: PERSON  #     2 QID · tu đoan tong đo
+  Q745456: LOCATION  #     2 QID · cum kinh doanh
+  Q779239: PERSON  #     2 QID · phat thanh quoc te
+  Q779415: LOCATION  #     2 QID · đac khu hanh chinh cong hoa nhan dan trung hoa
+  Q7860962: PERSON  #     2 QID · road type
+  Q80096233: PERSON  #     2 QID · wikimedia information list
+  Q828909: PERSON  #     2 QID · wharf
+  Q831740: LOCATION  #     2 QID · krai of russia
+  Q83620: LOCATION  #     2 QID · thoroughfare
+  Q847027: PERSON  #     2 QID · grande ecole
+  Q847906: PERSON  #     2 QID · online magazine
+  Q848507: PERSON  #     2 QID · commercial bank
+  Q861911: PERSON  #     2 QID · dien van
+  Q864113: EVENT  #     2 QID · chien tranh uy nhiem
+  Q878223: LOCATION  #     2 QID · son nguyen
+  Q898771: PERSON  #     2 QID · tau tuan duong hang nang
+  Q9026907: DYNASTY  #     2 QID · magnicide
+  Q91615393: PERSON  #     2 QID · khoan muc wikidata can đuoc chia re
+  Q917182: PERSON  #     2 QID · military academy
+  Q9209474: LOCATION  #     2 QID · auction house
+  Q922203: PERSON  #     2 QID · bo luat
+  Q932268: PERSON  #     2 QID · he thong đo luong
+  Q93468132: LOCATION  #     2 QID · hexadecad
+  Q9357091: PERSON  #     2 QID · ly luan chinh tri
+  Q936518: PERSON  #     2 QID · hang san xuat hang khong vu tru
+  Q956214: LOCATION  #     2 QID · tinh ly
+  Q96474707: PERSON  #     2 QID · honorary award
+  Q97166215: LOCATION  #     2 QID · thanh pho thuoc thanh pho truc thuoc trung uong cua viet nam
+  Q98645843: PERSON  #     2 QID · wikimedia music-related list
+  Q1001051: PERSON  #     1 QID · buddhist text
+  Q100151658: LOCATION  #     1 QID · failure mode
+  Q1004875: DYNASTY  #     1 QID · bumiputera
+  Q1015103: PERSON  #     1 QID · castle chapel
+  Q101965: DYNASTY  #     1 QID · experiment
+  Q102046748: PERSON  #     1 QID · freedom of information law
+  Q102336293: PERSON  #     1 QID · live streaming service
+  Q102410240: PERSON  #     1 QID · amendment to the united states constitution
+  Q10273077: PERSON  #     1 QID · architecture school
+  Q103229495: PERSON  #     1 QID · men's association football team
+  Q103810966: TITLE  #     1 QID · circus profession
+  Q103812529: PERSON  #     1 QID · organ type
+  Q103817: DYNASTY  #     1 QID · indigenous people
+  Q103843042: PERSON  #     1 QID · organism subdivision type
+  Q10387689: LOCATION  #     1 QID · unit of power
+  Q1040374: DYNASTY  #     1 QID · group
+  Q1043197: DYNASTY  #     1 QID · divination
+  Q104649845: PERSON  #     1 QID · film organization
+  Q104740165: DYNASTY  #     1 QID · set of religion characters
+  Q104843: PERSON  #     1 QID · cruiser
+  Q1048606: DYNASTY  #     1 QID · foreign legion
+  Q1049394: PERSON  #     1 QID · phonetic transcription
+  Q1049757: PERSON  #     1 QID · multi-purpose stadium
+  Q105027608: DYNASTY  #     1 QID · republic of korea marine corps brigade
+  Q105036901: DYNASTY  #     1 QID · infantry division of the republic of korea army
+  Q105079980: TITLE  #     1 QID · anglican archbishop
+  Q105085320: PERSON  #     1 QID · beobachtungsobjekt
+  Q105571050: DYNASTY  #     1 QID · cavalry division
+  Q105758271: PERSON  #     1 QID · multilateral development bank
+  Q105765460: DYNASTY  #     1 QID · russian fleet
+  Q1058914: PERSON  #     1 QID · software company
+  Q1062856: LOCATION  #     1 QID · anniversary
+  Q1063239: PERSON  #     1 QID · polity
+  Q1063547: PERSON  #     1 QID · voice type
+  Q106355253: PERSON  #     1 QID · gospel episode
+  Q106611381: DYNASTY  #     1 QID · jewelry shop chain
+  Q106651372: PERSON  #     1 QID · business newspaper
+  Q106651430: PERSON  #     1 QID · communist newspaper
+  Q106652786: PERSON  #     1 QID · entertainment newspaper
+  Q106668646: PERSON  #     1 QID · military newspaper
+  Q10669482: TITLE  #     1 QID · minister of the navy
+  Q106719627: LOCATION  #     1 QID · ministry of the soviet union
+  Q1068145: PERSON  #     1 QID · official script
+  Q1068842: LOCATION  #     1 QID · footbridge
+  Q106947327: PERSON  #     1 QID · regulations
+  Q106974458: PERSON  #     1 QID · long-series books
+  Q107099245: PERSON  #     1 QID · sport ministry
+  Q10729326: PERSON  #     1 QID · pirate
+  Q107301909: LOCATION  #     1 QID · administrative levels and divisions of china
+  Q107356781: PERSON  #     1 QID · song type
+  Q107357104: PERSON  #     1 QID · type of dance
+  Q10737: DYNASTY  #     1 QID · suicide
+  Q10740132: PERSON  #     1 QID · binh chung
+  Q1074076: LOCATION  #     1 QID · chinese constellation
+  Q107425: LOCATION  #     1 QID · landscape
+  Q1074523: LOCATION  #     1 QID · planned community
+  Q107489970: PERSON  #     1 QID · bamboo slip
+  Q107524042: PERSON  #     1 QID · amendment and abolition of laws and regulations
+  Q10756188: PERSON  #     1 QID · treasury
+  Q107566885: LOCATION  #     1 QID · ?
+  Q10810927: LOCATION  #     1 QID · national routes in vietnam
+  Q108392111: TITLE  #     1 QID · university head
+  Q108403040: PERSON  #     1 QID · university in ontario
+  Q10840661: LOCATION  #     1 QID · urban areas of vietnam
+  Q108804811: LOCATION  #     1 QID · detention house in japan
+  Q109288828: DYNASTY  #     1 QID · group of men
+  Q109411: DYNASTY  #     1 QID · curse
+  Q1097498: DYNASTY  #     1 QID · ruler
+  Q110311622: PERSON  #     1 QID · vietnamese television drama
+  Q110401282: PERSON  #     1 QID · type of worldview
+  Q110653654: PERSON  #     1 QID · kind of quantity
+  Q1107656: PERSON  #     1 QID · garden
+  Q110900120: PERSON  #     1 QID · type of cinematic work
+  Q1110684: PERSON  #     1 QID · regulatory college
+  Q1112477: LOCATION  #     1 QID · narrow-gauge railway
+  Q111252415: DYNASTY  #     1 QID · religious group
+  Q1114515: PERSON  #     1 QID · comics publishing company
+  Q111840604: PERSON  #     1 QID · administrative agency
+  Q11197007: DYNASTY  #     1 QID · ethnoreligious group
+  Q112057532: PERSON  #     1 QID · type of technology
+  Q112234259: PERSON  #     1 QID · source type
+  Q11224256: PERSON  #     1 QID · ip network
+  Q1123245: LOCATION  #     1 QID · stage
+  Q11233245: LOCATION  #     1 QID · list of capitals in south korea
+  Q112731293: PERSON  #     1 QID · type of tree
+  Q1129474: LOCATION  #     1 QID · cultural landscape
+  Q11294827: PERSON  #     1 QID · camera manufacturer
+  Q1129645: PERSON  #     1 QID · trade bloc
+  Q113010180: PERSON  #     1 QID · functional department of the central committee of the chinese communist party
+  Q1134237: DYNASTY  #     1 QID · royal court
+  Q113574050: PERSON  #     1 QID · tibetan religion
+  Q113644093: PERSON  #     1 QID · negotiation technique
+  Q1136601: LOCATION  #     1 QID · unitary authority area
+  Q11371: PERSON  #     1 QID · internet service provider
+  Q1137809: LOCATION  #     1 QID · courthouse
+  Q11384: PERSON  #     1 QID · wide area network
+  Q1140229: LOCATION  #     1 QID · political union
+  Q1141323: PERSON  #     1 QID · electoral college
+  Q11430552: PERSON  #     1 QID · diplomatic visit
+  Q1143371: EVENT  #     1 QID · cession
+  Q1143635: PERSON  #     1 QID · business school
+  Q114392939: PERSON  #     1 QID · drink brand
+  Q1144278: PERSON  #     1 QID · diocesan bishop
+  Q1144991: DYNASTY  #     1 QID · military reserve force
+  Q1147274: LOCATION  #     1 QID · apostolic see
+  Q1147354: PERSON  #     1 QID · sequence
+  Q1149061: LOCATION  #     1 QID · language area
+  Q115328490: PERSON  #     1 QID · cpsu body
+  Q115368202: PERSON  #     1 QID · defunct government institution
+  Q115427560: PERSON  #     1 QID · university of excellence
+  Q1155404: PERSON  #     1 QID · vector graphics editor
+  Q11558636: LOCATION  #     1 QID · ?
+  Q1156739: PERSON  #     1 QID · umbrella brand
+  Q1156831: PERSON  #     1 QID · umbrella organization
+  Q1156854: PERSON  #     1 QID · policy
+  Q11578774: PERSON  #     1 QID · broadcasting program
+  Q115858000: LOCATION  #     1 QID · viet nam sports team
+  Q116056897: PERSON  #     1 QID · heritage register of intangible cultural heritage
+  Q11606415: PERSON  #     1 QID · confucian classic
+  Q11610935: PERSON  #     1 QID · mythological sword
+  Q11636247: PERSON  #     1 QID · super-dreadnought
+  Q11639620: LOCATION  #     1 QID · monetary subunit
+  Q116453729: PERSON  #     1 QID · record label group
+  Q116460050: PERSON  #     1 QID · asset type
+  Q116773301: LOCATION  #     1 QID · organized militia
+  Q1168287: LOCATION  #     1 QID · intervention
+  Q116869372: PERSON  #     1 QID · the openstreetmap
+  Q11691: PERSON  #     1 QID · san giao dich chung khoan
+  Q116979266: LOCATION  #     1 QID · đai phat thanh truyen hinh nha nuoc
+  Q117023459: PERSON  #     1 QID · loai hinh to chuc
+  Q117146794: TITLE  #     1 QID · arts degree
+  Q1172284: PERSON  #     1 QID · tap hop du lieu
+  Q1172599: LOCATION  #     1 QID · vinh hep
+  Q11727006: LOCATION  #     1 QID · ?
+  Q11753232: PERSON  #     1 QID · launch service provider
+  Q11771944: PERSON  #     1 QID · cong vu
+  Q11780435: PERSON  #     1 QID · nguyet san
+  Q11790203: PERSON  #     1 QID · branch of chemistry
+  Q1179466: PERSON  #     1 QID · de facto regime
+  Q1180262: LOCATION  #     1 QID · residenz
+  Q118140435: LOCATION  #     1 QID · very large online platform
+  Q11836899: LOCATION  #     1 QID · military restricted area
+  Q1185562: PERSON  #     1 QID · tau san bay hang nhe
+  Q1186981: PERSON  #     1 QID · supercarrier
+  Q11871901: PERSON  #     1 QID · rock type
+  Q118798990: DYNASTY  #     1 QID · international association of the faithful
+  Q118905629: LOCATION  #     1 QID · type of roman catholic institution
+  Q1189816: PERSON  #     1 QID · ton giao sac toc
+  Q1190993: LOCATION  #     1 QID · tiet khi
+  Q1191127: PERSON  #     1 QID · featural writing system
+  Q1191702: PERSON  #     1 QID · constructed writing system
+  Q119173073: LOCATION  #     1 QID · united states article iii court
+  Q1192819: PERSON  #     1 QID · sung may hang trung
+  Q1194894: PERSON  #     1 QID · tap quan quoc te
+  Q1194970: PERSON  #     1 QID · cong ty dot-com
+  Q1197588: PERSON  #     1 QID · military government
+  Q120121699: LOCATION  #     1 QID · lien minh kinh te chinh tri
+  Q120197147: DYNASTY  #     1 QID · republic of korea marine corps division
+  Q1204499: PERSON  #     1 QID · đinh
+  Q12057999: LOCATION  #     1 QID · fortification system
+  Q120680118: LOCATION  #     1 QID · jingu
+  Q1207451: DYNASTY  #     1 QID · tien
+  Q12075477: LOCATION  #     1 QID · islam of an area
+  Q12093113: DYNASTY  #     1 QID · unit
+  Q1210334: LOCATION  #     1 QID · railway bridge
+  Q12104174: LOCATION  #     1 QID · bao tang dan toc ky
+  Q1210950: LOCATION  #     1 QID · kenh nuoc
+  Q121289722: PERSON  #     1 QID · boat class
+  Q12134916: LOCATION  #     1 QID · centre of oblast
+  Q12143: LOCATION  #     1 QID · mui gio
+  Q12168697: LOCATION  #     1 QID · orthodox holy days
+  Q12184: PERSON  #     1 QID · đai dich
+  Q121916: PERSON  #     1 QID · dung cu viet
+  Q122: LOCATION  #     1 QID · thang tam
+  Q1221033: TITLE  #     1 QID · rank group
+  Q123035442: PERSON  #     1 QID · type of physical object by use
+  Q123193388: LOCATION  #     1 QID · oil crisis
+  Q12323: PERSON  #     1 QID · đap
+  Q123370638: PERSON  #     1 QID · branch of computer science
+  Q123440126: LOCATION  #     1 QID · thanh pho cua mexico
+  Q123588392: PERSON  #     1 QID · loai dung cu
+  Q1238731: LOCATION  #     1 QID · le vong
+  Q1239328: PERSON  #     1 QID · bach khoa toan thu quoc gia
+  Q1241288: LOCATION  #     1 QID · bo kinh te
+  Q12413618: LOCATION  #     1 QID · bien gioi quoc te
+  Q124377741: LOCATION  #     1 QID · geographical unit of indonesia
+  Q124436176: LOCATION  #     1 QID · airspace
+  Q124936: LOCATION  #     1 QID · major basilica
+  Q125191: PERSON  #     1 QID · buc anh
+  Q1252319: DYNASTY  #     1 QID · lay movement
+  Q125258812: DYNASTY  #     1 QID · sister duo
+  Q12540664: PERSON  #     1 QID · nha phan phoi truyen thong
+  Q1254933: PERSON  #     1 QID · đai quan sat thien van
+  Q125517960: PERSON  #     1 QID · type of electronic component
+  Q12552047: DYNASTY  #     1 QID · lanh chua
+  Q125542526: PERSON  #     1 QID · loai hoat đong
+  Q125577386: PERSON  #     1 QID · foreign intelligence service
+  Q12570: LOCATION  #     1 QID · cau day vong
+  Q12579633: PERSON  #     1 QID · phat minh
+  Q1259759: PERSON  #     1 QID · chuong trinh ngan tap
+  Q12607437: PERSON  #     1 QID · dictionary of the english language
+  Q1261096: DYNASTY  #     1 QID · quan chinh quy
+  Q1262438: LOCATION  #     1 QID · international court
+  Q126329412: LOCATION  #     1 QID · political schism
+  Q126393583: PERSON  #     1 QID · former business
+  Q1267632: LOCATION  #     1 QID · raion of ukraine
+  Q126917082: LOCATION  #     1 QID · unit of celsius temperature
+  Q127334927: PERSON  #     1 QID · band
+  Q127421212: PERSON  #     1 QID · type of power
+  Q1276157: LOCATION  #     1 QID · travel website
+  Q127871326: DYNASTY  #     1 QID · estate of the realm
+  Q12791: PERSON  #     1 QID · sword
+  Q12830429: LOCATION  #     1 QID · protestantism of an area
+  Q12832168: PERSON  #     1 QID · artificial satellite of the earth
+  Q12833777: LOCATION  #     1 QID · christianity of an area
+  Q1284645: PERSON  #     1 QID · edict
+  Q12870: LOCATION  #     1 QID · explosive chemicals
+  Q128889633: PERSON  #     1 QID · type of product
+  Q129060826: PERSON  #     1 QID · regional fishery advisory body
+  Q12933353: LOCATION  #     1 QID · buddhism of an area
+  Q1298239: PERSON  #     1 QID · executive order
+  Q130109687: PERSON  #     1 QID · type of tax
+  Q1301371: PERSON  #     1 QID · computer network
+  Q1302471: LOCATION  #     1 QID · unit of volume
+  Q13027888: DYNASTY  #     1 QID · baseball team
+  Q130326199: PERSON  #     1 QID · preserved watercraft
+  Q130382439: PERSON  #     1 QID · military university
+  Q130459448: PERSON  #     1 QID · type of condition
+  Q130583773: PERSON  #     1 QID · type of crime
+  Q1306755: LOCATION  #     1 QID · administrative centre
+  Q13073773: LOCATION  #     1 QID · catholic church of an area
+  Q131263: TITLE  #     1 QID · barracks
+  Q131427665: LOCATION  #     1 QID · quan hien chuong cua california
+  Q131436: PERSON  #     1 QID · tro choi co ban
+  Q131466339: PERSON  #     1 QID · minting authority
+  Q131505: PERSON  #     1 QID · chu nghia bi truyen
+  Q1317634: PERSON  #     1 QID · vac
+  Q131832106: PERSON  #     1 QID · hoat đong tinh bao cua trung quoc o nuoc ngoai
+  Q1320217: PERSON  #     1 QID · chinh quyen trung uong
+  Q13218382: LOCATION  #     1 QID · thanh pho va quan hien chuong
+  Q1321960: PERSON  #     1 QID · truong luat
+  Q132296770: LOCATION  #     1 QID · roman catholic monastery
+  Q132560290: PERSON  #     1 QID · third-party payer
+  Q13257647: LOCATION  #     1 QID · service award
+  Q133004: PERSON  #     1 QID · diaspora
+  Q1334738: PERSON  #     1 QID · tieu chuan quoc te
+  Q1335818: PERSON  #     1 QID · supranational union
+  Q13366129: LOCATION  #     1 QID · so le
+  Q133798571: PERSON  #     1 QID · epistemological values
+  Q133829011: PERSON  #     1 QID · type of homicide
+  Q1338798: PERSON  #     1 QID · sac lenh hanh phap hoa ky
+  Q1340449: LOCATION  #     1 QID · review site
+  Q1340590: LOCATION  #     1 QID · canh đong chet
+  Q13410422: LOCATION  #     1 QID · quan cua florida
+  Q134125602: PERSON  #     1 QID · catholic ecclesiastical decoration
+  Q13415366: LOCATION  #     1 QID · quan cua tennessee
+  Q134161: PERSON  #     1 QID · cong ty co phan
+  Q134485872: PERSON  #     1 QID · form of holiday
+  Q1346215: PERSON  #     1 QID · đang cam quyen
+  Q13473501: DYNASTY  #     1 QID · tap the
+  Q134793056: PERSON  #     1 QID · music company
+  Q135236640: LOCATION  #     1 QID · enumeration of 21
+  Q135236644: LOCATION  #     1 QID · enumeration of 24
+  Q135236653: LOCATION  #     1 QID · enumeration of 28
+  Q135236697: LOCATION  #     1 QID · enumeration of 200
+  Q13537604: PERSON  #     1 QID · religious ceremony
+  Q135412187: PERSON  #     1 QID · resource type
+  Q135419779: LOCATION  #     1 QID · shikinai supershrine
+  Q1358344: PERSON  #     1 QID · news program
+  Q135910860: PERSON  #     1 QID · incitement to violence
+  Q1361229: EVENT  #     1 QID · conquest
+  Q136281265: PERSON  #     1 QID · university shooting
+  Q13634374: EVENT  #     1 QID · ethnic violence
+  Q1364556: PERSON  #     1 QID · music award
+  Q136556163: DYNASTY  #     1 QID · pla command force
+  Q136653105: PERSON  #     1 QID · type of industry
+  Q136750414: PERSON  #     1 QID · type of military vehicle
+  Q136772238: PERSON  #     1 QID · animal type
+  Q1368: PERSON  #     1 QID · money
+  Q136822: PERSON  #     1 QID · higher education
+  Q136851277: DYNASTY  #     1 QID · national guard
+  Q1371037: PERSON  #     1 QID · university of technology
+  Q137126043: PERSON  #     1 QID · undesirable foreign organization in russia
+  Q1371427: DYNASTY  #     1 QID · ethnophaulism
+  Q137774087: PERSON  #     1 QID · type of violence
+  Q138348066: TITLE  #     1 QID · female occupation
+  Q1384677: PERSON  #     1 QID · religious congregation
+  Q138634790: LOCATION  #     1 QID · hi-tech park
+  Q138775: PERSON  #     1 QID · border guard
+  Q139243747: PERSON  #     1 QID · type of artifact
+  Q139545757: PERSON  #     1 QID · ebook distribution platform
+  Q1401585: LOCATION  #     1 QID · medium regional center
+  Q140311475: PERSON  #     1 QID · type of creative work
+  Q1403502: LOCATION  #     1 QID · pentatope number
+  Q140354053: PERSON  #     1 QID · type of series
+  Q140424465: PERSON  #     1 QID · type of vehicle
+  Q140595023: PERSON  #     1 QID · type of stream (flowing liquid)
+  Q140640277: PERSON  #     1 QID · type of incident
+  Q1407225: PERSON  #     1 QID · television award
+  Q140937749: LOCATION  #     1 QID · entity of bosnia and herzegovina
+  Q141255352: LOCATION  #     1 QID · online newspaper without paywall
+  Q141277394: DYNASTY  #     1 QID · labor activism
+  Q1412901: EVENT  #     1 QID · non-aggression pact
+  Q1414729: PERSON  #     1 QID · cinema film format
+  Q141604321: PERSON  #     1 QID · propaganda organization
+  Q1416685: PERSON  #     1 QID · rampart
+  Q1418640: LOCATION  #     1 QID · local government in germany
+  Q142092635: PERSON  #     1 QID · type of polygon by number of edges
+  Q142127987: PERSON  #     1 QID · military history museum
+  Q1422929: LOCATION  #     1 QID · đo thi đau đan
+  Q1428660: PERSON  #     1 QID · type of watercourse
+  Q1429218: LOCATION  #     1 QID · cantilever bridge
+  Q1437459: LOCATION  #     1 QID · day nui
+  Q14390192: LOCATION  #     1 QID · centered tetrahedral number
+  Q14514600: DYNASTY  #     1 QID · nhom nhan vat hu cau
+  Q1451906: PERSON  #     1 QID · women's organization
+  Q1459574: PERSON  #     1 QID · compendium
+  Q14626453: PERSON  #     1 QID · regional rail
+  Q146491: PERSON  #     1 QID · luat hinh su
+  Q146591: LOCATION  #     1 QID · vi tuyen
+  Q1478443: PERSON  #     1 QID · association football federation
+  Q1480166: PERSON  #     1 QID · kabushiki gaisha
+  Q14941854: PERSON  #     1 QID · oil company
+  Q14946528: LOCATION  #     1 QID · nhap nhang
+  Q14952: PERSON  #     1 QID · headgear
+  Q1497364: LOCATION  #     1 QID · khu phuc hop
+  Q1498487: EVENT  #     1 QID · mat uoc
+  Q15042037: LOCATION  #     1 QID · khu vuc thong ke
+  Q15063611: LOCATION  #     1 QID · thanh pho cua new york
+  Q15069452: LOCATION  #     1 QID · natura 2000 site
+  Q15079663: LOCATION  #     1 QID · tuyen đuong sat van chuyen nhanh
+  Q1509716: LOCATION  #     1 QID · nha tho kinh si đoan
+  Q15142889: PERSON  #     1 QID · weapon family
+  Q1516659: EVENT  #     1 QID · united states national cemetery
+  Q1519799: LOCATION  #     1 QID · ministry of health
+  Q152081: LOCATION  #     1 QID · trai tap trung
+  Q1525: PERSON  #     1 QID · vong xuyen
+  Q15303456: PERSON  #     1 QID · rugby union venue
+  Q15304003: LOCATION  #     1 QID · quoc gia thuoc vuong quoc ha lan
+  Q15324: LOCATION  #     1 QID · thuy vuc
+  Q153936: LOCATION  #     1 QID · dan quan
+  Q15401699: LOCATION  #     1 QID · archaeological age
+  Q1540416: LOCATION  #     1 QID · boundary point
+  Q1546073: EVENT  #     1 QID · covert operation
+  Q15487029: LOCATION  #     1 QID · patriarchal basilica
+  Q1550680: LOCATION  #     1 QID · lanh tho chua to chuc
+  Q1551763: PERSON  #     1 QID · people's commissariat
+  Q155271: PERSON  #     1 QID · vien nghien cuu chinh sach
+  Q1553195: PERSON  #     1 QID · party leader
+  Q155656: PERSON  #     1 QID · di chuc
+  Q155705: PERSON  #     1 QID · detente
+  Q15620174: LOCATION  #     1 QID · tinh cua chdcnd trieu tien
+  Q15623926: PERSON  #     1 QID · wikimedia set index article
+  Q15634695: LOCATION  #     1 QID · special administrative area of thailand
+  Q1566035: PERSON  #     1 QID · korean buddhist temple
+  Q157031: PERSON  #     1 QID · foundation
+  Q15711797: LOCATION  #     1 QID · finance ministry
+  Q15733622: LOCATION  #     1 QID · cultural superarea
+  Q1573906: PERSON  #     1 QID · concert tour
+  Q1578744: LOCATION  #     1 QID · burial vault
+  Q15788: PERSON  #     1 QID · ruble
+  Q15811108: PERSON  #     1 QID · fuhrerpartei
+  Q15839299: TITLE  #     1 QID · theatrical occupation
+  Q15847440: LOCATION  #     1 QID · public security ministry
+  Q159334: PERSON  #     1 QID · secondary school
+  Q159385: PERSON  #     1 QID · geopolitics
+  Q1597273: LOCATION  #     1 QID · leap day
+  Q160091: LOCATION  #     1 QID · plain
+  Q160151: LOCATION  #     1 QID · price
+  Q161726: PERSON  #     1 QID · multinational corporation
+  Q1618899: PERSON  #     1 QID · fashion label
+  Q1620945: PERSON  #     1 QID · historically black college or university
+  Q162157: PERSON  #     1 QID · chartered company
+  Q1622925: TITLE  #     1 QID · court appointment
+  Q162827: PERSON  #     1 QID · atlas
+  Q16326794: PERSON  #     1 QID · mythological serpent
+  Q1642263: DYNASTY  #     1 QID · targeted killing
+  Q164240: PERSON  #     1 QID · megalith
+  Q164509: DYNASTY  #     1 QID · đong vat an tap
+  Q1646218: EVENT  #     1 QID · international environmental agreement
+  Q165116: LOCATION  #     1 QID · grand duchy
+  Q16562419: PERSON  #     1 QID · political entity
+  Q1659844: LOCATION  #     1 QID · information ministry
+  Q1660312: PERSON  #     1 QID · major label
+  Q166142: PERSON  #     1 QID · application software
+  Q1663017: PERSON  #     1 QID · engineering school
+  Q1664720: PERSON  #     1 QID · institute
+  Q1665984: PERSON  #     1 QID · interdisciplinary science
+  Q166620: LOCATION  #     1 QID · drainage basin
+  Q167037: PERSON  #     1 QID · corporation
+  Q1673189: DYNASTY  #     1 QID · irregular military
+  Q16735822: PERSON  #     1 QID · history museum
+  Q16827539: DYNASTY  #     1 QID · combat support agency
+  Q16830702: PERSON  #     1 QID · municipal board
+  Q1686006: PERSON  #     1 QID · summer residence
+  Q1686959: PERSON  #     1 QID · underground infrastructure system
+  Q1688932: PERSON  #     1 QID · jiedushi
+  Q1697305: PERSON  #     1 QID · narrative motif
+  Q1700154: PERSON  #     1 QID · colonial society
+  Q170321: LOCATION  #     1 QID · wetland
+  Q170483: PERSON  #     1 QID · sailing ship
+  Q17074907: PERSON  #     1 QID · piastre
+  Q17084016: PERSON  #     1 QID · nonprofit corporation
+  Q17099416: PERSON  #     1 QID · wikimedia list of songs
+  Q171180: DYNASTY  #     1 QID · taboo
+  Q17152708: PERSON  #     1 QID · republic regime in france
+  Q1716124: LOCATION  #     1 QID · national road
+  Q171751: LOCATION  #     1 QID · banana republic
+  Q17205: PERSON  #     1 QID · aircraft carrier
+  Q17221: PERSON  #     1 QID · spokesperson
+  Q172904: PERSON  #     1 QID · syncretism
+  Q17320423: LOCATION  #     1 QID · daerah khusus
+  Q173387: LOCATION  #     1 QID · grave
+  Q173462: PERSON  #     1 QID · crime against humanity
+  Q17362920: PERSON  #     1 QID · wikimedia duplicated page
+  Q1745370: PERSON  #     1 QID · film stock
+  Q17455058: PERSON  #     1 QID · music museum
+  Q17457753: LOCATION  #     1 QID · census subdivision in canada
+  Q1748957: PERSON  #     1 QID · fach
+  Q17489659: PERSON  #     1 QID · group of works
+  Q17505024: PERSON  #     1 QID · space agency
+  Q1750673: DYNASTY  #     1 QID · major command of the united states army
+  Q1751757: PERSON  #     1 QID · rotor machine
+  Q17518870: PERSON  #     1 QID · group of literary works
+  Q17522177: TIME  #     1 QID · age
+  Q17537576: PERSON  #     1 QID · creative work
+  Q1762591: PERSON  #     1 QID · periodic health examination
+  Q1763090: PERSON  #     1 QID · sentence
+  Q17633526: PERSON  #     1 QID · wikinews article
+  Q1763828: PERSON  #     1 QID · multi-purpose hall
+  Q1768043: LOCATION  #     1 QID · metropolitan statistical area
+  Q1787375: PERSON  #     1 QID · children's interest channel
+  Q1787389: TITLE  #     1 QID · danh xung hoang gia va quy toc thai lan
+  Q178743: PERSON  #     1 QID · bia
+  Q178803: PERSON  #     1 QID · thuong mai quoc te
+  Q1788454: LOCATION  #     1 QID · nut giao thong
+  Q1788992: DYNASTY  #     1 QID · to chuc toi pham
+  Q17898: LOCATION  #     1 QID · quyen lgbt cua cac quoc gia
+  Q1790360: LOCATION  #     1 QID · đe quoc thuoc đia
+  Q1790577: PERSON  #     1 QID · planned language
+  Q1791899: PERSON  #     1 QID · cultural magazine
+  Q17946: DYNASTY  #     1 QID · du luan
+  Q17955: PERSON  #     1 QID · phe binh
+  Q179700: PERSON  #     1 QID · tuong
+  Q180046: DYNASTY  #     1 QID · tham hiem khong gian
+  Q1802419: PERSON  #     1 QID · chinh quyen bang
+  Q1802963: PERSON  #     1 QID · dinh thu
+  Q18043413: DYNASTY  #     1 QID · chuoi sieu thi
+  Q1807108: PERSON  #     1 QID · shipping line
+  Q1814351: EVENT  #     1 QID · can thiep suc khoe cong đong
+  Q18173381: TITLE  #     1 QID · post of duty
+  Q181970: PERSON  #     1 QID · archaism
+  Q18208028: PERSON  #     1 QID · index
+  Q182113: PERSON  #     1 QID · lockheed c-141 starlifter
+  Q182133: PERSON  #     1 QID · syllabary
+  Q182274: DYNASTY  #     1 QID · chu nghia phuc hoi lanh tho
+  Q18247357: LOCATION  #     1 QID · group of structures or buildings
+  Q182531: PERSON  #     1 QID · thiet giap ham
+  Q1825417: LOCATION  #     1 QID · moveable feast
+  Q1826687: DYNASTY  #     1 QID · bo tu
+  Q182832: PERSON  #     1 QID · buoi hoa nhac
+  Q18328106: PERSON  #     1 QID · religion-related award
+  Q18449828: LOCATION  #     1 QID · stone arch bridge
+  Q18452301: LOCATION  #     1 QID · octadecagonal number
+  Q184611: LOCATION  #     1 QID · luy thua cua 10
+  Q184644: LOCATION  #     1 QID · nhac vien
+  Q1850936: PERSON  #     1 QID · benefit concert
+  Q18534542: DYNASTY  #     1 QID · chuoi nha hang
+  Q185363: PERSON  #     1 QID · bien nien su
+  Q185598: PERSON  #     1 QID · nhat ky
+  Q186431: PERSON  #     1 QID · mat nghi hong y
+  Q18691599: LOCATION  #     1 QID · military installation
+  Q187223: LOCATION  #     1 QID · pha
+  Q187616: LOCATION  #     1 QID · di vat
+  Q188025: LOCATION  #     1 QID · ho nuoc man
+  Q18810091: LOCATION  #     1 QID · census division of canada
+  Q188509: LOCATION  #     1 QID · ngoai o
+  Q188823: PERSON  #     1 QID · hoc bong
+  Q188913: PERSON  #     1 QID · đon đien
+  Q1894248: PERSON  #     1 QID · coining
+  Q18949: LOCATION  #     1 QID · square pyramidal number
+  Q1896989: PERSON  #     1 QID · subject of international law
+  Q1897098: PERSON  #     1 QID · service club
+  Q1898357: PERSON  #     1 QID · naval academy
+  Q1898583: DYNASTY  #     1 QID · thuy quan luc chien
+  Q1899015: PERSON  #     1 QID · to chuc bao ton
+  Q190893: LOCATION  #     1 QID · centered cube number
+  Q191110: LOCATION  #     1 QID · nen co
+  Q191320: PERSON  #     1 QID · đia ly chinh tri
+  Q191600: PERSON  #     1 QID · quyen dan su va chinh tri
+  Q192498: LOCATION  #     1 QID · phan cap hanh chinh phap
+  Q192581: PERSON  #     1 QID · viec lam
+  Q192619: LOCATION  #     1 QID · crypt
+  Q19294925: PERSON  #     1 QID · ?
+  Q19307174: PERSON  #     1 QID · nen tang phan phoi ky thuat so
+  Q1933026: LOCATION  #     1 QID · launch site
+  Q1935136: PERSON  #     1 QID · geflugeltes wort
+  Q1938208: PERSON  #     1 QID · legal institution
+  Q193866: LOCATION  #     1 QID · annals
+  Q193944: DYNASTY  #     1 QID · tang đoan
+  Q194188: LOCATION  #     1 QID · san bay vu tru
+  Q194195: LOCATION  #     1 QID · cong vien giai tri
+  Q1944508: PERSON  #     1 QID · mongolian writing system
+  Q19476593: TITLE  #     1 QID · quan ham canh sat
+  Q1961493: TITLE  #     1 QID · guild house
+  Q196600: PERSON  #     1 QID · thuong hieu truyen thong
+  Q1967454: LOCATION  #     1 QID · national memorial of the united states
+  Q1968122: PERSON  #     1 QID · national red cross and red crescent society
+  Q19691007: LOCATION  #     1 QID · institutional complex
+  Q197: PERSON  #     1 QID · may bay
+  Q1970365: PERSON  #     1 QID · bao tang van vat hoc
+  Q19705: PERSON  #     1 QID · criminal code
+  Q1971570: PERSON  #     1 QID · cot co
+  Q1971849: PERSON  #     1 QID · religious school
+  Q1979154: PERSON  #     1 QID · mo hinh
+  Q197952: PERSON  #     1 QID · tap đoan kinh te
+  Q19861951: PERSON  #     1 QID · type of food or dish
+  Q19883131: DYNASTY  #     1 QID · armed organisation group
+  Q19967801: PERSON  #     1 QID · dich vu truc tuyen
+  Q19973770: PERSON  #     1 QID · bo van hoa
+  Q20026879: PERSON  #     1 QID · aircraft lift class
+  Q200297: LOCATION  #     1 QID · nha may nhiet đien
+  Q20032039: PERSON  #     1 QID · tire manufacturer
+  Q2003221: LOCATION  #     1 QID · huan chuong hiep si
+  Q2006518: PERSON  #     1 QID · hoang that
+  Q20088085: PERSON  #     1 QID · dictionary page in wikipedia
+  Q2016031: PERSON  #     1 QID · offshore construction
+  Q202008: LOCATION  #     1 QID · vung đac quyen kinh te
+  Q20202352: LOCATION  #     1 QID · locality of mexico
+  Q202435: LOCATION  #     1 QID · lieutenancy area of scotland
+  Q202825: PERSON  #     1 QID · xe chien đau bo binh
+  Q202833: LOCATION  #     1 QID · phuong tien truyen thong mang xa hoi
+  Q2030462: PERSON  #     1 QID · worldview
+  Q204894: LOCATION  #     1 QID · bien can bien
+  Q205665: PERSON  #     1 QID · chuan muc xa hoi
+  Q2057658: PERSON  #     1 QID · cadet branch
+  Q206106: LOCATION  #     1 QID · d-day
+  Q2061186: PERSON  #     1 QID · dong tu ton giao
+  Q206290: PERSON  #     1 QID · chi muc trich dan
+  Q20655472: PERSON  #     1 QID · bo suu tap bien tap
+  Q207320: DYNASTY  #     1 QID · to chuc ban quan su
+  Q20746389: PERSON  #     1 QID · christian missionary society
+  Q20749395: DYNASTY  #     1 QID · naval unit
+  Q20794493: LOCATION  #     1 QID · mythology of an area
+  Q208500: LOCATION  #     1 QID · than vuong quoc
+  Q20860083: LOCATION  #     1 QID · educational facility
+  Q2088593: PERSON  #     1 QID · đia chi
+  Q2093358: PERSON  #     1 QID · language regulator
+  Q209680: PERSON  #     1 QID · kinh
+  Q2098373: LOCATION  #     1 QID · bo ke hoach
+  Q2101516: PERSON  #     1 QID · political police
+  Q2101619: EVENT  #     1 QID · political slogan
+  Q210167: PERSON  #     1 QID · hang phat trien tro choi đien tu
+  Q21032622: PERSON  #     1 QID · space grant institution
+  Q2106202: PERSON  #     1 QID · postal services ministry
+  Q210729: PERSON  #     1 QID · electrical element
+  Q210815: DYNASTY  #     1 QID · canh sat quan su
+  Q211201: DYNASTY  #     1 QID · xo viet
+  Q21168880: PERSON  #     1 QID · resistance
+  Q211690: LOCATION  #     1 QID · khu tu quan luan đon
+  Q21198342: PERSON  #     1 QID · loat manga
+  Q2122214: PERSON  #     1 QID · national archives
+  Q212238: PERSON  #     1 QID · cong chuc
+  Q2139657: LOCATION  #     1 QID · government of german reich
+  Q214183: PERSON  #     1 QID · secret police
+  Q2144359: PERSON  #     1 QID · environmental issue
+  Q21480300: PERSON  #     1 QID · mass shooting
+  Q215048: PERSON  #     1 QID · supergroup
+  Q21605492: PERSON  #     1 QID · nasa program
+  Q217327: DYNASTY  #     1 QID · suicide attack
+  Q217901: EVENT  #     1 QID · capitulation
+  Q21886169: PERSON  #     1 QID · men's magazine
+  Q2191807: PERSON  #     1 QID · rhyme dictionary
+  Q21976118: DYNASTY  #     1 QID · book of mormon character
+  Q2207288: PERSON  #     1 QID · craft
+  Q2231510: LOCATION  #     1 QID · col
+  Q2232001: LOCATION  #     1 QID · show cave
+  Q226418: PERSON  #     1 QID · chauvinism
+  Q2269590: LOCATION  #     1 QID · sen
+  Q2269913: DYNASTY  #     1 QID · president of the senate
+  Q2284298: LOCATION  #     1 QID · paleocontinent
+  Q2285706: TITLE  #     1 QID · head of government
+  Q2300373: PERSON  #     1 QID · national trade union center
+  Q2300991: EVENT  #     1 QID · separate peace
+  Q23055202: DYNASTY  #     1 QID · intelligence community
+  Q2315359: PERSON  #     1 QID · historical language
+  Q2319498: PERSON  #     1 QID · architectural landmark
+  Q232405: PERSON  #     1 QID · metric system
+  Q233455: PERSON  #     1 QID · family instructions
+  Q234460: PERSON  #     1 QID · text
+  Q2352616: PERSON  #     1 QID · catalog
+  Q2357674: TITLE  #     1 QID · cap bac va quan ham quan giai phong nhan dan trung quoc
+  Q2367508: LOCATION  #     1 QID · tran
+  Q23718: LOCATION  #     1 QID · huong chinh
+  Q2380335: EVENT  #     1 QID · khong kich
+  Q23901123: DYNASTY  #     1 QID · national under-17 association football team
+  Q2393184: LOCATION  #     1 QID · hill station
+  Q23955632: PERSON  #     1 QID · to chuc cong giao
+  Q23983664: LOCATION  #     1 QID · nhan khau cua quoc gia
+  Q2401749: PERSON  #     1 QID · cong ty vien thong
+  Q241317: PERSON  #     1 QID · nen tang may tinh
+  Q24398318: PERSON  #     1 QID · cong trinh ton giao
+  Q2442401: PERSON  #     1 QID · cong ty thu am
+  Q2446662: LOCATION  #     1 QID · tourism ministry
+  Q244696: PERSON  #     1 QID · peso
+  Q244793: LOCATION  #     1 QID · twin cities
+  Q245260: LOCATION  #     1 QID · chum đo thi
+  Q24579448: PERSON  #     1 QID · podcast directory
+  Q2462003: PERSON  #     1 QID · instant messaging client
+  Q24699794: LOCATION  #     1 QID · cong trinh xay dung dung lam bao tang
+  Q247979: LOCATION  #     1 QID · curia
+  Q24856: PERSON  #     1 QID · loat phim
+  Q24862: PERSON  #     1 QID · phim ngan
+  Q2495862: PERSON  #     1 QID · congress
+  Q25036733: TIME  #     1 QID · near-parabolic comet
+  Q2510454: PERSON  #     1 QID · ky thi kien thuc
+  Q25106976: PERSON  #     1 QID · tac pham ban đo hoc
+  Q2515553: PERSON  #     1 QID · hien phap lien xo
+  Q2516426: PERSON  #     1 QID · bo giao thong van tai
+  Q2531956: DYNASTY  #     1 QID · ethnic minority group
+  Q2537117: PERSON  #     1 QID · hang phim lon
+  Q25397890: PERSON  #     1 QID · loai thu vien
+  Q25424534: PERSON  #     1 QID · chinh phu quan
+  Q25449457: LOCATION  #     1 QID · quoc gia luc đia
+  Q25530138: PERSON  #     1 QID · nguyen
+  Q25537105: TITLE  #     1 QID · bandasak
+  Q2554364: TITLE  #     1 QID · quy toc tay ban nha
+  Q2559933: LOCATION  #     1 QID · buddhist holiday
+  Q2578692: DYNASTY  #     1 QID · commonwealth
+  Q25894868: LOCATION  #     1 QID · type of environment
+  Q25917154: PERSON  #     1 QID · truck bombing
+  Q2620826: PERSON  #     1 QID · declaration
+  Q2622299: PERSON  #     1 QID · software engine
+  Q2637759: LOCATION  #     1 QID · freight railway line
+  Q2638480: DYNASTY  #     1 QID · church congregation
+  Q26398: PERSON  #     1 QID · public broadcasting
+  Q264965: DYNASTY  #     1 QID · subculture
+  Q2661866: LOCATION  #     1 QID · leyland number
+  Q2667285: PERSON  #     1 QID · ancient university
+  Q26760286: DYNASTY  #     1 QID · paralympics team
+  Q269949: LOCATION  #     1 QID · highway
+  Q2700595: DYNASTY  #     1 QID · dyad
+  Q270513: LOCATION  #     1 QID · catalan number
+  Q271990: PERSON  #     1 QID · naga
+  Q273120: DYNASTY  #     1 QID · protest
+  Q2736168: LOCATION  #     1 QID · historical nationality
+  Q27491613: LOCATION  #     1 QID · pacific typhoon season
+  Q276173: PERSON  #     1 QID · pavilion
+  Q277759: PERSON  #     1 QID · book series
+  Q27951514: LOCATION  #     1 QID · indoor arena
+  Q28060193: PERSON  #     1 QID · governmental meteorological service
+  Q280783: PERSON  #     1 QID · popular assembly
+  Q28140340: PERSON  #     1 QID · women's association football team
+  Q28194802: PERSON  #     1 QID · tunnel network
+  Q283202: LOCATION  #     1 QID · harbor
+  Q2832578: EVENT  #     1 QID · military deception
+  Q28337: LOCATION  #     1 QID · shoal
+  Q2864737: PERSON  #     1 QID · nghe thuat ton giao
+  Q28783456: PERSON  #     1 QID · obsolete currency
+  Q2881199: PERSON  #     1 QID · public body in spain
+  Q28820001: DYNASTY  #     1 QID · musical scene
+  Q2893829: PERSON  #     1 QID · second franciscan order
+  Q29023906: LOCATION  #     1 QID · temporary exhibition
+  Q29076424: LOCATION  #     1 QID · noi cac cua viet nam
+  Q29102902: PERSON  #     1 QID · papal election
+  Q29300714: DYNASTY  #     1 QID · international association
+  Q29428439: LOCATION  #     1 QID · hexad
+  Q294308: PERSON  #     1 QID · publicly funded health care
+  Q29439175: PERSON  #     1 QID · photography award
+  Q29441699: LOCATION  #     1 QID · octad
+  Q295382: PERSON  #     1 QID · sustainable business
+  Q29556: PERSON  #     1 QID · tu do dan su
+  Q29575627: PERSON  #     1 QID · bang chu cai chu latinh
+  Q2974552: LOCATION  #     1 QID · thanh pho cua new jersey
+  Q2983893: LOCATION  #     1 QID · quarter
+  Q2990635: LOCATION  #     1 QID · composition c
+  Q2992127: PERSON  #     1 QID · civil service examination
+  Q29933858: LOCATION  #     1 QID · territorial claim
+  Q2995256: PERSON  #     1 QID · rail vehicle manufacturer
+  Q29982117: PERSON  #     1 QID · musical instrument model
+  Q3001185: DYNASTY  #     1 QID · jewish religious movements
+  Q30047053: LOCATION  #     1 QID · web archive
+  Q30089777: PERSON  #     1 QID · patriotic society
+  Q30337748: LOCATION  #     1 QID · isq base quantity
+  Q3054261: PERSON  #     1 QID · explosive device
+  Q30559504: PERSON  #     1 QID · van phong chinh phu
+  Q3059502: PERSON  #     1 QID · phe phan
+  Q3062294: PERSON  #     1 QID · cum tu latinh
+  Q3084700: PERSON  #     1 QID · tirailleur
+  Q309118: DYNASTY  #     1 QID · bo chinh tri
+  Q3152824: PERSON  #     1 QID · thiet che van hoa
+  Q317557: LOCATION  #     1 QID · nha tho giao xu
+  Q3176665: PERSON  #     1 QID · nationality law
+  Q319845: PERSON  #     1 QID · ngan hang đau tu
+  Q32178211: PERSON  #     1 QID · to chuc am nhac
+  Q3231690: PERSON  #     1 QID · car model
+  Q3233801: DYNASTY  #     1 QID · nhom thu ghet
+  Q3240539: DYNASTY  #     1 QID · quay roi
+  Q3244907: PERSON  #     1 QID · khao thi theo tieu chuan
+  Q324618: PERSON  #     1 QID · pacification
+  Q325261: LOCATION  #     1 QID · quoc gia ve tinh
+  Q3254959: PERSON  #     1 QID · chung toc
+  Q3267791: LOCATION  #     1 QID · pressure system
+  Q3268571: LOCATION  #     1 QID · phan cap hanh chinh cua mot quoc gia
+  Q3269648: PERSON  #     1 QID · community organization
+  Q32815: PERSON  #     1 QID · thanh đuong hoi giao
+  Q3284499: TITLE  #     1 QID · capitol building
+  Q328468: LOCATION  #     1 QID · trai tap trung cua đuc quoc xa
+  Q3297051: LOCATION  #     1 QID · chartered community
+  Q3297186: PERSON  #     1 QID · limited series
+  Q330284: LOCATION  #     1 QID · cho
+  Q3314483: PERSON  #     1 QID · trai cay
+  Q331644: LOCATION  #     1 QID · han quoc
+  Q3318733: DYNASTY  #     1 QID · chu nghia đoc lap
+  Q33215: PERSON  #     1 QID · ngon ngu đuoc xay dung
+  Q3327521: LOCATION  #     1 QID · tu đien truc tuyen
+  Q3337280: PERSON  #     1 QID · marine navigation
+  Q334166: PERSON  #     1 QID · che đo phuong tien
+  Q3348196: LOCATION  #     1 QID · tinh cua ukraina
+  Q3355498: PERSON  #     1 QID · contemplative order
+  Q336473: PERSON  #     1 QID · aid agency
+  Q339834: LOCATION  #     1 QID · cuong quoc vung
+  Q3400227: PERSON  #     1 QID · ideographic writing system
+  Q3400794: PERSON  #     1 QID · chat ngot
+  Q3434769: LOCATION  #     1 QID · vung vi mo
+  Q34439356: LOCATION  #     1 QID · hurricane
+  Q3464665: PERSON  #     1 QID · mua chuong trinh truyen hinh
+  Q34651: PERSON  #     1 QID · giao hoi kito giao
+  Q3491832: LOCATION  #     1 QID · he thong tong hop ket qua đanh gia
+  Q3497659: PERSON  #     1 QID · articles of association
+  Q35054: LOCATION  #     1 QID · buu đien
+  Q35112127: PERSON  #     1 QID · toa nha lich su
+  Q3533467: PERSON  #     1 QID · hanh đong nhom
+  Q3536928: EVENT  #     1 QID · hiep đinh thuong mai tu do
+  Q35535: PERSON  #     1 QID · canh sat
+  Q355505: TITLE  #     1 QID · nobiliary particle
+  Q3558970: LOCATION  #     1 QID · lang ba lan
+  Q3577751: PERSON  #     1 QID · ecole d'application
+  Q3622002: LOCATION  #     1 QID · khu vuc đia ly
+  Q368290: PERSON  #     1 QID · nha phat hanh phim
+  Q369730: LOCATION  #     1 QID · pho đi bo
+  Q37178026: PERSON  #     1 QID · metaorganization
+  Q372690: PERSON  #     1 QID · tong lanh su quan
+  Q3735153: EVENT  #     1 QID · non-combatant evacuation operation
+  Q375011: LOCATION  #     1 QID · religious holiday
+  Q375928: LOCATION  #     1 QID · ha vien
+  Q376: PERSON  #     1 QID · đong ho
+  Q37901: LOCATION  #     1 QID · eo bien
+  Q379693: PERSON  #     1 QID · truc xuat
+  Q380093: PERSON  #     1 QID · truong đien anh
+  Q38033430: PERSON  #     1 QID · hang giai thuong
+  Q380782: DYNASTY  #     1 QID · tong tu lenh
+  Q384515: PERSON  #     1 QID · chinh luan
+  Q38786485: PERSON  #     1 QID · hinh thuc giao tiep
+  Q3879425: LOCATION  #     1 QID · stella octangula number
+  Q38911: LOCATION  #     1 QID · vung cua cong hoa sec
+  Q389959: PERSON  #     1 QID · air-raid shelter
+  Q3922583: TITLE  #     1 QID · nghe nghiep ve suc khoe
+  Q3950: PERSON  #     1 QID · villa
+  Q39604065: LOCATION  #     1 QID · monad
+  Q39816: LOCATION  #     1 QID · valley
+  Q40056: PERSON  #     1 QID · computer program
+  Q4005772: DYNASTY  #     1 QID · major military unit
+  Q40482169: PERSON  #     1 QID · defunct political party
+  Q4056382: PERSON  #     1 QID · autonomous non-commercial organization
+  Q4067597: DYNASTY  #     1 QID · combination company
+  Q4070702: PERSON  #     1 QID · literary archetype
+  Q4117139: PERSON  #     1 QID · biological database
+  Q41207: PERSON  #     1 QID · coin
+  Q41253: PERSON  #     1 QID · movie theater
+  Q41254: PERSON  #     1 QID · grammy awards
+  Q4129802: PERSON  #     1 QID · highest honors of the ussr
+  Q41374: PERSON  #     1 QID · incarnation
+  Q41397: DYNASTY  #     1 QID · genocide
+  Q41415: PERSON  #     1 QID · soup
+  Q41691: LOCATION  #     1 QID · demilitarized zone
+  Q4204511: PERSON  #     1 QID · historic church
+  Q42178: DYNASTY  #     1 QID · vice president
+  Q4220920: TITLE  #     1 QID · filmmaking occupation
+  Q4226220: TITLE  #     1 QID · naval officer rank
+  Q4229700: DYNASTY  #     1 QID · committee of national security
+  Q42401304: DYNASTY  #     1 QID · age group
+  Q4240305: PERSON  #     1 QID · cross
+  Q4307514: DYNASTY  #     1 QID · municipal government
+  Q43109: PERSON  #     1 QID · referendum
+  Q43371397: PERSON  #     1 QID · mythological or legendary monkey
+  Q442927: PERSON  #     1 QID · party newspaper
+  Q44377: PERSON  #     1 QID · tunnel
+  Q44409287: PERSON  #     1 QID · type of machine element
+  Q44597158: PERSON  #     1 QID · health specialty
+  Q4482688: LOCATION  #     1 QID · feudal monarchy
+  Q4491715: PERSON  #     1 QID · phonemic transcription
+  Q45290083: PERSON  #     1 QID · rugby league venue
+  Q45296117: PERSON  #     1 QID · aircraft type
+  Q4533081: DYNASTY  #     1 QID · ethnolinguistic group
+  Q4539: PERSON  #     1 QID · cooperative
+  Q45740849: PERSON  #     1 QID · historical dictionary
+  Q45762: PERSON  #     1 QID · dead language
+  Q4586781: LOCATION  #     1 QID · royal peculiar
+  Q459409: PERSON  #     1 QID · hate crime
+  Q46337: PERSON  #     1 QID · manifesto
+  Q4663903: PERSON  #     1 QID · wikimedia portal
+  Q467511: LOCATION  #     1 QID · deficient number
+  Q4698343: EVENT  #     1 QID · air offensive
+  Q470775: PERSON  #     1 QID · a posteriori language
+  Q47089: LOCATION  #     1 QID · fault
+  Q47248051: LOCATION  #     1 QID · indigenous area
+  Q47280: PERSON  #     1 QID · abrahamic religion
+  Q473094: PERSON  #     1 QID · fast battleship
+  Q475023: PERSON  #     1 QID · exact science
+  Q47502370: PERSON  #     1 QID · walk of fame
+  Q476883: PERSON  #     1 QID · trade coin
+  Q4774348: PERSON  #     1 QID · anti-corruption agency
+  Q4817: PERSON  #     1 QID · column
+  Q4818719: LOCATION  #     1 QID · attributes of god in christianity
+  Q482517: PERSON  #     1 QID · chaebol
+  Q484416: DYNASTY  #     1 QID · caste
+  Q486245: PERSON  #     1 QID · national treasures of south korea
+  Q486983: TITLE  #     1 QID · academic rank
+  Q48747650: LOCATION  #     1 QID · cite scolaire
+  Q4893413: PERSON  #     1 QID · diplomatic correspondence
+  Q4897819: PERSON  #     1 QID · role
+  Q49055407: LOCATION  #     1 QID · high-tech zone
+  Q49367: TIME  #     1 QID · ice age
+  Q49389: PERSON  #     1 QID · tourism
+  Q4942969: PERSON  #     1 QID · leishu
+  Q49703: PERSON  #     1 QID · sacrament
+  Q49845: PERSON  #     1 QID · mail
+  Q49850: PERSON  #     1 QID · journal
+  Q4991371: PERSON  #     1 QID · soldier
+  Q5019497: LOCATION  #     1 QID · calendar day
+  Q506240: PERSON  #     1 QID · television film
+  Q50705: LOCATION  #     1 QID · square number
+  Q507850: PERSON  #     1 QID · marian apparition
+  Q512187: LOCATION  #     1 QID · federal republic
+  Q512442: PERSON  #     1 QID · legal authority
+  Q5124642: PERSON  #     1 QID · civil decoration
+  Q51481377: PERSON  #     1 QID · women's association football club
+  Q51645: PERSON  #     1 QID · ecumenical council
+  Q5189488: PERSON  #     1 QID · crown corporation
+  Q5193405: PERSON  #     1 QID · cultural rights
+  Q52177058: PERSON  #     1 QID · civic building
+  Q5266746: PERSON  #     1 QID · development bank
+  Q5292: PERSON  #     1 QID · encyclopedia
+  Q53060: LOCATION  #     1 QID · gate
+  Q5307593: PERSON  #     1 QID · united states presidential doctrine
+  Q5311332: LOCATION  #     1 QID · duchies in england
+  Q53251146: PERSON  #     1 QID · parliamentary archives
+  Q53732481: LOCATION  #     1 QID · nuclear test site
+  Q53744: LOCATION  #     1 QID · defoliant
+  Q5381350: EVENT  #     1 QID · environmental protocol
+  Q5420001: PERSON  #     1 QID · exempt charity
+  Q5440532: LOCATION  #     1 QID · federal holiday in the united states
+  Q5466628: PERSON  #     1 QID · for-profit corporation
+  Q5503: LOCATION  #     1 QID · rapid transit
+  Q55097243: PERSON  #     1 QID · defunct organization
+  Q55177041: LOCATION  #     1 QID · list of regions of the people's republic of china
+  Q55341040: LOCATION  #     1 QID · video game database
+  Q55454542: TIME  #     1 QID · climate optimum
+  Q55657615: DYNASTY  #     1 QID · commission
+  Q557206: PERSON  #     1 QID · catholic university
+  Q558075: PERSON  #     1 QID · sexual violence
+  Q55833: LOCATION  #     1 QID · supercontinent
+  Q559026: PERSON  #     1 QID · ship class
+  Q560361: PERSON  #     1 QID · draft document
+  Q5611017: PERSON  #     1 QID · groundscraper
+  Q56242045: LOCATION  #     1 QID · anglican church building
+  Q56242250: PERSON  #     1 QID · anglican or episcopal cathedral
+  Q5633421: PERSON  #     1 QID · scientific journal
+  Q56557664: LOCATION  #     1 QID · səhər
+  Q568041: PERSON  #     1 QID · universal bank
+  Q568765: PERSON  #     1 QID · sports magazine
+  Q57082336: PERSON  #     1 QID · award medal
+  Q575727: LOCATION  #     1 QID · museum ship
+  Q576921: PERSON  #     1 QID · chinese classics
+  Q57821: PERSON  #     1 QID · fortification
+  Q582577: PERSON  #     1 QID · economic policy
+  Q58621988: LOCATION  #     1 QID · temple complex
+  Q58901077: PERSON  #     1 QID · publication format
+  Q59140288: DYNASTY  #     1 QID · expert group
+  Q5926864: LOCATION  #     1 QID · group of lakes
+  Q5932254: PERSON  #     1 QID · demographic profile
+  Q593682: LOCATION  #     1 QID · sphere of influence
+  Q59773381: PERSON  #     1 QID · car model series
+  Q5988403: PERSON  #     1 QID · identity provider
+  Q599151: DYNASTY  #     1 QID · official
+  Q5999051: PERSON  #     1 QID · illegal sport
+  Q6017200: LOCATION  #     1 QID · ministry of science and technology
+  Q602446: PERSON  #     1 QID · lyrics
+  Q603773: PERSON  #     1 QID · lecture
+  Q6040928: PERSON  #     1 QID · institute of technology
+  Q6065085: PERSON  #     1 QID · political party in spain
+  Q60671452: PERSON  #     1 QID · work of the federal government of the united states
+  Q609591: LOCATION  #     1 QID · commonwealth
+  Q60997538: PERSON  #     1 QID · kokai gaisha
+  Q610018: PERSON  #     1 QID · foreign relations
+  Q615699: LOCATION  #     1 QID · online encyclopedia
+  Q617059: PERSON  #     1 QID · humanitarian crisis
+  Q61752993: PERSON  #     1 QID · trilingual dictionary
+  Q62032401: PERSON  #     1 QID · album chart
+  Q620749: LOCATION  #     1 QID · dogma
+  Q622454: DYNASTY  #     1 QID · red scare
+  Q623109: PERSON  #     1 QID · sports league
+  Q62447: PERSON  #     1 QID · aerodrome
+  Q62470341: PERSON  #     1 QID · music newspaper
+  Q62662439: PERSON  #     1 QID · declaration
+  Q627189: PERSON  #     1 QID · labour party
+  Q62832: PERSON  #     1 QID · observatory
+  Q636497: PERSON  #     1 QID · stock character
+  Q637017: LOCATION  #     1 QID · episcopal conference
+  Q63718619: PERSON  #     1 QID · type of law
+  Q63981612: PERSON  #     1 QID · product category
+  Q64027599: DYNASTY  #     1 QID · gas station chain
+  Q641226: PERSON  #     1 QID · arena
+  Q641319: PERSON  #     1 QID · no quarter
+  Q645466: LOCATION  #     1 QID · national coat of arms
+  Q64578911: PERSON  #     1 QID · former hospital
+  Q6458277: PERSON  #     1 QID · lgbtq+ rights organization
+  Q646740: EVENT  #     1 QID · landing operation
+  Q6484056: PERSON  #     1 QID · land development
+  Q6501447: DYNASTY  #     1 QID · local government
+  Q65083733: LOCATION  #     1 QID · schism in christianity
+  Q655593: LOCATION  #     1 QID · emporium
+  Q657326: DYNASTY  #     1 QID · estates of the realm
+  Q657449: PERSON  #     1 QID · parade
+  Q657908: DYNASTY  #     1 QID · reserve components of the united states armed forces
+  Q658255: PERSON  #     1 QID · subsidiary company
+  Q66010119: LOCATION  #     1 QID · month starting on monday
+  Q660668: PERSON  #     1 QID · training vessel
+  Q66374263: LOCATION  #     1 QID · religion of an area
+  Q6647667: PERSON  #     1 QID · high literature
+  Q66735962: DYNASTY  #     1 QID · united states army formation
+  Q66737615: PERSON  #     1 QID · institute for medical research
+  Q66739700: LOCATION  #     1 QID · rural development ministry
+  Q66745531: PERSON  #     1 QID · language subsystem
+  Q66811410: TITLE  #     1 QID · medical profession
+  Q672502: LOCATION  #     1 QID · ernestine duchy
+  Q674928: LOCATION  #     1 QID · pentagonal number
+  Q67655225: LOCATION  #     1 QID · film duology
+  Q6784066: PERSON  #     1 QID · mass migration
+  Q681263: PERSON  #     1 QID · open standard
+  Q68295960: PERSON  #     1 QID · swedish government agency
+  Q6867185: LOCATION  #     1 QID · ministry of industry
+  Q68723978: LOCATION  #     1 QID · unit of thermodynamic temperature
+  Q691154: LOCATION  #     1 QID · ministry of public works
+  Q697279: PERSON  #     1 QID · petition
+  Q697295: LOCATION  #     1 QID · shrine
+  Q6979657: PERSON  #     1 QID · national public health institute
+  Q6982012: EVENT  #     1 QID · naval offensive
+  Q699: PERSON  #     1 QID · fairy tale
+  Q701165: DYNASTY  #     1 QID · maquis
+  Q7023411: PERSON  #     1 QID · nhac đo
+  Q7048853: PERSON  #     1 QID · non-binding resolution
+  Q708676: PERSON  #     1 QID · charitable organization
+  Q7094076: LOCATION  #     1 QID · online database
+  Q7099402: PERSON  #     1 QID · oral poetry
+  Q71533077: PERSON  #     1 QID · wikibase reason for preferred rank
+  Q7157512: DYNASTY  #     1 QID · peace conference
+  Q719487: LOCATION  #     1 QID · overseas collectivity of france
+  Q7210362: PERSON  #     1 QID · political party committee
+  Q721067: PERSON  #     1 QID · professional wrestling promotion
+  Q723685: PERSON  #     1 QID · video on demand
+  Q7241458: PERSON  #     1 QID · presidential proclamation
+  Q7247847: DYNASTY  #     1 QID · đoi ngu san xuat
+  Q7252696: LOCATION  #     1 QID · provincial deputation in spanish america
+  Q728904: LOCATION  #     1 QID · nature park
+  Q732717: PERSON  #     1 QID · co quan hanh phap
+  Q7328910: PERSON  #     1 QID · bo suu tap nghe thuat
+  Q734818: LOCATION  #     1 QID · che đo cong quan
+  Q735160: PERSON  #     1 QID · crude drug
+  Q7361876: LOCATION  #     1 QID · roman catholic dogma
+  Q7397: PERSON  #     1 QID · phan mem
+  Q7406919: PERSON  #     1 QID · dich vu
+  Q742421: DYNASTY  #     1 QID · đoan kich
+  Q744099: LOCATION  #     1 QID · hillfort
+  Q744448: PERSON  #     1 QID · foreign policy of the united states
+  Q7444961: LOCATION  #     1 QID · security forces
+  Q7446977: LOCATION  #     1 QID · đong đat ngoai khoi sanriku
+  Q746290: LOCATION  #     1 QID · bang (sudan)
+  Q748: PERSON  #     1 QID · phat giao
+  Q748019: PERSON  #     1 QID · hoi khoa hoc
+  Q75054287: LOCATION  #     1 QID · am nhac theo quoc gia hoac vung
+  Q751722: PERSON  #     1 QID · quay roi tinh duc
+  Q752106: LOCATION  #     1 QID · legislature broadcaster
+  Q7540126: TITLE  #     1 QID · tru so
+  Q7543083: PERSON  #     1 QID · đai lo
+  Q7559: PERSON  #     1 QID · rong
+  Q756202: PERSON  #     1 QID · tien te du tru
+  Q7574799: LOCATION  #     1 QID · thanh pho đac biet cua han quoc
+  Q760037: PERSON  #     1 QID · counter-insurgency
+  Q7631958: LOCATION  #     1 QID · tieu vung
+  Q7638697: PERSON  #     1 QID · sun grant institution
+  Q766238: DYNASTY  #     1 QID · mutual aid
+  Q77115: PERSON  #     1 QID · trung tam cong đong
+  Q777120: LOCATION  #     1 QID · thi tran cua pennsylvania
+  Q778000: TITLE  #     1 QID · ?
+  Q785020: LOCATION  #     1 QID · bon tram tich
+  Q7858742: PERSON  #     1 QID · two-player game
+  Q786766: DYNASTY  #     1 QID · autogenocide
+  Q788176: LOCATION  #     1 QID · khu vuc hanh chinh tu tri
+  Q7892363: PERSON  #     1 QID · united states cable news
+  Q8010730: PERSON  #     1 QID · independent organ
+  Q8027727: PERSON  #     1 QID · wissenschaft
+  Q805233: DYNASTY  #     1 QID · ballet company
+  Q806869: LOCATION  #     1 QID · banner
+  Q8070: LOCATION  #     1 QID · tsunami
+  Q80793969: PERSON  #     1 QID · ranked list
+  Q811430: LOCATION  #     1 QID · fixed construction
+  Q811582: LOCATION  #     1 QID · construction ministry
+  Q811701: PERSON  #     1 QID · model series
+  Q816829: PERSON  #     1 QID · periodization
+  Q81741: DYNASTY  #     1 QID · magic
+  Q82036085: PERSON  #     1 QID · physical media format
+  Q820477: LOCATION  #     1 QID · mine
+  Q828787: DYNASTY  #     1 QID · volunteer military
+  Q829080: PERSON  #     1 QID · professional association
+  Q837556: PERSON  #     1 QID · forced displacement
+  Q838296: PERSON  #     1 QID · international auxiliary language
+  Q839470: PERSON  #     1 QID · sacred language
+  Q840396: PERSON  #     1 QID · ideal
+  Q841418: EVENT  #     1 QID · strategic bombing
+  Q844619: PERSON  #     1 QID · vihara
+  Q845945: LOCATION  #     1 QID · shinto shrine
+  Q8461: PERSON  #     1 QID · racism
+  Q847109: PERSON  #     1 QID · dreadnought
+  Q847959: LOCATION  #     1 QID · social cataloging application
+  Q848599: PERSON  #     1 QID · brit milah
+  Q852215: LOCATION  #     1 QID · veritable records
+  Q858439: PERSON  #     1 QID · presidential election
+  Q85853098: LOCATION  #     1 QID · marian dogma
+  Q858804: DYNASTY  #     1 QID · dan toc thieu so o trung quoc
+  Q859781: LOCATION  #     1 QID · bigotry
+  Q860861: PERSON  #     1 QID · tac pham đieu khac
+  Q863915: PERSON  #     1 QID · inland port
+  Q865588: DYNASTY  #     1 QID · uy ban
+  Q866196: LOCATION  #     1 QID · toa giam muc
+  Q867459: LOCATION  #     1 QID · cac vung cua thai lan
+  Q870455: PERSON  #     1 QID · bagno
+  Q87167: PERSON  #     1 QID · thu ban
+  Q872181: PERSON  #     1 QID · huong đao
+  Q874405: DYNASTY  #     1 QID · nhom xa hoi
+  Q875157: PERSON  #     1 QID · khu nghi mat
+  Q876274: LOCATION  #     1 QID · hai chien
+  Q877955: TITLE  #     1 QID · pho thu tuong
+  Q88372: LOCATION  #     1 QID · esplanade
+  Q88789639: TITLE  #     1 QID · artistic profession
+  Q889821: LOCATION  #     1 QID · thong đoc tieu bang hoa ky
+  Q898712: PERSON  #     1 QID · khong tac
+  Q899192: DYNASTY  #     1 QID · phuong dien quan
+  Q90049510: DYNASTY  #     1 QID · elite unit
+  Q906512: PERSON  #     1 QID · shipwrecking
+  Q907116: LOCATION  #     1 QID · monument (spain)
+  Q91122: PERSON  #     1 QID · boong ke
+  Q9134365: PERSON  #     1 QID · quoc vuong cua vuong quoc anh
+  Q917441: LOCATION  #     1 QID · environment ministry
+  Q9212979: DYNASTY  #     1 QID · bo đoi am nhac
+  Q92483361: PERSON  #     1 QID · subscription television channel
+  Q9259: LOCATION  #     1 QID · di san the gioi
+  Q92786122: LOCATION  #     1 QID · ministry of veteran affairs
+  Q930752: PERSON  #     1 QID · chuyen khoa
+  Q933394: LOCATION  #     1 QID · exclave
+  Q93352: LOCATION  #     1 QID · bo bien
+  Q93465857: LOCATION  #     1 QID · dodecad
+  Q93465891: LOCATION  #     1 QID · tridecad
+  Q934744: PERSON  #     1 QID · political scandal
+  Q93479232: DYNASTY  #     1 QID · military legion
+  Q934951: LOCATION  #     1 QID · historical regions of romania
+  Q93636179: PERSON  #     1 QID · won
+  Q938236: DYNASTY  #     1 QID · panel
+  Q9388534: PERSON  #     1 QID · archival collection
+  Q944816: LOCATION  #     1 QID · khu vuc sinh thai
+  Q94670589: PERSON  #     1 QID · christian organization
+  Q94920: LOCATION  #     1 QID · jewish holiday
+  Q952037: DYNASTY  #     1 QID · gia toc chinh tri
+  Q955824: PERSON  #     1 QID · hoc hoi
+  Q95993050: PERSON  #     1 QID · first order
+  Q96253971: PERSON  #     1 QID · loai thuoc tinh
+  Q96264607: PERSON  #     1 QID · type of security
+  Q96474676: PERSON  #     1 QID · giai thuong cho nu dien vien chinh xuat sac nhat
+  Q96474679: PERSON  #     1 QID · award for best direction
+  Q97300909: LOCATION  #     1 QID · buddhist triad
+  Q97374157: LOCATION  #     1 QID · international parliament
+  Q975166: LOCATION  #     1 QID · tetrahedral number
+  Q975413: PERSON  #     1 QID · tu đien bach khoa
+  Q9779: PERSON  #     1 QID · bang chu cai
+  Q98116669: LOCATION  #     1 QID · religious complex
+  Q985073: LOCATION  #     1 QID · lanh tho uy thac lien hiep quoc
+  Q987075: PERSON  #     1 QID · new university
+  Q990488: LOCATION  #     1 QID · luftkurort
+  Q996839: PERSON  #     1 QID · hoi huynh đe
+  Q99734981: PERSON  #     1 QID · coherent system of units
+

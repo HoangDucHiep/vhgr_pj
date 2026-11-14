@@ -35,10 +35,12 @@ docs/10-nhat-ky/
 | [`phase-01.md`](phase-01.md) | 1 — Lọc corpus 5 tầng T0–T5 | 13–14/11/2026 | Thang số liệu lọc nhiễu · vì sao thêm T5 · lỗi 5 lỗi & cách sửa |
 | [`phase-02.md`](phase-02.md) | 2 — Làm sạch wikitext, tách câu/đoạn, trích hyperlink | 14/11/2026 | 3 lỗi lớn (offset lệch 502 bài · vỡ câu do soft-wrap · `<ref>` nuốt text) · chốt mẫu số link & cách đo "câu hợp lệ" |
 | [`phase-03.md`](phase-03.md) | 3 — Parse infobox + chuẩn hóa ngày (A4) | 14/11/2026 | 10.078 triple confidence ≥ 0,95 · **audit đóng phase**: 4 lỗi thật (347 triple trùng · 4 self-loop · 81 trùng giữa artifact · template mơ hồ) · ablation đo từng fix |
+| [`phase-04.md`](phase-04.md) | 4 — Nhãn bạc NER từ hyperlink (B2.1) | 14/11/2026 | 186.960 câu · 138.860 mention · độ phủ **100%** · **audit đóng phase**: 4 lỗi thật (thiếu ranh giới từ · "Quan lại nhà X" · siêu dữ liệu sinh tử · số đo lượng) · ablation 5 bước |
 | [`so-lieu/phase-00-mo-truong.json`](so-lieu/phase-00-mo-truong.json) | 0 | — | Phiên bản thư viện, cấu hình hạ tầng, so sánh phương án bảo vệ DB |
 | [`so-lieu/phase-01-bang-do-sanh.json`](so-lieu/phase-01-bang-do-sanh.json) | 1 | — | Thống kê corpus trước/sau T5 theo mọi chiều |
 | [`so-lieu/phase-02-text-stats.json`](so-lieu/phase-02-text-stats.json) | 2 | — | Số liệu văn bản Phase 2: trước/sau theo từng lỗi · so sánh 3 phương án xử lý wikilink |
 | [`so-lieu/phase-03-infobox-stats.json`](so-lieu/phase-03-infobox-stats.json) | 3 | — | Số liệu infobox Phase 3: 8 Gate (5 gốc + 3 bất biến) · **thang ablation** đo từng fix riêng lẻ |
+| [`so-lieu/phase-04-ner-stats.json`](so-lieu/phase-04-ner-stats.json) | 4 | — | Số liệu nhãn bạc NER Phase 4: 5 Gate · phân bố nguồn nhãn (7 nguồn) · **thang ablation 5 bước** · F1 theo loại của 2 baseline |
 
 ## Cách dùng cho báo cáo / slide
 
@@ -51,6 +53,8 @@ docs/10-nhat-ky/
 | Slide "bài học kinh nghiệm" | `phase-01.md` § *Bài học* |
 | Slide "sai lệch so với kế hoạch" | `reports/deviations.md` (D-004 → D-030) |
 | Slide "audit: 5 Gate xanh mà dữ liệu vẫn sai" | `phase-03.md` § *Ý tưởng cho slide* + `so-lieu/phase-03-infobox-stats.json` § `thang_so_sanh_ablation` |
+| Slide "sinh nhãn bạc NER" | `phase-04.md` § *Ý tưởng cho slide* + `so-lieu/phase-04-ner-stats.json` § `thang_so_sanh_ablation` |
+| Slide "chất lượng nhãn NER" | `phase-04.md` § *Số liệu đo được* + `reports/silver_quality.md` |
 | Số liệu tổng quan toàn dự án | `docs/PROGRESS.md` § *Chỉ số đo được* |
 
 ## Mẫu chuẩn cho phase sau

@@ -1,0 +1,244 @@
+{
+  "_meta": {
+    "phase": "04",
+    "title": "Sinh nhãn bạc NER từ hyperlink (B2 phần 1)",
+    "ngay": "2026-11-14",
+    "nguon_so_lieu": {
+      "silver": "data/interim/ner_silver.jsonl",
+      "stats": "data/interim/silver_quality_stats.json",
+      "splits": "data/splits/splits.json",
+      "lenh": "python -m src.ner.build_silver --out data/interim/ner_silver.jsonl"
+    }
+  },
+  "tong_quan": {
+    "n_sentences": 186960,
+    "n_mentions": 138860,
+    "n_sentences_labelled": 79407,
+    "coverage": 0.4247,
+    "n_sentences_with_link": 60078,
+    "n_sentences_with_link_labelled": 60078,
+    "coverage_linked": 1.0,
+    "num_labels": 13,
+    "scheme": "BIO"
+  },
+  "entity_distribution": {
+    "PERSON": 37242,
+    "DYNASTY": 5957,
+    "EVENT": 9019,
+    "LOCATION": 30818,
+    "TIME": 53654,
+    "TITLE": 2170
+  },
+  "source_distribution": {
+    "category": 69748,
+    "time_regex": 35685,
+    "qid_direct": 18208,
+    "qid_ancestor": 7675,
+    "pattern": 4039,
+    "kg_type": 3367,
+    "wikidata_signal": 138
+  },
+  "mention_length_mean": {
+    "DYNASTY": 2.85,
+    "EVENT": 3.75,
+    "LOCATION": 2.38,
+    "PERSON": 2.84,
+    "TIME": 1.16,
+    "TITLE": 2.59
+  },
+  "splits": {
+    "train": 1952,
+    "dev": 244,
+    "test": 245
+  },
+  "gate": {
+    "gate_1_coverage_linked": {
+      "ky_vong": ">=0.90",
+      "thuc_te": 1.0,
+      "dat": true
+    },
+    "gate_2_so_lop_va_person": {
+      "so_lop_khac_O": 6,
+      "entity_chi_ty_hyperlink": {
+        "PERSON": 37242,
+        "LOCATION": 30818,
+        "TIME": 17969,
+        "EVENT": 9019,
+        "DYNASTY": 5957,
+        "TITLE": 2170
+      },
+      "person_la_lop_pho_bien_nhat_trong_nhom_hyperlink": true,
+      "dat": true
+    },
+    "gate_3_len_tokens_eq_labels": {
+      "ky_vong": "100%",
+      "thuc_te": "100%",
+      "dat": true
+    },
+    "gate_4_splits_khong_trung": {
+      "train": 1952,
+      "dev": 244,
+      "test": 245,
+      "dat": true
+    },
+    "gate_5_baseline_f1_dev": {
+      "ky_vong": ">=0.60",
+      "surface_micro_f1": 0.3917,
+      "gazetteer_micro_f1": 0.799,
+      "gazetteer_macro_f1": 0.8261,
+      "dat": true
+    }
+  },
+  "thang_so_sanh_ablation": {
+    "_note": "Đo từng fix riêng lẻ trên cùng corpus. Bản 'trước' là bản triển khai đầu tiên (BIOES 25 lớp, nguồn khác).",
+    "buoc_fix": [
+      {
+        "buoc": "baseline (chỉ QID + infobox + pattern)",
+        "nguon_nhan": 32137,
+        "person": null,
+        "time": 57604,
+        "gazetteer_dev_f1": 0.7388
+      },
+      {
+        "buoc": "+ them nguon category",
+        "nguon_nhan": null,
+        "time": 57604,
+        "gazetteer_dev_f1": null
+      },
+      {
+        "buoc": "+ chuyen scheme sang BIO 13 lop",
+        "nguon_nhan": null,
+        "time": 57604,
+        "gazetteer_dev_f1": null
+      },
+      {
+        "buoc": "+ TIME chi gan khi co ngu canh",
+        "nguon_nhan": null,
+        "time": 35685,
+        "gazetteer_dev_f1": 0.799
+      },
+      {
+        "buoc": "+ sua ranh gioi tu trong mau category",
+        "nguon_nhan": 138860,
+        "person": 37242,
+        "time": 53654,
+        "gazetteer_dev_f1": 0.799
+      }
+    ]
+  },
+  "baseline_dev_chi_tiet": {
+    "surface": {
+      "micro": {
+        "precision": 0.5708,
+        "recall": 0.2982,
+        "f1": 0.3917,
+        "support": 13774
+      },
+      "macro": {
+        "precision": 0.56,
+        "recall": 0.2896,
+        "f1": 0.3306
+      },
+      "per_label": {
+        "DYNASTY": {
+          "precision": 0.8558,
+          "recall": 0.6259,
+          "f1": 0.723,
+          "support": 588
+        },
+        "EVENT": {
+          "precision": 0.2274,
+          "recall": 0.2588,
+          "f1": 0.2421,
+          "support": 769
+        },
+        "LOCATION": {
+          "precision": 0.7929,
+          "recall": 0.0715,
+          "f1": 0.1311,
+          "support": 3107
+        },
+        "PERSON": {
+          "precision": 0.4838,
+          "recall": 0.554,
+          "f1": 0.5165,
+          "support": 3877
+        },
+        "TIME": {
+          "precision": 1.0,
+          "recall": 0.2275,
+          "f1": 0.3707,
+          "support": 5143
+        },
+        "TITLE": {
+          "precision": 0.0,
+          "recall": 0.0,
+          "f1": 0.0,
+          "support": 290
+        }
+      },
+      "n_sentences": 19049,
+      "n_gold_entities": 13774,
+      "n_pred_entities": 7195
+    },
+    "gazetteer": {
+      "micro": {
+        "precision": 0.988,
+        "recall": 0.6707,
+        "f1": 0.799,
+        "support": 13774
+      },
+      "macro": {
+        "precision": 0.9761,
+        "recall": 0.7483,
+        "f1": 0.8261
+      },
+      "per_label": {
+        "DYNASTY": {
+          "precision": 0.886,
+          "recall": 0.9252,
+          "f1": 0.9052,
+          "support": 588
+        },
+        "EVENT": {
+          "precision": 0.9811,
+          "recall": 0.8114,
+          "f1": 0.8883,
+          "support": 769
+        },
+        "LOCATION": {
+          "precision": 0.9909,
+          "recall": 0.8799,
+          "f1": 0.9322,
+          "support": 3107
+        },
+        "PERSON": {
+          "precision": 0.9985,
+          "recall": 0.8826,
+          "f1": 0.937,
+          "support": 3877
+        },
+        "TIME": {
+          "precision": 1.0,
+          "recall": 0.3352,
+          "f1": 0.5021,
+          "support": 5143
+        },
+        "TITLE": {
+          "precision": 1.0,
+          "recall": 0.6552,
+          "f1": 0.7917,
+          "support": 290
+        }
+      },
+      "n_sentences": 19049,
+      "n_gold_entities": 13774,
+      "n_pred_entities": 9350
+    }
+  },
+  "n_splits_dev_chi_tiet": {
+    "n_sentences_dev": 19049,
+    "n_sentences_train": 150230,
+    "gazetteer_size": 12539
+  }
+}

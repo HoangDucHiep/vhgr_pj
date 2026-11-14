@@ -356,3 +356,51 @@
 - Ảnh hưởng: `dong_doi_tai` 0 → **31** triple; 13 bài triều đại chuyển từ `place` → `dynasty` (đúng). Đo bằng **ablation** (tắt riêng `AMBIGUOUS_TEMPLATES`): tổng triple 10.047 → **10.078** (+31, toàn bộ là `dong_doi_tai`); `thuoc_trieu_dai` **không đổi** (631) — vì 13 bài triều đại này không có trường `triều đại`/`hoàng tộc` riêng. Gate 1–5 **không đổi**.
 - Xử lý: Thêm `AMBIGUOUS_TEMPLATES` trong `src/preprocess/infobox_entity_types.py` (4 template: `infobox former country`, `infobox country`, `infobox former subdivision`, `infobox former monarchy`). `normalize_type()` nhận thêm tham số `wikidata_signal`: nếu template thuộc danh sách mơ hồ **và** có tín hiệu Wikidata → ưu tiên tín hiệu; không có tín hiệu → rơi về `type_map`. Thêm test regression `test_ambiguous_template_prefers_wikidata_signal`.
 - Cập nhật file: `src/preprocess/infobox_entity_types.py`, `src/preprocess/parse_infobox.py`, `configs/infobox_mapping.yaml`, `tests/test_infobox.py`, `reports/phase_03_report.md`, `docs/10-nhat-ky/phase-03.md`
+
+## D-031 — Scheme nhãn NER bạc: BIO (13 lớp) thay vì BIOES (25 lớp) (Phase 4 — 14/11/2026)
+- Ngày: 2026-11-14
+- Phase: 4
+- Loại: kỹ thuật
+- Kế hoạch: `docs/09` §Phase 4 mục 1 viết "sinh `nhãn TIME` bằng regex", output contract minh hoạ `"labels":["B-PERSON","I-PERSON","O",...]`; `docs/09` §Phase 5 mục 2 ghi `num_labels = 2*6 + 1 = 13 (BIOES × 6 nhãn + O)`.
+- Thực tế: hai tài liệu **mâu thuẫn nhau** — `docs/CONTEXT.md` §2.4 và output contract Phase 4 dùng **BIO** (13 lớp), còn dòng `num_labels = 2*6 + 1 = 13 (BIOES × 6 nhãn + O)` trong Phase 5 ghi "BIOES" nhưng công thức `2*6+1` chỉ đúng với **BIO** (BIOES thật là `4*6+1 = 25`). Bản triển khai đầu tiên chọn BIOES 25 lớp → lệch `docs/CONTEXT.md` §2.4 và output contract Phase 4.
+- Lý do: `docs/CONTEXT.md` là "số đã chốt" (theo `AGENTS.md` §2 "quy tắc vàng"), và output contract Phase 4 minh hoạ nhãn `B-`/`I-`/`O`. Công thức `num_labels = 2*6+1 = 13` cũng khớp BIO. Vì vậy **BIO là lựa chọn đúng**, và dòng "BIOES" trong Phase 5 là **lỗi đánh máy** cần sửa để tránh Phase 5 dùng `num_labels=25`.
+- Ảnh hưởng: `ner_silver.jsonl` đổi scheme (`S-`/`E-` → `B-`/`I-`); `src/evaluation/metrics.py` đổi logic gom span (`I-`/`E-` → chỉ `I-`); `tests/test_silver_labels.py` đổi 3 assert về scheme. Số liệu Gate 1–5 **không đổi** (đo lại sau khi chuyển scheme, xem bảng ở `docs/10-nhat-ky/phase-04.md` §4).
+- Xử lý: Chuẩn hóa **BIO** trong `src/ner/build_silver.py` (`BIO_PREFIXES = ("B-", "I-")`, `NUM_LABELS = 13`); sửa `src/evaluation/metrics.py`; cập nhật `docs/09` §Phase 5 (bỏ chữ "BIOES"); cập nhật `AGENTS.md` §7 và `docs/CONTEXT.md` §2.4 nếu cần.
+- Cập nhật file: `src/ner/build_silver.py`, `src/evaluation/metrics.py`, `tests/test_silver_labels.py`, `docs/09-ke-hoach-thuc-thien.md`, `reports/phase_04_report.md`, `docs/10-nhat-ky/phase-04.md`
+
+## D-032 — Thêm nguồn nhãn `category` (Wikipedia category) đứng đầu thứ tự ưu tiên (Phase 4 — 14/11/2026)
+- Ngày: 2026-11-14
+- Phase: 4
+- Loại: kỹ thuật
+- Kế hoạch: `docs/09` §Phase 4 mục 1 quy định thứ tự ưu tiên suy nhãn: (1) QID → `P31` → map; (2) `infobox_entities.jsonl`; (3) mẫu tên; (4) bỏ nếu không xác định. `docs/09` §Gate "Lùi" cũng chỉ nhắc 3 nguồn: `qid`/`infobox`/`pattern`.
+- Thực tế: bản triển khai đầu tiên theo đúng thứ tự trên chỉ gán được **17.364 + 7.229 + 3.367 + 4.039 + 138 = 32.137 mention** từ link (nhiều đích link không có QID trong dump, hoặc QID không có `P31` — đo được **0/1.788** QID mới có `P31`). Nhưng Wikipedia **category** ("Người Hà Nội", "Thành phố ở Việt Nam", "Chiến tranh Việt Nam", "Nhà Nguyễn") là tín hiệu **mạnh và chính xác** do biên tập viên gắn tay, đặc biệt với corpus tiếng Việt mà `P31` rất thưa.
+- Lý do: `P31` cho corpus tiếng Việt không ổn định — nhiều bài không có `P31` chuẩn, và khi `P31` là lớp generic ("human") thì **mọi** người thành `PERSON`, kể cả khi tên đích thực ra là quốc gia/địa danh. Category không có vấn đề này.
+- Ảnh hưởng: nguồn nhãn `category` chiếm **69.748 / 138.860 mention (50,2%)** — nguồn lớn nhất. Nhờ vậy **100%** câu có link nội bộ đều có nhãn (Gate 1). Baseline gazetteer trên dev: F1 **0,3917 → 0,7990**.
+- Xử lý: Thêm `src/ner/category_types.py` (phân loại category → 6 nhãn, khớp cả bản có dấu lẫn bản bỏ dấu); đặt `category` **đầu** thứ tự ưu tiên trong `SilverLabeller.resolve()`; khai báo `confidence.category = 0.97` trong `configs/ner_silver_config.yaml`. Cập nhật `docs/09` §Phase 4 cho khớp thực tế.
+- Cập nhật file: `src/ner/category_types.py`, `src/ner/build_silver.py`, `configs/ner_silver_config.yaml`, `docs/09-ke-hoach-thuc-thien.md`, `reports/phase_04_report.md`, `docs/10-nhat-ky/phase-04.md`
+
+## D-033 — Nhãn TIME chỉ gán khi có ngữ cảnh, loại số đo lượng (Phase 4 — 14/11/2026)
+- Ngày: 2026-11-14
+- Phase: 4
+- Loại: kỹ thuật
+- Kế hoạch: `docs/09` §Phase 4 mục 1 ghi: "Đồng thời sinh `nhãn TIME` bằng regex trên câu (không cần link): `\b\d{3,4}\b` trong ngữ cảnh 'năm', `thế kỷ [IVXLCDM]+`".
+- Thực tế: bản triển khai đầu tiên hiểu `\b\d{3,4}\b` là **không cần ngữ cảnh** → gán TIME cho **mọi** số 3–4 chữ số trong câu. Đo trên 186.960 câu: **57.604** mention TIME, trong đó **16.099** là số **không phải năm**: `000` (từ "650.000 m³/ngày"), `500` (ha), `3000`, `462`, `650`… Nhiều câu bị gán **3–4** nhãn TIME sai liên tiếp (vd "khoảng 650.000 m³/ngày (2015)" → "000" + "2015" cùng là TIME).
+- Lý do: `docs/09` đã ghi rõ điều kiện "**trong ngữ cảnh 'năm'**" — bản triển khai đầu bỏ sót điều kiện này. Ngoài ra cần ràng thêm khoảng lịch sử (1000–2100) vì số 3 chữ số không phải năm.
+- Ảnh hưởng: TIME **57.604 → 35.685** mention; số TIME sai 16.099 → **0** (đo lại bằng `require_context` + khoảng 1000–2100 + ranh giới từ). Baseline surface dev F1 **0,3495 → 0,3917**; gazetteer **0,7388 → 0,7990**.
+- Xử lý: (a) thêm cờ `require_context` cho mẫu năm đứng riêng; (b) thêm `time_context_before` / `time_context_after` vào `configs/ner_silver_config.yaml`; (c) sửa `SilverLabeller._has_time_context()` để chỉ xét **2 token liền kề** (xét cả câu làm mọi số sau một chữ "năm" đều thành "năm" → sai hàng nghìn số như "203/2025/QH15").
+- Cập nhật file: `src/ner/build_silver.py`, `configs/ner_silver_config.yaml`, `reports/phase_04_report.md`, `docs/10-nhat-ky/phase-04.md`
+
+## D-034 — Sửa lỗi ranh giới từ trong mẫu category Wikipedia (Phase 4 — 14/11/2026)
+- Ngày: 2026-11-14
+- Phase: 4
+- Loại: kỹ thuật
+- Kế hoạch: `docs/09` §Phase 4 mục 1 yêu cầu suy nhãn theo đích link, không xác định → **bỏ** (không gán nhãn sai).
+- Thực tế: mẫu category viết **không có ranh giới từ** ở cuối nhánh thay thế, nên regex khớp **tiền tố** của nhánh khác. Đo được 4 nhóm lỗi thật:
+  1. `^nha ho` (DYNASTY) khớp "Nhà **ho**ạt động quyền LGBT Mỹ" (PERSON) → **183** category bị gán nhầm DYNASTY.
+  2. `^nha ngo` (DYNASTY) khớp "Nhà **ngo**ại giao Việt Nam" (PERSON) → **108** category sai.
+  3. `^quan l[aai]i` (TITLE) khớp "Quan lại **nhà Nguyễn**" — đây là **người** (chức quan) → **185** bài người bị gán TITLE thay vì PERSON (vd "Trần Trọng Kim", "Trịnh Kiểm").
+  4. `^nam (sinh|mat|tu)` (TIME) khớp category **siêu dữ liệu** "Năm sinh không rõ" / "Năm mất thiếu" → bài người bị gán TIME thay vì PERSON (vd "Nam tước Đức", "Nam tước phu nhân Liên hiệp Anh").
+- Lý do: `re.search` với mẫu không có `\b` ở cuối → "hoạt động" bắt đầu bằng "ho" nên khớp. Thêm vào đó, "Quan lại nhà X" / "Hoàng đế" là **người** chứ không phải tước hiệu, và category "Năm sinh ..." là **siêu dữ liệu** chứ không phải đơn vị thời gian.
+- Ảnh hưởng: sau khi sửa, chỉ mục category phủ **10.264 / 15.580** đích link (trước: 10.791 → sai nhãn); phân bố entity đổi: PERSON 36.477 → **37.242** (+765), TITLE 2.887 → **2.170** (−717), TIME 57.184 → **53.654** (−3.530). Gate 5 (baseline F1) **tăng**: gazetteer dev F1 **0,7990** (giữ nguyên sau sửa lần cuối), và `PERSON` lại là lớp phổ biến nhất trong nhóm entity gắn từ link (37.242 > 30.818 LOCATION).
+- Xử lý: Bổ sung `\b` vào **mọi** nhánh thay thế trong `CATEGORY_PATTERNS`; tách "Quan lại nhà X"/"Hoàng đế" sang `PERSON`; bỏ mẫu `^nam (sinh|mat|tu)`; thêm `^nha (hoat dong|...)` vào `PERSON`; chuyển `^quan l[aai]i$` (đứng một mình) sang `TITLE`.
+- Cập nhật file: `src/ner/category_types.py`, `reports/phase_04_report.md`, `docs/10-nhat-ky/phase-04.md`

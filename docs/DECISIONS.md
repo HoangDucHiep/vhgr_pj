@@ -231,3 +231,114 @@ model khi Phase 5+ thay đổi mô hình.
 
 **Hệ quả:** 3 test bắt buộc trong `tests/test_infobox.py`; `.cursor/rules/data-contracts.mdc`
 §"Artifact Phase 3" ghi rõ quy tắc này.
+
+---
+
+## D-031 — Scheme nhãn NER bạc: BIO (13 lớp), không phải BIOES (25 lớp)
+
+**Ngày:** 14/11/2026 · **Trạng thái:** đã chốt
+
+**Bối cảnh:** `docs/09` §Phase 4 (output contract) dùng nhãn `B-PERSON`/`I-PERSON`/`O`, và
+`docs/CONTEXT.md` §2.4 chốt `num_labels = 2×6+1 = 13`. Nhưng `docs/09` §Phase 5 lại ghi
+`num_labels = 2*6 + 1 = 13 (BIOES × 6 nhãn + O)` — **mâu thuẫn**: BIOES thật là `4×6+1 = 25`.
+
+**Quyết định:** dùng **BIO** (`B-`/`I-`/`O`) = **13 lớp**. Dòng "BIOES" trong `docs/09` §Phase 5
+là lỗi đánh máy → đã sửa để Phase 5 không dùng nhầm `num_labels=25`.
+
+**Lý do:** `docs/CONTEXT.md` là "số đã chốt" theo `AGENTS.md` §2 ("quy tắc vàng"), và công thức
+`2×6+1` chỉ đúng với BIO.
+
+**Hệ quả:** `src/ner/build_silver.py` (`BIO_PREFIXES`, `NUM_LABELS=13`), `src/evaluation/metrics.py`
+(logic gom span), `tests/test_silver_labels.py`. Chi tiết: `reports/deviations.md` D-031.
+
+---
+
+## D-032 — Nguồn nhãn bạc: **Wikipedia category** đứng đầu, trước Wikidata `P31`
+
+**Ngày:** 14/11/2026 · **Trạng thái:** đã chốt
+
+**Bối cảnh:** `docs/09` §Phase 4 quy định suy nhãn theo QID → `P31` → map. Khi đo thực tế trên
+corpus tiếng Việt (2.441 bài), đường này cho ra rất ít: **0 / 1.788** QID mới có `P31`, và khi
+có thì thường là lớp generic ("human") → **mọi** người thành `PERSON`, kể cả khi tên đích thực
+ra là quốc gia hay địa danh.
+
+**Quyết định:** thêm nguồn **`category`** (category Wikipedia của bài đích, từ `dump_facts.jsonl`)
+đứng **đầu** thứ tự ưu tiên, với `confidence = 0.97`. Chuỗi đầy đủ:
+`category` → `qid_direct` → `qid_ancestor` → `kg_type` → `wikidata_signal` → `pattern` → bỏ.
+
+**Lý do:** category do **biên tập viên** gắn tay là tín hiệu mạnh và đúng đặc biệt với corpus
+tiếng Việt (phân biệt được "Nhà **hoạt động**" (PERSON) với "Nhà **Nguyễn**" (DYNASTY) — điều
+mà `P31` không làm được).
+
+**Hệ quả:** `category` chiếm **50,2%** nguồn nhãn; độ phủ câu có hyperlink **100%**;
+baseline gazetteer dev F1 **0,7388 → 0,7990**. Thêm `src/ner/category_types.py`.
+Chi tiết: `reports/deviations.md` D-032.
+
+---
+
+## D-033 — Nhãn TIME chỉ gán khi có ngữ cảnh liền kề
+
+**Ngày:** 14/11/2026 · **Trạng thái:** đã chốt
+
+**Bối cảnh:** `docs/09` §Phase 4 yêu cầu regex sinh TIME `\b\d{3,4}\b` **"trong ngữ cảnh
+'năm'"**. Bản triển khai đầu bỏ sót điều kiện → gán TIME cho **mọi** số 3–4 chữ số, đo được
+**16.099** số **không phải năm** bị gán sai (vd "650.000 m³/ngày" → "000", "500 ha").
+
+**Quyết định:** năm đứng riêng chỉ được gán khi có **ngữ cảnh liền kề** (2 token trước/sau
+thuộc `time_context_before/after` trong `configs/ner_silver_config.yaml`) **và** nằm trong khoảng
+lịch sử 1000–2100.
+
+**Lý do:** điều kiện "trong ngữ cảnh" trong đặc tả là **bắt buộc**, không phải gợi ý. Ngoài ra
+ngữ cảnh phải **liền kề** — nếu xét cả câu thì một chữ "năm" ở đầu câu sẽ biến mọi con số phía
+sau thành năm (đo được "Nghị quyết số 203/2025/QH15" → 2 năm sai).
+
+**Hệ quả:** TIME **57.604 → 35.685** mention; số năm sai **16.099 → 0**.
+Chi tiết: `reports/deviations.md` D-033.
+
+---
+
+## D-034 — Mọi mẫu category Wikipedia phải có ranh giới từ (`\b`)
+
+**Ngày:** 14/11/2026 · **Trạng thái:** đã chốt
+
+**Bối cảnh:** `docs/09` §Phase 4 yêu cầu "không xác định → bỏ (không gán nhãn sai)". Bản triển
+khai đầu viết mẫu category **không có ranh giới từ** ở cuối nhánh thay thế → regex khớp **tiền tố**
+của nhánh khác. Đo được 4 nhóm lỗi thật:
+
+| Mẫu cũ | Khớp nhầm vào | Số category sai |
+|---|---|---|
+| `^nha ho` (DYNASTY) | "Nhà **ho**ạt động quyền LGBT Mỹ" (PERSON) | 183 |
+| `^nha ngo` (DYNASTY) | "Nhà **ngo**ại giao Việt Nam" (PERSON) | 108 |
+| `^quan l[aai]i` (TITLE) | "Quan lại **nhà Nguyễn**" — đây là **người** | 185 bài người |
+| `^nam (sinh\|mat\|tu)` (TIME) | "**Năm sinh không rõ**" — đây là **siêu dữ liệu** | bài người |
+
+**Quyết định:** (1) bổ sung `\b` vào **mọi** nhánh thay thế trong `CATEGORY_PATTERNS`;
+(2) "Quan lại nhà X" / "Hoàng đế" → `PERSON`; chỉ "Quan lại" đứng một mình mới là `TITLE`;
+(3) bỏ mẫu `^nam (sinh|mat|tu)`; (4) thêm `^nha (hoat dong|hoa hoc|ngoai giao|...)` → `PERSON`.
+
+**Lý do:** mẫu theo tên danh mục phải khớp **trọn cụm từ**, không khớp tiền tố. Ngoài ra cần
+phân biệt "người mang chức vị" (Quan lại nhà Nguyễn) với "tước hiệu" (Thụy hiệu), và "đơn vị
+thời gian" (Thế kỷ) với "siêu dữ liệu sinh tử" (Năm sinh không rõ).
+
+**Hệ quả:** PERSON 36.477 → **37.242**; TITLE 2.887 → **2.170**; TIME 57.184 → **53.654**;
+`PERSON` lại là lớp phổ biến nhất trong nhóm entity gắn từ hyperlink.
+Chi tiết: `reports/deviations.md` D-034.
+
+---
+
+## D-035 — Bảng map lớp Wikidata → nhãn NER **sinh tự động**, không viết tay
+
+**Ngày:** 14/11/2026 · **Trạng thái:** đã chốt
+
+**Bối cảnh:** `docs/09` §Phase 4 ghi bảng map ở `configs/wikidata_type_map.yaml`. Với ~2.400 lớp
+Wikidata, viết tay không khả thi và không tái lập được khi dump cập nhật.
+
+**Quyết định:** `scripts/build_type_map.py` sinh bảng map từ `data/interim/class_hierarchy.json`
+(cạnh `P279` trực tiếp) + `data/interim/class_labels.json` (nhãn tiếng Anh/Việt). Khớp tên lớp
+theo từ khoá với **ưu tiên cụm dài** và **danh sách cụm loại trừ** (vd "sovereign state",
+"island country" → `LOCATION` để không khớp nhầm `PERSON`).
+
+**Lý do:** tái lập được, cập nhật được, và tránh lỗi thủ công.
+
+**Hệ quả:** bảng map có **~2.400 lớp**, phủ **94,2%** QID mục tiêu.
+Chi tiết: `reports/deviations.md` D-035.

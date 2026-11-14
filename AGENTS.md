@@ -111,7 +111,8 @@ reports/      # kết quả đánh giá, phase reports
 | `data/interim/infobox_triples.jsonl` | 3 | triple từ infobox (`method="infobox"`, `confidence ≥ 0.95`) |
 | `data/interim/lead_triples.jsonl` | 3 | triple fallback từ đoạn dẫn (`method="rule"`, `confidence=0.85`) |
 | `data/interim/infobox_entities.jsonl` | 3 | entity + 11 node props (birth_year, death_year, reign_start/end, temple_name, posthumous_name, reign_title, gender, aliases, birth_place, death_place) |
-| `data/interim/ner_silver.jsonl` | 4 | nhãn bạc NER |
+| `data/interim/ner_silver.jsonl` | 4 | nhãn bạc NER — **scheme BIO** (`B-`/`I-`/`O`, 13 lớp), token-level, kèm `mentions` (start/end token, label, target, qid, source, `target_type_confidence`) |
+| `data/splits/splits.json` | 4 | chia tập theo `page_id`: train/dev/test 80/10/10, seed 42 |
 | `data/interim/ner_predictions.jsonl` | 5 | NER dự đoán (offset ký tự) |
 | `data/interim/coref_resolved.jsonl` | 6 | mention + canonical_id |
 | `data/interim/re_train.jsonl` | 7 | tập huấn luyện RE (Wikidata DS) |

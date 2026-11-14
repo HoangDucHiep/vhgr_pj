@@ -342,19 +342,22 @@ python scripts/stats_infobox.py     # tỉ lệ parse thành công, tỉ lệ c�
 **Việc phải làm**
 1. `src/ner/build_silver.py`:
    - Duyệt `links`; giữ link có `anchor == target` hoặc `target` là chuỗi con của `anchor` (tránh `[[thành phố]]` → "thành phố").
-   - **Suy nhãn theo đích** theo thứ tự ưu tiên:
-     1. Đích có `wikibase_item` → tra QID → `P31` → map sang nhãn (`Q5`→PERSON, `Q116`→PERSON, `Q164950`→DYNASTY, `Q178561`→EVENT, `Q1656682`→EVENT, `Q486972`→LOCATION, `Q256408`/`Q706208`/`Q696100`/`Q4164871`→TITLE). Bảng map ở `configs/wikidata_type_map.yaml`.
-     2. Đích nằm trong `infobox_entities.jsonl` với type đã biết.
-     3. Đích khớp mẫu tên: `nhà X` / `triều đại X` → DYNASTY; `[[<năm>]]` hoặc `[[Thế kỷ XV]]` → TIME; `[[X (miếu hiệu)]]` → TITLE.
-     4. Không xác định → bỏ (không gán nhãn sai).
-   - Đồng thời sinh `nhãn TIME` bằng regex trên câu (không cần link): `\b\d{3,4}\b` trong ngữ cảnh "năm", `thế kỷ [IVXLCDM]+`.
+   - **Suy nhãn theo đích** theo thứ tự ưu tiên (đã cập nhật sau khi đo thực tế — xem D-032):
+     1. **Category Wikipedia** của bài đích (từ `dump_facts.jsonl`) → khớp mẫu category → nhãn. Nguồn mạnh nhất cho corpus tiếng Việt (chiếm 50,2% nguồn nhãn).
+     2. Đích có `wikibase_item` → tra QID → `P31` → map sang nhãn. Bảng map ở `configs/wikidata_type_map.yaml` (**sinh tự động** bằng `scripts/build_type_map.py`).
+     3. Lớp cha `P279*` → map sang nhãn (bắt lớp không có tên trực tiếp).
+     4. Đích nằm trong `infobox_entities.jsonl` với type đã biết.
+     5. Tín hiệu `wikidata_signal` (Phase 1).
+     6. Đích khớp mẫu tên: `nhà X` / `triều đại X` → DYNASTY; `[[<năm>]]` hoặc `[[Thế kỷ XV]]` → TIME; `[[X (miếu hiệu)]]` → TITLE.
+     7. Không xác định → bỏ (không gán nhãn sai).
+   - Đồng thời sinh `nhãn TIME` bằng regex trên câu (không cần link): `\b\d{3,4}\b` **trong ngữ cảnh "năm"**, `thế kỷ [IVXLCDM]+`. Năm đứng riêng chỉ được gán khi có **ngữ cảnh liền kề** (xem D-033).
    - Lưu `target_type_confidence` để lọc nhãn yếu.
 2. `src/ner/silver_quality.py`: đánh giá nhãn bạc bằng **rule baseline** trên tập dev (tự đánh giá bằng chính quy tắc → đo độ nhất quán) + báo cáo phân bố nhãn, tỉ lệ câu có nhãn.
 3. Chia tập theo **bài**: `data/splits/splits.json` = `{train: [page_id...], dev: [...], test: [...]}` — 80/10/10, seed 42, lưu file để tái lập.
 
 **Lệnh kiểm thử**
 ```bash
-python -m src.ner.build_silver --config configs/default.yaml
+python -m src.ner.build_silver --out data/interim/ner_silver.jsonl
 pytest -q tests/test_silver_labels.py
 python -m src.ner.silver_quality --out reports/silver_quality.md
 python - <<'PY'
@@ -376,6 +379,12 @@ PY
 
 **Lùi:** nếu nhãn bạc dưới 0.60 F1 → kiểm tra đường dẫn suy nhãn theo QID (thống kê phân bố nguồn nhãn: `qid`/`infobox`/`pattern`), sửa map, chạy lại.
 
+**Kết quả thực tế (14/11/2026):** báo cáo `reports/phase_04_report.md` · nhật ký `docs/10-nhat-ky/phase-04.md` · số liệu `docs/10-nhat-ky/so-lieu/phase-04-ner-stats.json` · sai lệch D-031 → D-035.
+
+> **Gate 1–5 đạt:** độ phủ câu có hyperlink **100,0%** (60.078/60.078) · **6** lớp nhãn, `PERSON` phổ biến nhất trong nhóm entity từ hyperlink (37.242) · 100% `len(tokens) == len(labels)` · splits 1.952/244/245, trùng **0** · baseline gazetteer dev micro F1 **0,7990** (≥ 0,60).
+>
+> **Audit đóng phase (14/11/2026):** phát hiện **4 lỗi thật** trong bản triển khai đầu → đã sửa, thêm 6 test regression (300 test → pass hết). Số liệu **đã cập nhật**: TIME 57.604 → **53.654** (loại **16.099** số đo lượng bị gán nhầm là năm); PERSON 35.425 → **37.242**; TITLE 2.887 → **2.170** (loại "Quan lại nhà Nguyễn" khỏi TITLE). Baseline gazetteer dev F1 **0,7388 → 0,7990**. Sai lệch mới: **D-031 → D-035**. Chi tiết: `reports/phase_04_report.md`.
+
 ---
 
 ## Phase 5 — Huấn luyện mô hình NER + suy luận (B1, B2)
@@ -393,7 +402,7 @@ PY
 **Việc phải làm**
 1. `src/ner/data_convert.py`: word-level → subword BIOES. Dùng `tokenizer(text, is_split_into_words=True, return_offsets_mapping=True)`; label cho subword đầu = label của word, còn lại `I-<type>` nếu word đó cũng mang label, `O` nếu không; ghi `word_id` để map ngược.
 2. `src/ner/train_ner.py` (chạy được cả local CPU lẫn Kaggle GPU):
-   - `AutoModelForTokenClassification` từ `vinai/phobert-base`, `num_labels = 2*6 + 1 = 13` (BIOES × 6 nhãn + O).
+   - `AutoModelForTokenClassification` từ `vinai/phobert-base`, `num_labels = 2*6 + 1 = 13` (BIO × 6 nhãn + O).
    - `TrainingArguments`: `seed=42`, `output_dir`, `save_total_limit=2`, `save_steps`, `eval_strategy="epoch"`, `metric_for_best_model="f1"`, `load_best_model_at_end=True`, `fp16` chỉ khi có CUDA, `report_to="none"`.
    - `EarlyStoppingCallback(early_stopping_patience=2)`.
    - Tính F1 bằng `src/evaluation/metrics.py` (seqeval-style) trên tập dev.

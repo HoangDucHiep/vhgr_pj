@@ -1,0 +1,153 @@
+# Cấu hình sinh nhãn bạc NER (Phase 4 — B2.1)
+#
+# Bảng map **lớp Wikidata → nhãn NER** nằm ở file riêng
+# `configs/wikidata_type_map.yaml` (sinh tự động bởi
+# `scripts/build_type_map.py` — có ~2.400 lớp).
+#
+# File này chứa phần **cấu hình thủ công**: độ tin cậy theo nguồn nhãn,
+# ngưỡng lọc, mẫu tên và regex sinh nhãn TIME.
+
+# ---------------------------------------------------------------------------
+# 1. Map loại node KG (Phase 3) → nhãn NER
+# ---------------------------------------------------------------------------
+# Nguồn: `data/interim/infobox_entities.jsonl` (trường `type`).
+kg_type:
+  person: PERSON
+  dynasty: DYNASTY
+  event: EVENT
+  place: LOCATION
+  title: TITLE
+  year: TIME
+
+# ---------------------------------------------------------------------------
+# 2. Map tín hiệu Wikidata (Phase 1) → nhãn NER
+# ---------------------------------------------------------------------------
+# Nguồn: `documents.jsonl` → `wikidata_signal`.
+wikidata_signal:
+  person: PERSON
+  place: LOCATION
+  dynasty: DYNASTY
+  house: DYNASTY
+  battle: EVENT
+  event: EVENT
+
+# ---------------------------------------------------------------------------
+# 3. Độ tin cậy theo nguồn nhãn
+# ---------------------------------------------------------------------------
+# Lưu vào `target_type_confidence` trong `ner_silver.jsonl` để lọc nhãn yếu
+# ở Phase 5 (huấn luyện). Nguồn càng mạnh → tin cậy càng cao.
+confidence:
+  category: 0.97          # category Wikipedia (biên tập viên gắn tay) — mạnh nhất
+  qid_direct: 0.95        # tên lớp P31 tự nó khớp từ khoá
+  qid_ancestor: 0.88      # lớp cha P279 khớp từ khoá
+  kg_type: 0.92           # infobox_entities.jsonl (Phase 3)
+  wikidata_signal: 0.85   # tín hiệu Wikidata Phase 1
+  pattern: 0.78           # mẫu tên ("nhà X", "Thế kỷ XV"…)
+  time_regex: 0.82        # regex năm / thế kỷ trên câu
+
+# ---------------------------------------------------------------------------
+# 4. Ngưỡng lọc nhãn
+# ---------------------------------------------------------------------------
+# Nhãn có `target_type_confidence` < ngưỡng này bị **loại** khỏi
+# `ner_silver.jsonl`. Nhằm đảm bảo chất lượng nhãn bạc đủ dùng để train
+# (Gate Phase 4: baseline F1 ≥ 0,60).
+min_confidence: 0.78
+
+# ---------------------------------------------------------------------------
+# 5. Mẫu tên → nhãn (không cần QID)
+# ---------------------------------------------------------------------------
+# Chỉ dùng khi không xác định được bằng QID / infobox. Áp dụng trên **tên đích
+# link** đã bỏ dấu.
+patterns:
+  # --- Triều đại ---
+  - {pattern: "^nha [a-z]", label: DYNASTY}
+  - {pattern: "^trieu dai ", label: DYNASTY}
+  - {pattern: "^de trieu dai ", label: DYNASTY}
+  - {pattern: "^vo trieu dai ", label: DYNASTY}
+
+  # --- Tước hiệu ---
+  - {pattern: "\\(mi[eê]u hieu\\)$", label: TITLE}
+  - {pattern: "\\(thuy hieu\\)$", label: TITLE}
+  - {pattern: "\\(trieu hieu\\)$", label: TITLE}
+  - {pattern: "\\(hieu\\)$", label: TITLE}
+
+  # --- Sự kiện ---
+  - {pattern: "^tran ", label: EVENT}
+  - {pattern: "^chien tranh ", label: EVENT}
+  - {pattern: "^cuoc chien ", label: EVENT}
+  - {pattern: "^le ", label: EVENT}
+
+  # --- Địa danh ---
+  - {pattern: "^tinh ", label: LOCATION}
+  - {pattern: "^thanh pho ", label: LOCATION}
+  - {pattern: "^huyen ", label: LOCATION}
+  - {pattern: "^xa ", label: LOCATION}
+  - {pattern: "^thanh ", label: LOCATION}
+  - {pattern: "^lang ", label: LOCATION}
+  - {pattern: "^ap ", label: LOCATION}
+
+# ---------------------------------------------------------------------------
+# 6. Regex sinh nhãn TIME (không cần link)
+# ---------------------------------------------------------------------------
+# Áp dụng trên **câu** (sau khi tách token) để bắt năm / thế kỷ không gắn
+# link. Chỉ gán khi vị trí **chưa** có nhãn khác.
+#
+# Ràng buộc: năm phải nằm trong khoảng 1000–2100 và viết đủ 4 chữ số.
+# Số đơn vị đo (ha, m³, người…) và phần thập phân (vd "650.000") **không**
+# phải năm → bị loại.
+#
+# `require_context: true` ⇒ chỉ chấp nhận năm đứng riêng khi có ngữ cảnh
+# ("năm 1945", "(1831)", "từ 1977") theo `time_context_before/after`.
+time:
+  year:
+    # Năm có ngữ cảnh "năm ..." (mạnh nhất). Chấp nhận cả "năm" và "nam"
+    # để không phụ thuộc dấu thanh.
+    - {pattern: "\\b(?:năm|nam)\\s+(\\d{4})\\b", group: 1, label: TIME}
+    # Khoảng năm "1954 – 1961".
+    - {pattern: "\\b(\\d{4})\\s*[-–—]\\s*(\\d{4})\\b", group: 1, label: TIME}
+    # Năm đứng riêng — chỉ trong khoảng 1000–2100, cần ngữ cảnh.
+    - {
+        pattern: "\\b(?:1[0-9]{3}|20[0-9]{2}|2100)\\b",
+        group: 0,
+        label: TIME,
+        require_context: true,
+      }
+  century:
+    - {pattern: "\\bthế kỷ\\s+([IVXLCDM]+|[0-9]{1,2})\\b", group: 1, label: TIME}
+    - {pattern: "\\bthe ky\\s+([IVXLCDM]+|[0-9]{1,2})\\b", group: 1, label: TIME}
+
+# Token **trước** năm đứng riêng → năm đó là năm thật.
+time_context_before:
+  - "năm"
+  - "nam"
+  - "từ"
+  - "tu"
+  - "đến"
+  - "den"
+  - "vào"
+  - "vao"
+  - "thế"
+  - "kỷ"
+  - "ky"
+  - "thập"
+  - "thap"
+  - "niên"
+  - "nien"
+  - "cuối"
+  - "cuoi"
+  - "đầu"
+  - "dau"
+  - "giữa"
+  - "giua"
+
+# Token **sau** năm đứng riêng → năm đó là năm thật (vd "1831)", "1977 tới").
+# KHÔNG gồm "năm"/"nam" vì đó là **thời lượng** (vd "1000 năm"), không phải năm.
+time_context_after:
+  - "-"
+  - "–"
+  - "—"
+  - ")"
+  - "tới"
+  - "toi"
+  - "đến"
+  - "den"
