@@ -309,3 +309,50 @@
 - Ảnh hưởng: không đổi số liệu Gate. Sau khi sửa, cả 3 artifact đều có `dump_version="20261101"` + `model_name="vinai/phobert-base"`.
 - Xử lý: Bổ sung 2 trường vào `src/preprocess/parse_infobox.py` (triple + entity) và `src/preprocess/extract_lead_dates.py` (triple đoạn dẫn). `dump_version` của triple lấy **theo từng bài** từ `documents.jsonl` (không phụ thuộc thứ tự chạy). Thêm 3 test bắt buộc (`test_triples_carry_dump_version_and_model_name` với 2 tham số + `test_entities_carry_dump_version_and_model_name`) để quy tắc này tự động áp cho các phase sau.
 - Cập nhật file: `src/preprocess/parse_infobox.py`, `src/preprocess/extract_lead_dates.py`, `docs/DECISIONS.md` (D-014), `.cursor/rules/data-contracts.mdc`, `tests/test_infobox.py`, `reports/phase_03_report.md`, `docs/10-nhat-ky/phase-03.md`
+
+## D-027 — Loại triple trùng `(subject, relation, object)` + self-loop (Phase 3 — audit 14/11/2026)
+- Ngày: 2026-11-14
+- Phase: 3 (audit đóng phase)
+- Loại: kỹ thuật
+- Kế hoạch: `docs/09` §Phase 3 yêu cầu "100% triple có đủ 6 trường bắt buộc" và `AGENTS.md` §5.1 ("mọi triple/cạnh có bằng chứng"). Không có quy định nào về **trùng lặp**.
+- Thực tế: 3 lỗi phát hiện khi audit độc lập Phase 2–3 (14/11/2026), đo trên artifact `infobox_triples.jsonl` tại HEAD (10.394 triple):
+  1. **Trùng lặp**: **347** triple thừa trong **341** nhóm trùng khoá `(doc_id, subject, relation, object)` — vd bài có **hai** trường `Ngày sinh` và `Ngày sinh (từ Ngày mất)` cùng năm → `sinh_nam` bị ghi 2 lần. Số `sinh_nam` bị **phình** từ 732 lên **985** (+253, tức +34,6%). (Đo không khoá `doc_id`: **527** triple thừa trong **518** nhóm — phần chênh là các quan hệ **đối xứng hợp lệ** giữa 2 bài, vd "Quang Trung → Nguyễn Nhạc" và "Nguyễn Nhạc → Quang Trung"; **không** phải lỗi.)
+  2. **Self-loop**: **4** triple có `subject == object` (vd bài của chính người được ghi là "Tiền nhiệm" của họ) → vi phạm `Triple.is_valid()` trong `src/common/schemas.py`.
+  3. **Stale artifact**: `lead_triples.jsonl` được sinh lúc 04:38, `infobox_triples.jsonl` được sinh lại lúc 04:40 → danh sách bỏ qua `docs_with_dates` đã cũ → **81** triple ngày trùng giữa lead và infobox trên **47** bài. Test `test_no_duplicate_lead_and_infobox_dates` **FAIL**.
+- Lý do: (1) Wikipedia có nhiều trường cùng nội dung — mỗi trường sinh một triple, không có bước gộp; (2) không có kiểm tra self-loop ở tầng sinh triple; (3) `extract_lead_dates.py` phụ thuộc `infobox_triples.jsonl` nhưng **thứ tự chạy** không được ràng buộc, nên artifact cũ vẫn còn trên đĩa.
+- Ảnh hưởng: số liệu Gate **tính sai** (đếm trùng làm tỉ lệ trông đẹp hơn thực tế). Sau khi sửa: triple 10.394 → **10.078** (−316); `sinh_nam` 985 → **732** (−253; 722/732 bài có **đúng 1** `sinh_nam`); `mat_nam` 635 → **628** (−7); self-loop 4 → **0**; trùng trong 1 doc 347 → **0**; trùng lead∩infobox 81 → **0**. Gate 1–5 **không đổi** (100% / 92,4% / 100% / 100% / 0).
+- Xử lý: (a) thêm `seen: set[tuple[str, str, str]]` trong `build_triples()` — giữ bản **đầu tiên** (thứ tự trường infobox = bản có bằng chứng trực tiếp), đếm bằng `skipped_duplicate`; (b) thêm kiểm tra `subject == object` → `skipped_self_loop`; (c) ràng buộc **thứ tự chạy** `parse_infobox.py` → `extract_lead_dates.py` và ghi rõ vào `docs/09` §Phase 3 + `reports/phase_03_report.md`; (d) thêm 3 test regression.
+- Cập nhật file: `src/preprocess/parse_infobox.py`, `tests/test_infobox.py`, `docs/09-ke-hoach-thuc-thien.md`, `reports/phase_03_report.md`, `docs/10-nhat-ky/phase-03.md`
+
+## D-028 — Không trích `danh_bai` từ infobox trận đánh (Phase 3 — audit 14/11/2026)
+- Ngày: 2026-11-14
+- Phase: 3 (audit đóng phase)
+- Loại: phạm vi
+- Kế hoạch: `docs/09` §Phase 3 mục 2 ghi `bên tham chiến`/`kết quả` → "thuộc tính event" (không sinh quan hệ). `docs/04` §3.1 quy định `danh_bai`: chủ thể = **người** đánh bại (winner → loser).
+- Thực tế: bản triển khai đầu tiên trích `danh_bai` từ trường `ket qua`/`result`. Đo trên toàn bộ **207** trận đánh trong corpus: trích được **4** cặp, trong đó **1 cặp sai** (bài "Trận Đông Dương": suy ra "Campuchia đánh bại Đông Dương", trong khi đúng ra bên thắng là "Việt Nam Dân chủ Cộng hòa"), và **4/4** vi phạm `RELATION_SUBJECT_TYPES["danh_bai"] = {person}` vì bên thắng/thua là **quốc gia / triều đại / liên minh** ("Campuchia", "Việt Minh", "Nhà Thanh").
+- Lý do: trường `ket qua` là **câu văn** ("Việt Nam Dân chủ Cộng hòa chiến thắng"), không phải tên node; `combatant1`/`combatant2` là **phe phái**, không phải cá nhân. Suy đoán từ câu văn + ghép với tên phe phái tạo ra quan hệ **sai** — vi phạm `AGENTS.md` §5.3 ("không bịa") nặng hơn việc thiếu một quan hệ.
+- Ảnh hưởng: 16/18 quan hệ có triple (thiếu `anh_em_cua` và `danh_bai`). `anh_em_cua` = **0** vì **không bài nào** trong corpus có trường anh em / sibling (đã quét wikitext thô: 0 lần xuất hiện) → đây là **hạn chế dữ liệu**, không phải lỗi code. `danh_bai` = 0 là **quyết định có chủ đích** (D-028) → sẽ sinh ở Phase 8 từ mô hình RE/LLM, nơi bằng chứng ở mức câu văn.
+- Xử lý: Xoá hẳn khối cấu hình `battle_result` khỏi `configs/infobox_mapping.yaml` và hàm `extract_battle_result()` khỏi `src/preprocess/parse_infobox.py`; thay bằng comment giải thích + dẫn chiếu D-028. Thêm test regression `test_battle_relation_is_not_extracted_from_infobox`.
+- Cập nhật file: `src/preprocess/parse_infobox.py`, `configs/infobox_mapping.yaml`, `tests/test_infobox.py`, `docs/09-ke-hoach-thuc-thien.md`, `reports/phase_03_report.md`, `docs/10-nhat-ky/phase-03.md`
+
+## D-029 — Gộp khoá tham số infobox `_` ↔ khoảng trắng (`_collapse_key`) (Phase 3 — audit 14/11/2026)
+- Ngày: 2026-11-14
+- Phase: 3 (audit đóng phase)
+- Loại: kỹ thuật
+- Kế hoạch: `docs/09` §Phase 3 mục 1 yêu cầu "đưa ra dict phẳng `key → value` (key lowercase, bỏ dấu gạch dưới)".
+- Thực tế: `normalize_name()` giữ nguyên dấu gạch dưới → Wikipedia dùng **hai** cách viết khoá (`| noi_sinh =` và `| noi sinh =`, `| birth_date =` và `| birth date =`) trở thành **hai khoá khác nhau** trong dict. Bảng mapping viết bằng một biến thể (`noi sinh`) → **không bao giờ** được gọi với biến thể kia (`noi_sinh`). Các trường bị bỏ sót: `noi sinh`/`noi mat` (→ `sinh_tai`/`mat_tai`), `ngay sinh`/`ngay mat`, `ke nhiem`/`tien nhiem`, `gioi tinh`, `tu`/`thuy hieu`/`mieu hieu`…
+- Lý do: quy tắc "bỏ dấu gạch dưới" của `docs/09` được hiểu là "bỏ dấu **tiếng Việt**" (bỏ thanh điệu), không phải "bỏ ký tự `_`". Nhưng wikitext thực sự dùng `_` thay khoảng trắng trong nhiều template.
+- Ảnh hưởng: một phần trường không được trích → triple bị thiếu. Đo bằng **ablation** (tắt riêng `_collapse_key`, giữ nguyên 2 fix còn lại): tổng triple 10.074 → **10.078** (+4); `sinh_tai` 1.429 → **1.432** (+3); `mat_tai` 952 → **953** (+1). `sinh_nam`/`mat_nam` **không đổi** — các trường ngày trong corpus đều dùng khoảng trắng. Gate 1–5 **không đổi**.
+- Xử lý: Thêm `_collapse_key()` (`" ".join(key.replace("_", " ").split())`) trong `src/preprocess/parse_infobox.py`; dựng `fields_by_key` / `aliases_by_key` / `node_props_by_key` (tra bằng khoá đã gộp ở **cả hai** phía → không mất khoá nào).
+- Cập nhật file: `src/preprocess/parse_infobox.py`, `configs/infobox_mapping.yaml`, `reports/phase_03_report.md`, `docs/10-nhat-ky/phase-03.md`
+
+## D-030 — Template mơ hồ `infobox former country` → tín hiệu Wikidata được ưu tiên (Phase 3 — audit 14/11/2026)
+- Ngày: 2026-11-14
+- Phase: 3 (audit đóng phase)
+- Loại: kỹ thuật
+- Kế hoạch: `docs/09` §Phase 3 mục 4 quy định thứ tự suy loại chủ thể: "tên template (`type_map`) → `wikidata_signal` (Phase 1) → `article`".
+- Thực tế: tên template **không phân biệt được** loại chủ thể trong trường hợp này. Wikipedia dùng `{{infobox former country}}` cho **cả** quốc gia ("Việt Nam Cộng hòa", "Nam Kỳ", "Trung Kỳ" → `place`) **và** triều đại ("Nhà Nguyễn", "Nhà Trần", "Nhà Lý", "Nhà Hồ", "Nhà Mạc", "Nhà Tiền Lý"… → `dynasty`). Tên template ép `place` → **13 bài triều đại bị gán nhầm `place`** → `dong_doi_tai` = **0** triple (vì `docs/04` §3.1 yêu cầu chủ thể `dong_doi_tai` là `dynasty`), `thuoc_trieu_dai` mất 13 bài.
+- Lý do: bảng `type_map` không thể biểu diễn quan hệ "1 template → nhiều loại". Tín hiệu `wikidata_signal` từ Phase 1 (Wikidata biết "Nhà Trần" là `house`/`dynasty`, "Nam Kỳ" là `place`) là nguồn **mạnh hơn** tên template — nhưng thứ tự ưu tiên trong `docs/09` đặt template trước.
+- Ảnh hưởng: `dong_doi_tai` 0 → **31** triple; 13 bài triều đại chuyển từ `place` → `dynasty` (đúng). Đo bằng **ablation** (tắt riêng `AMBIGUOUS_TEMPLATES`): tổng triple 10.047 → **10.078** (+31, toàn bộ là `dong_doi_tai`); `thuoc_trieu_dai` **không đổi** (631) — vì 13 bài triều đại này không có trường `triều đại`/`hoàng tộc` riêng. Gate 1–5 **không đổi**.
+- Xử lý: Thêm `AMBIGUOUS_TEMPLATES` trong `src/preprocess/infobox_entity_types.py` (4 template: `infobox former country`, `infobox country`, `infobox former subdivision`, `infobox former monarchy`). `normalize_type()` nhận thêm tham số `wikidata_signal`: nếu template thuộc danh sách mơ hồ **và** có tín hiệu Wikidata → ưu tiên tín hiệu; không có tín hiệu → rơi về `type_map`. Thêm test regression `test_ambiguous_template_prefers_wikidata_signal`.
+- Cập nhật file: `src/preprocess/infobox_entity_types.py`, `src/preprocess/parse_infobox.py`, `configs/infobox_mapping.yaml`, `tests/test_infobox.py`, `reports/phase_03_report.md`, `docs/10-nhat-ky/phase-03.md`

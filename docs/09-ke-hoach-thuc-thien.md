@@ -281,6 +281,8 @@ python scripts/stats_text.py
    > Prop chỉ được ghi khi triple tương ứng **thực sự** được sinh — không khẳng định thuộc tính cho quan hệ đã bị loại vì lỗi schema (xem `reports/deviations.md` D-025).
 6. Fallback đoạn dẫn → `data/interim/lead_triples.jsonl`: chỉ ngoặc đầu tiên của câu dẫn, khoảng cách sinh–mất ≤ 120 năm, chỉ bài `person`.
 7. **Truy vết**: cả 3 artifact phải ghi `dump_version` + `model_name` (ràng buộc `AGENTS.md` §5.6 — xem D-026).
+8. **Thứ tự chạy là bắt buộc**: `parse_infobox.py` **phải** chạy trước `extract_lead_dates.py`, vì script sau đọc `infobox_triples.jsonl` để biết bài nào **đã có** ngày sinh/mất (tránh trích trùng từ đoạn dẫn). Chạy sai thứ tự → `lead_triples.jsonl` bị **stale** → trùng ngày (xem D-027).
+9. **Loại triple trùng + self-loop**: `build_triples()` phải khử trùng `(subject, relation, object)` trong 1 doc và loại triple có `subject == object` (xem D-027).
 
 **Lệnh kiểm thử**
 ```bash
@@ -307,12 +309,17 @@ python scripts/stats_infobox.py     # tỉ lệ parse thành công, tỉ lệ c�
       *(định nghĩa: nhận diện được khối template — 146 bài có template rỗng, xem D-021)*
 - [x] ≥ 90% bài nhân vật có ít nhất 1 trường ngày sinh/mất hoặc quan hệ gia đình được trích → **92,4%** (980/1.061)
 - [x] Chuẩn hóa ngày đúng ≥ 95% trên tập 30 chuỗi mẫu trong `tests/fixtures/dates.jsonl` → **100,0%** (30/30)
-- [x] 100% triple có đủ 6 trường bắt buộc, `method="infobox"`, `confidence ≥ 0.95` → **100%** (10.394/10.394)
+- [x] 100% triple có đủ 6 trường bắt buộc, `method="infobox"`, `confidence ≥ 0.95` → **100%** (10.078/10.078)
 - [x] 0 quan hệ ngoài danh mục → **0** (0 vi phạm `RELATION_SUBJECT_TYPES`)
+- [x] **0 triple trùng** `(subject, relation, object)` trong 1 doc → **0** (341 nhóm / 347 triple thừa ở HEAD → 0, xem D-027)
+- [x] **0 self-loop** (`subject == object`) → **0** (4 ở HEAD → 0, xem D-027)
+- [x] **0 trùng ngày** giữa `lead_triples.jsonl` và `infobox_triples.jsonl` → **0** (81 trên 47 bài ở HEAD → 0, xem D-027)
 
 **Lùi:** nếu parse thấp → thay `wikitextparser` bằng regex cân bằng ngoặc cho template (viết trong `parse_infobox.py` với cờ `--fallback-regex`).
 
 **Kết quả thực tế (14/11/2026):** báo cáo `reports/phase_03_report.md` · nhật ký `docs/10-nhat-ky/phase-03.md` · số liệu `docs/10-nhat-ky/so-lieu/phase-03-infobox-stats.json` · sai lệch D-019 → D-026.
+
+> **Audit đóng phase (14/11/2026):** phát hiện 4 lỗi thật trong bản triển khai đầu (trùng triple, self-loop, stale artifact, template mơ hồ) → đã sửa, thêm 6 test regression (280 test → pass hết). Số liệu **đã cập nhật**: triple 10.394 → **10.078**; `sinh_nam` 985 → **732** (bỏ trùng); `dong_doi_tai` 0 → **31** (template mơ hồ). Gate 1–5 **không đổi**. Sai lệch mới: **D-027 → D-030**. Chi tiết: `reports/phase_03_report.md` §Audit.
 
 ---
 

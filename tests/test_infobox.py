@@ -681,3 +681,111 @@ def test_birth_place_only_set_when_triple_emitted():
     if "birth_place" in props:
         assert any(t["relation"] == "sinh_tai" for t in triples)
 
+
+
+# ---------------------------------------------------------------------------
+# Regression — các lỗi phát hiện khi audit Phase 3 (14/11/2026)
+# ---------------------------------------------------------------------------
+
+
+def test_no_duplicate_triples_within_same_document():
+    """Regression D-027: cùng `(subject, relation, object)` trong **1 doc** chỉ 1 lần.
+
+    Nguyên nhân gốc: Wikipedia có **hai** trường cùng nội dung (vd `Ngày sinh`
+    và `Ngày sinh (từ Ngày mất)` trong template "sinh và mất") → cùng một quan
+    hệ bị ghi 2 lần, làm sai lệch mọi thống kê đếm triple.
+    """
+    if not TRIPLES:
+        pytest.skip("chưa có infobox_triples.jsonl")
+
+    seen: dict[tuple[str, str, str], int] = defaultdict(int)
+    for triple in TRIPLES:
+        key = (triple["doc_id"], triple["subject"], triple["relation"], triple["object"])
+        seen[key] += 1
+
+    duplicates = {key: count for key, count in seen.items() if count > 1}
+    assert not duplicates, (
+        f"còn {len(duplicates)} triple trùng trong cùng 1 doc, ví dụ: "
+        f"{list(duplicates.items())[:3]}"
+    )
+
+
+def test_no_self_loop_triples():
+    """Regression D-027: chủ thể = đối tượng → vi phạm `Triple.is_valid()`.
+
+    Hay gặp khi infobox ghi nhầm (vd bài của chính người được ghi là
+    "Tiền nhiệm" của họ).
+    """
+    if not TRIPLES:
+        pytest.skip("chưa có infobox_triples.jsonl")
+
+    self_loops = [t for t in TRIPLES if t["subject"] == t["object"]]
+    assert not self_loops, (
+        f"còn {len(self_loops)} self-loop, ví dụ: "
+        f"{[(t['doc_id'], t['relation']) for t in self_loops[:3]]}"
+    )
+
+
+def test_dedupe_counters_are_recorded():
+    """Regression D-027: bộ đếm `skipped_duplicate` / `skipped_self_loop` phải có."""
+    triples, _, counters = _build("Lý Thái Tổ")
+    assert "skipped_duplicate" in counters
+    assert "skipped_self_loop" in counters
+
+
+def test_ambiguous_template_prefers_wikidata_signal():
+    """Regression D-030: template mơ hồ → tín hiệu Wikidata phải được ưu tiên.
+
+    `infobox former country` dùng cho **cả** quốc gia ("Nam Kỳ" → `place`) lẫn
+    triều đại ("Nhà Trần" → `dynasty`). Tên template không phân biệt được →
+    tín hiệu Wikidata (`house`/`dynasty`) là nguồn đáng tin hơn.
+    """
+    # Triều đại → `dynasty`
+    assert (
+        normalize_type("infobox former country", MAPPING["type_map"], wikidata_signal="house")
+        == "dynasty"
+    )
+    assert (
+        normalize_type("infobox former country", MAPPING["type_map"], wikidata_signal="dynasty")
+        == "dynasty"
+    )
+    # Quốc gia / địa danh → `place`
+    assert (
+        normalize_type("infobox former country", MAPPING["type_map"], wikidata_signal="place")
+        == "place"
+    )
+    # Không có tín hiệu → rơi về `type_map` (mặc định `place`)
+    assert normalize_type("infobox former country", MAPPING["type_map"]) == "place"
+
+
+def test_dynasty_articles_have_dong_doi_tai_triples():
+    """Regression D-030: bài triều đại phải sinh được `dong_doi_tai` (→ thủ đô).
+
+    Trước đây `dong_doi_tai` = 0 vì `infobox former country` ép `place` làm
+    chủ thể, mà `docs/04` §3.1 yêu cầu chủ thể của `dong_doi_tai` là `dynasty`.
+    """
+    if not TRIPLES:
+        pytest.skip("chưa có infobox_triples.jsonl")
+
+    capital_relations = [t for t in TRIPLES if t["relation"] == "dong_doi_tai"]
+    assert capital_relations, "không có triple dong_doi_tai nào"
+    assert all(t["subject_type"] == "dynasty" for t in capital_relations), (
+        "dong_doi_tai phải có chủ thể loại dynasty"
+    )
+
+
+def test_battle_relation_is_not_extracted_from_infobox():
+    """Regression D-028: `danh_bai` **không** được trích từ infobox.
+
+    `docs/04` §3.1 quy định `danh_bai`: chủ thể = **người** đánh bại. Thực tế
+    trường `ket qua`/`result` là **câu văn** nêu tên quốc gia / triều đại /
+    liên minh → không phải `person`. Đo trên 207 trận đánh: 4 cặp trích
+    được, 1 cặp sai, 4/4 vi phạm schema.
+    """
+    assert "battle_result" not in MAPPING, "khối cấu hình battle_result phải bị loại"
+
+    if TRIPLES:
+        battle_triples = [t for t in TRIPLES if t["relation"] == "danh_bai"]
+        assert not battle_triples, (
+            f"còn {len(battle_triples)} triple danh_bai từ infobox — phải để Phase 8 xử lý"
+        )

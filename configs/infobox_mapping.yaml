@@ -69,6 +69,14 @@ fields:
   deathplace: {relation: mat_tai, kind: entity, value_type: place, prop: death_place}
   place of death: {relation: mat_tai, kind: entity, value_type: place, prop: death_place}
 
+  # --- Thủ đô (dynasty → place) ---
+  # `dong_doi_tai` theo `docs/04` §3.1 là dynasty → place: chủ thể phải là
+  # **triều đại**. Chỉ sinh khi chủ thể là `dynasty` — bị validator loại nếu
+  # không (xem `RELATION_SUBJECT_TYPES` trong `src/common/schemas.py`).
+  thu do: {relation: dong_doi_tai, kind: entity, value_type: place}
+  do thanh: {relation: dong_doi_tai, kind: entity, value_type: place}
+  capital: {relation: dong_doi_tai, kind: entity, value_type: place}
+
   # --- Gia đình ---
   cha: {relation: cha_cua, kind: entity, value_type: person}
   father: {relation: cha_cua, kind: entity, value_type: person}
@@ -261,6 +269,25 @@ type_map:
   house: dynasty
   the: dynasty
   former monarchy: dynasty
+  # LƯU Ý: không có template riêng cho triều đại trong corpus (đã quét 2.441 bài):
+  # cả 13 bài "Nhà X" đều dùng `infobox former country` — dùng chung với quốc
+  # gia ("Nam Kỳ", "Việt Nam Cộng hòa"). Không phân biệt được bằng tên template
+  # → xem `AMBIGUOUS_TEMPLATES` trong `src/preprocess/infobox_entity_types.py`
+  # (tín hiệu Wikidata `house`/`dynasty` được ưu tiên). Xem D-030.
+  # --- Quốc gia ---
+  # `country`/`former country` là loại **place** (địa danh), không phải dynasty.
+  # Trường `capital` của chúng là thủ đô → `dong_doi_tai` cần chủ thể là
+  # dynasty → không sinh (đã ghi rõ ở `fields.thu do`).
+  #
+  # LƯU Ý: template `infobox former country` được dùng cho **cả hai** nhóm:
+  #   - quốc gia thật: "Việt Nam Cộng hòa", "Nam Kỳ" → `place`
+  #   - **triều đại**: "Nhà Nguyễn", "Nhà Trần", "Nhà Lý" → `dynasty`
+  # → Không phân biệt được bằng tên template. Xem `ambiguous_templates`
+  # trong `src/preprocess/infobox_entity_types.py`: khi template nằm trong
+  # danh sách mơ hồ, tín hiệu Wikidata (`house`/`dynasty`) được ưu tiên.
+  infobox country: place
+  infobox former country: place
+  infobox former subdivision: place
 
   # --- Trận đánh → event (KG không có node "battle") ---
   battle: event
@@ -407,30 +434,28 @@ type_map:
   to chuc: place
 
 # ---------------------------------------------------------------------------
-# Kết quả trận đánh → quan hệ `danh_bai` (winner → loser)
+# Kết quả trận đánh → quan hệ `danh_bai` (winner → loser) — **CỐ Ý KHÔNG TRÍCH**
 # ---------------------------------------------------------------------------
-# Trường `ket qua` / `result` là **câu văn**, không phải tên node. Ta chỉ trích
-# được khi cấu trúc câu rõ ràng:
-#   - "<bên> chiến thắng"            → bên thắng
-#   - "Chiến thắng của <bên>"        → bên thắng
-#   - "<bên> thất bại"               → bên thua
-# Bên thua được suy từ **bên tham chiến đối diện** (`ben 1`/`ben 2` hoặc
-# `combatant1`/`combatant2`) — không có suy đoán ngoài dữ liệu.
-battle_result:
-  fields: [ket qua, result, outcome, ket qua va hau qua]
-  #: Trường chứa hai bên tham chiến (theo thứ tự).
-  sides_fields:
-    vi: [ben 1, ben 2]
-    en: [combatant1, combatant2]
-  #: Mẫu câu → vị trí bên thắng / bên thua trong nhóm link.
-  winner_patterns:
-    - "chiến thắng"
-    - "thắng lợi"
-    - "thắng trận"
-  loser_patterns:
-    - "thất bại"
-    - "bị đánh bại"
-    - "bị đẹp"
+# `docs/04` §3.1 quy định `danh_bai`: chủ thể = **người** đánh bại (winner →
+# loser), ví dụ "Lê Lợi → nhà Minh". Thực tế trong Wikipedia:
+#   - trường `ket qua`/`result` là **câu văn** ("Việt Nam Dân chủ Cộng hòa
+#     chiến thắng"), không phải tên node;
+#   - bên thắng/thua là **quốc gia / triều đại / liên minh** ("Campuchia",
+#     "Việt Minh", "Nhà Thanh") — không phải `person`;
+#   - `combatant1`/`combatant2` là **phe phái**, cũng không phải người.
+#
+# Đo trên toàn bộ 207 trận đánh trong corpus (14/11/2026): trích được 4 cặp,
+# trong đó 1 cặp **sai** ("Campuchia thắng Đông Dương" — đúng ra bên thắng là
+# "Việt Nam Dân chủ Cộng hòa"), và 4/4 đều vi phạm
+# `RELATION_SUBJECT_TYPES["danh_bai"] = {person}`.
+#
+# → Khối cấu hình `battle_result` đã bị **xoá**. `danh_bai` sẽ được sinh ở
+# Phase 8 từ mô hình RE / LLM, nơi có đủ bằng chứng ở mức câu văn.
+# Xem `reports/deviations.md` D-028.
+#
+# (Tham chiếu cũ đã bị loại: fields: [ket qua, result, outcome, ...],
+#  sides_fields: {vi: [ben 1, ben 2], en: [combatant1, combatant2]},
+#  winner_patterns / loser_patterns.)
 
 # ---------------------------------------------------------------------------
 # Aliases — trường chứa bí danh / tên khác (thuộc tính node, không sinh triple)

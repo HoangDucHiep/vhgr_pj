@@ -623,87 +623,8 @@ def parse_period_field(value: str) -> tuple[int | None, int | None]:
     if not years:
         return None, None
     start = years[0]
-    end = years[-1]
-    return start, (end if len(years) > 1 else None)
-
-
-def extract_battle_result(
-    params: dict[str, str],
-    *,
-    battle_config: dict[str, Any],
-) -> tuple[str | None, str | None] | None:
-    """Trích (bên thắng, bên thua) từ trường kết quả trận đánh.
-
-    Chỉ trả về khi **cả hai** bên đều xác định được:
-    - bên thắng: từ mẫu câu "chiến thắng" / "thất bại" trong trường kết quả;
-    - bên thua: bên tham chiến còn lại trong `ben 1`/`ben 2` (hoặc `combatant1/2`).
-
-    Args:
-        params: Tham số infobox.
-        battle_config: Cấu hình `battle_result` từ config.
-
-    Returns:
-        Cặp ``(bên_thắng, bên_thua)`` hoặc ``None`` nếu không đủ bằng chứng.
-    """
-    result_fields: list[str] = battle_config.get("fields", [])
-    sides_config: dict[str, list[str]] = battle_config.get("sides_fields", {})
-    winner_patterns: list[str] = battle_config.get("winner_patterns", [])
-    loser_patterns: list[str] = battle_config.get("loser_patterns", [])
-
-    # 1. Hai bên tham chiến
-    sides: list[str] = []
-    for key_list in sides_config.values():
-        found = []
-        for key in key_list:
-            value = params.get(key)
-            if value:
-                links = extract_links(value)
-                if links:
-                    found.append(links[0][0])
-        if len(found) >= 2:
-            sides = found
-            break
-    if len(sides) < 2:
-        return None
-
-    # 2. Bên thắng / thua từ câu kết quả
-    result_text = ""
-    for key in result_fields:
-        value = params.get(key)
-        if value:
-            result_text = clean_value(value).lower()
-            if result_text:
-                break
-    if not result_text:
-        return None
-
-    has_winner = any(pattern in result_text for pattern in winner_patterns)
-    has_loser = any(pattern in result_text for pattern in loser_patterns)
-    if not has_winner and not has_loser:
-        return None
-
-    # 3. Bên nào được nêu tên trong câu kết quả
-    winner: str | None = None
-    loser: str | None = None
-    for side in sides:
-        side_key = strip_accents(side).lower()
-        if side_key and side_key in result_text:
-            if has_loser and not has_winner:
-                loser = side
-            else:
-                winner = side
-
-    if winner is None and loser is None:
-        return None
-
-    if winner is None and loser is not None:
-        winner = sides[1] if sides[0] == loser else sides[0]
-    if loser is None and winner is not None:
-        loser = sides[1] if sides[0] == winner else sides[0]
-
-    if winner is None or loser is None or winner == loser:
-        return None
-    return winner, loser
+    end = years[-1] if len(years) > 1 else None
+    return start, end
 
 
 # ---------------------------------------------------------------------------
@@ -781,6 +702,12 @@ def build_triples(
     gender_values: dict[str, str] = mapping.get("gender_values", {})
     title_prefixes: dict[str, str] = mapping.get("title_gender_prefixes", {})
 
+    # Bảng tra **đã gộp khoá** — tra bằng khoá gộp ở cả hai phía nên không
+    # mất khoá nào giữa `noi_sinh` và `noi sinh` (xem `_collapse_key`).
+    fields_by_key = {_collapse_key(key): spec for key, spec in fields.items()}
+    aliases_by_key = {_collapse_key(key): value for key, value in aliases_map.items()}
+    node_props_by_key = {_collapse_key(key): value for key, value in node_props_map.items()}
+
     title = doc.get("title", "")
     doc_id = doc.get("doc_id", "")
     page_id = doc.get("page_id", "")
@@ -808,9 +735,19 @@ def build_triples(
         "skipped_schema": 0,
         "skipped_gender": 0,
         "skipped_empty": 0,
+        "skipped_duplicate": 0,
+        "skipped_self_loop": 0,
     }
 
     field_index = 0
+
+    #: Khoá chống trùng: `(subject, relation, object)`.
+    #:
+    #: Wikipedia hay có **hai** trường cùng nội dung (vd `Ngày sinh` và
+    #: `Ngày sinh (từ Ngày mất)` trong template "sinh và mất") → cùng một
+    #: quan hệ bị ghi 2 lần. Giữ bản **đầu tiên** (thứ tự trường trong
+    #: infobox) là bản có bằng chứng trực tiếp.
+    seen_triples: set[tuple[str, str, str]] = set()
 
     def add_triple(
         *,
@@ -838,6 +775,18 @@ def build_triples(
         if not subject or not object_value:
             counters["skipped_empty"] += 1
             return False
+        # Self-loop: chủ thể = đối tượng → vi phạm `Triple.is_valid()`
+        # trong `src/common/schemas.py`. Hay xảy ra khi infobox ghi nhầm
+        # (vd "Kế nhiệm: Nguyễn Phúc Chú" trong bài của chính Nguyễn Phúc Chú).
+        if subject == object_value:
+            counters["skipped_self_loop"] += 1
+            return False
+        # Trùng lặp: cùng (subject, relation, object) đã ghi → bỏ.
+        key = (subject, relation, object_value)
+        if key in seen_triples:
+            counters["skipped_duplicate"] += 1
+            return False
+        seen_triples.add(key)
         triples.append(
             {
                 "doc_id": doc_id,
@@ -866,9 +815,13 @@ def build_triples(
         if not raw_value or not raw_value.strip():
             continue
 
+        # Khoá tham số trong wikitext có thể dùng `_` (`noi_sinh`) lẫn khoảng
+        # trắng (`noi sinh`) → gộp về một dạng để tra bảng (xem D-027).
+        lookup_key = _collapse_key(key)
+
         # --- Thuộc tính node (không sinh triple) ---
-        if key in node_props_map:
-            prop_name = node_props_map[key]
+        if lookup_key in node_props_by_key:
+            prop_name = node_props_by_key[lookup_key]
             if prop_name == "gender":
                 if context.subject_gender:
                     props["gender"] = context.subject_gender
@@ -889,14 +842,14 @@ def build_triples(
             continue
 
         # --- Alias ---
-        if key in aliases_map:
-            alias_type = aliases_map[key]
+        if lookup_key in aliases_by_key:
+            alias_type = aliases_by_key[lookup_key]
             cleaned = clean_value(raw_value)
             if cleaned:
                 props.setdefault("aliases", []).append({"alias": cleaned, "type": alias_type})
             continue
 
-        spec = fields.get(key)
+        spec = fields_by_key.get(lookup_key)
         if spec is None:
             continue
         counters["fields_mapped"] += 1
@@ -1043,28 +996,18 @@ def build_triples(
                 if added and prop_name and prop_name not in props:
                     props[prop_name] = display
 
-    # --- Quan hệ `danh_bai` (winner → loser) cho trận đánh ---
-    battle_config = mapping.get("battle_result") or {}
-    if battle_config:
-        sides = extract_battle_result(params, battle_config=battle_config)
-        if sides is not None:
-            winner_name, loser_name = sides
-            winner_type = infer_object_type(winner_name, type_map=type_map)
-            loser_type = infer_object_type(loser_name, type_map=type_map)
-            winner_id, _ = _entity(winner_type, winner_name)
-            loser_id, _ = _entity(loser_type, loser_name)
-            if winner_type != subject_type:
-                counters["skipped_schema"] += 1
-            else:
-                add_triple(
-                    relation="danh_bai",
-                    subject=winner_id,
-                    subject_type_value=winner_type,
-                    object_value=loser_id,
-                    object_type_value=loser_type,
-                    evidence=f"Kết quả: {winner_name} đánh bại {loser_name}",
-                    confidence=CONFIDENCE_INFOBOX,
-                )
+    # --- Quan hệ `danh_bai` (winner → loser) ---
+    # Cố ý **không** trích ở Phase 3.
+    #
+    # `docs/04` §3.1 quy định `danh_bai`: chủ thể = **người** đánh bại
+    # (winner → loser). Thực tế trong Wikipedia, trường `ket qua`/`result`
+    # là **câu văn** nêu tên **quốc gia / triều đại / liên minh** ("Campuchia",
+    # "Việt Minh", "Nhà Thanh") — không phải `person`. Đo trên 207 trận đánh
+    # trong corpus: trích được 4 cặp, 1 cặp sai, 4/4 vi phạm
+    # `RELATION_SUBJECT_TYPES["danh_bai"] = {person}`.
+    #
+    # `danh_bai` sẽ được sinh ở Phase 8 (mô hình RE / LLM), nơi bằng chứng
+    # ở mức câu văn. Xem `reports/deviations.md` D-028.
 
     return triples, props, counters
 
@@ -1072,6 +1015,28 @@ def build_triples(
 # ---------------------------------------------------------------------------
 # Pipeline
 # ---------------------------------------------------------------------------
+
+
+def _collapse_key(key: str) -> str:
+    """Gộp khoá tham số về dạng duy nhất để tra bảng.
+
+    Wikipedia dùng **cả hai** cách viết khoá tham số:
+    `| noi_sinh = ...` (gạch dưới) và `| noi sinh = ...` (khoảng trắng);
+    tương tự `birth_date` vs `birth date`. `normalize_name` giữ nguyên dấu
+    gạch dưới → hai biến thể trở thành **hai khoá khác nhau**, khiến bảng
+    mapping viết bằng một biến thể không bao giờ được gọi với biến thể kia.
+
+    Hàm này gộp cả hai về **một** khoá: thay `_` bằng khoảng trắng rồi gộp
+    khoảng trắng. Tra bảng bằng khoá đã gộp ở **cả hai** phía
+    (tham số lẫn bảng config) → không mất khoá nào.
+
+    Args:
+        key: Khoá tham số thô (đã bỏ dấu, viết thường).
+
+    Returns:
+        Khoá đã gộp, ví dụ ``"noi sinh"``.
+    """
+    return " ".join(key.replace("_", " ").split())
 
 
 def load_mapping(path: str | Path) -> dict[str, Any]:
@@ -1216,7 +1181,11 @@ def run(
         # KHÔNG mặc định `person` — bài "Hà Nội" có infobox
         # `{{Thông tin đơn vị hành chính Việt Nam}}` không map được, mặc định
         # `person` sẽ tạo node *Hà Nội* loại `person` (bịa).
-        resolved_type = normalize_type(infobox_type, type_map)
+        resolved_type = normalize_type(
+            infobox_type,
+            type_map,
+            wikidata_signal=doc.get("wikidata_signal"),
+        )
         if resolved_type is None:
             resolved_type = WIKIDATA_SIGNAL_TYPES.get(doc.get("wikidata_signal") or "")
         if resolved_type is None:

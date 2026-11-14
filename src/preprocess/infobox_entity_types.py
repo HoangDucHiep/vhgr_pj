@@ -136,13 +136,42 @@ _TYPE_PREFIXES: tuple[str, ...] = (
     "ban tin",
 )
 
+#: Template **mơ hồ** — dùng cho nhiều loại chủ thể khác nhau.
+#:
+#: `infobox former country` là ví dụ điển hình: Wikipedia dùng nó cho **cả**
+#: quốc gia ("Việt Nam Cộng hòa", "Nam Kỳ" → ``place``) **và** triều đại
+#: ("Nhà Nguyễn", "Nhà Trần", "Nhà Lý" → ``dynasty``). Tên template không
+#: phân biệt được → tín hiệu Wikidata (``house``/``dynasty``) phải được
+#: ưu tiên.
+#:
+#: Đo trên corpus 2.441 bài (14/11/2026): 39 bài dùng template này, trong đó
+#: 13 là triều đại (có tín hiệu Wikidata ``house``/``dynasty``) và 26 là quốc
+#: gia/địa danh (không có tín hiệu hoặc tín hiệu ``place``).
+#:
+#: Xem `reports/deviations.md` D-030.
+AMBIGUOUS_TEMPLATES: frozenset[str] = frozenset(
+    {
+        "infobox former country",
+        "infobox country",
+        "infobox former subdivision",
+        "infobox former monarchy",
+    }
+)
 
-def normalize_type(raw_type: str | None, type_map: dict[str, str] | None = None) -> str | None:
+
+def normalize_type(
+    raw_type: str | None,
+    type_map: dict[str, str] | None = None,
+    *,
+    wikidata_signal: str | None = None,
+) -> str | None:
     """Chuẩn hóa tên loại infobox → loại node KG.
 
     Args:
         raw_type: Tên loại infobox thô (đã bỏ dấu, lowercase).
         type_map: Bảng mapping loại. Nếu ``None`` thì dùng bảng Phase 1.
+        wikidata_signal: Tín hiệu loại từ Wikidata (Phase 1), dùng để **giải
+            quyết template mơ hồ** (xem `AMBIGUOUS_TEMPLATES`).
 
     Returns:
         Loại node KG hoặc ``None`` nếu không xác định được.
@@ -156,6 +185,15 @@ def normalize_type(raw_type: str | None, type_map: dict[str, str] | None = None)
     key = normalize_name(raw_type)
     if not key:
         return None
+
+    # (0) Template **mơ hồ** → tín hiệu Wikidata (mạnh hơn tên template).
+    #     "infobox former country" dùng cho cả quốc gia (`place`) lẫn triều
+    #     đại (`dynasty`); tín hiệu `house`/`dynasty` từ Wikidata là nguồn
+    #     đáng tin hơn tên template.
+    if key in AMBIGUOUS_TEMPLATES:
+        signal_type = WIKIDATA_SIGNAL_TYPES.get(wikidata_signal or "")
+        if signal_type is not None:
+            return signal_type
 
     if type_map:
         # (1) Khớp chính xác trước — bảng `type_map` chứa cả dạng có tiền tố
@@ -453,7 +491,7 @@ def build_context(
     Returns:
         Đối tượng `TypeContext`.
     """
-    subject_type = normalize_type(infobox_type, type_map)
+    subject_type = normalize_type(infobox_type, type_map, wikidata_signal=wikidata_signal)
     if subject_type is None:
         subject_type = WIKIDATA_SIGNAL_TYPES.get(wikidata_signal or "")
     if subject_type is None:

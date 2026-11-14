@@ -1,9 +1,9 @@
 # Phase 03 — Parse infobox + chuẩn hóa ngày (A4)
 
-- Ngày: 2026-11-14
-- Trạng thái: ✅ đạt Gate (5/5)
+- Ngày: 2026-11-14 (lần 1) · **Audit đóng phase: 2026-11-14 (lần 2)**
+- Trạng thái: ✅ đạt Gate (5/5) → sau audit: ✅ đạt Gate (5/5) + **3 Gate bổ sung**
 - Báo cáo Gate: `reports/phase_03_report.md`
-- Sai lệch: `reports/deviations.md` (D-019 → D-023)
+- Sai lệch: `reports/deviations.md` (D-019 → D-023, bổ sung D-025 → D-030)
 - Số liệu máy đọc được: `docs/10-nhat-ky/so-lieu/phase-03-infobox-stats.json`
 
 ---
@@ -105,6 +105,59 @@ Việt Nam"). Gán vào `person` là **bịa** (vi phạm nguyên tắc #3). →
 Đo được: trước khi thêm 3 điều kiện này, đoạn dẫn sinh **958 triple** cho 586 bài — trong đó
 có bài "Liên bang Đông Dương (chữ Nôm: …, sau 1947 là …)" bị gán nhầm năm sinh 1887.
 Sau khi chặn: **736 triple / 376 bài**, mọi mẫu đều đúng.
+
+### 2.5. [Audit] Cách xử lý triple trùng và self-loop
+
+| Phương án | Cách làm | Kết quả đo được | Chọn? | Lý do |
+|---|---|---|---|---|
+| **A — bộ nhớ trong 1 doc** | `seen: set[(subject, relation, object)]` trong `build_triples()` | 347 triple thừa → **0**; `sinh_nam` 985 → 732 | ✅ | Chặn đúng chỗ sinh ra trùng; không cần sửa dữ liệu |
+| **B — khử trùng ở tầng ghi file** | Dedup khi ghi `infobox_triples.jsonl` | Cũng về 0 | ❌ | Che lỗi: `props` và bộ đếm vẫn tính trùng → số liệu sai |
+| **C — bỏ qua** | — | 347 triple thừa | ❌ | Sai lệch âm thầm, Gate đo tỉ lệ nên không bắt được |
+
+**Quyết định:** A. Giữ bản **đầu tiên** (thứ tự trường trong infobox = bản có bằng chứng trực
+tiếp; bản sau là bản *suy*).
+
+**Quan trọng — cách đếm đúng:** khoá dedupe phải **kèm `doc_id`**. Đo không kèm cho ra 527
+triple thừa / 518 nhóm, nhưng phần chênh là các quan hệ **đối xứng hợp lệ** giữa 2 bài
+("Quang Trung → Nguyễn Nhạc" và "Nguyễn Nhạc → Quang Trung"). Dùng khoá toàn cục sẽ **xoá
+mất** thông tin quan hệ đối xứng.
+
+### 2.6. [Audit] Cách xử lý template mơ hồ (`infobox former country`)
+
+| Phương án | Cách làm | Kết quả đo được | Chọn? | Lý do |
+|---|---|---|---|---|
+| **A — tín hiệu Wikidata ưu tiên** | `AMBIGUOUS_TEMPLATES` + `wikidata_signal` | `dong_doi_tai` 0 → **31**; 13 bài "Nhà X" → `dynasty` | ✅ | Wikidata biết "Nhà Trần" là `house`, "Nam Kỳ" là `place` — tín hiệu **mạnh hơn** tên template |
+| **B — đoán theo tiền tố tiêu đề** | "Nhà X" → dynasty | Sẽ đúng 13/13 bài này | ❌ | Quy tắc bền vững hơn tín hiệu, nhưng **không suy ra được** từ dữ liệu (ngụ ý) — vi phạm "không bịa" |
+| **C — viết template riêng cho triều đại** | Chờ Wikipedia tách template | 0 bài | ❌ | Ngoài tầm kiểm soát; corpus không có template riêng |
+
+**Quyết định:** A. Chỉ áp dụng với **danh sách template mơ hồ** đã đo — không phải mọi template.
+Template không mơ hồ vẫn theo tên template (như `docs/09` §Phase 3 quy định).
+
+**Đo trên corpus (xác nhận A đúng):** 39 bài dùng `infobox former country` →
+**13** triều đại (tín hiệu `house`/`dynasty`) + **26** quốc gia (tín hiệu `place`/không có).
+Không có template riêng cho triều đại (đã quét 2.441 bài) → bảng `type_map` **không** giải
+quyết được, phải dùng tín hiệu.
+
+### 2.7. [Audit] Cách gộp khoá tham số `_` ↔ khoảng trắng
+
+| Phương án | Cách làm | Kết quả đo được | Chọn? | Lý do |
+|---|---|---|---|---|
+| **A — gộp ở lúc tra bảng** | `_collapse_key()` + `fields_by_key` | `sinh_tai` +3, `mat_tai` +1 | ✅ | Gộp **cả hai phía** → không mất khoá nào; không cần sửa config |
+| **B — sửa `normalize_name()`** | Bỏ `_` toàn cục | Tương tự | ❌ | `normalize_name()` dùng chung cho **tên hiển thị** → bỏ `_` sẽ phá tên có gạch dưới |
+| **C — viết cả 2 biến thể trong config** | Nhân đôi bảng mapping | Tương tự | ❌ | Bảng phình ra, dễ lệch; phải nhớ thêm khi thêm trường |
+
+**Quyết định:** A. Nguyên tắc: **bảng tra phải nhận cả hai định dạng** — chuẩn hóa ở lúc tra,
+không ở lúc lưu (cùng bài học với lỗi #12 ở §6).
+
+### 2.8. [Audit] Có nên trích `danh_bai` từ infobox trận đánh?
+
+| Phương án | Cách làm | Kết quả đo được | Chọn? | Lý do |
+|---|---|---|---|---|
+| **A — trích từ `ket qua`/`result`** | Khớp mẫu "chiến thắng"/"thất bại" | 4 cặp; **1 sai**; 4/4 vi phạm `{person}` | ❌ | Vi phạm `AGENTS.md` §5.3 |
+| **B — để Phase 8 (RE/LLM)** | Bằng chứng ở mức câu văn | Chưa đến hạn | ✅ | Đúng bản chất quan hệ |
+| **C — đổi schema** | Cho `danh_bai` nhận `place`/`dynasty` | — | ❌ | `docs/04` §3.1 đã chốt; **tập 18 quan hệ không đổi** |
+
+**Quyết định:** B. Xoá hẳn code + config, thay bằng comment giải thích và dẫn chiếu D-028.
 
 ---
 
@@ -228,6 +281,83 @@ Sau khi chặn: **736 triple / 376 bài**, mọi mẫu đều đúng.
 
 ---
 
+### [Audit 14/11/2026] — 4 quyết định mới
+
+Audit độc lập Phase 2–3 (rà chéo artifact, đọc wikitext thô, đo bằng ablation) phát hiện
+**4 lỗi thật** trong bản triển khai đầu. Chi tiết kỹ thuật: `reports/deviations.md`.
+
+### D-027 — Khử trùng triple + loại self-loop + ràng buộc thứ tự chạy
+
+- **Lý do:** 3 lỗi cùng hệ quả — số liệu Gate đếm trùng nên tỉ lệ trông đẹp hơn thực tế:
+  1. **347** triple thừa trong **341** nhóm trùng `(doc_id, subject, relation, object)`.
+     Nguyên nhân: Wikipedia có **hai** trường cùng nội dung (`Ngày sinh` + `Ngày sinh (từ
+     Ngày mất)`) → mỗi trường sinh 1 triple, không có bước gộp. `sinh_nam` bị phình
+     732 → **985** (+34,6%).
+  2. **4** self-loop (`subject == object`) → vi phạm `Triple.is_valid()`.
+  3. **81** triple ngày trùng giữa lead ∩ infobox trên **47** bài — `lead_triples.jsonl`
+     sinh lúc 04:38, `infobox_triples.jsonl` sinh lại lúc 04:40 → `docs_with_dates` **stale**.
+- **Quyết định:**
+  - `seen: set[(subject, relation, object)]` trong `build_triples()`, giữ bản **đầu tiên**;
+    bộ đếm `skipped_duplicate`.
+  - Kiểm tra `subject == object` trong `add_triple()`; bộ đếm `skipped_self_loop`.
+  - Ràng buộc **thứ tự chạy** `parse_infobox.py` → `extract_lead_dates.py`, ghi rõ trong
+    `docs/09` §Phase 3 + báo cáo + ghi chú cho phase sau.
+  - **Khoá dedupe phải kèm `doc_id`** — nếu không sẽ xoá mất quan hệ đối xứng hợp lệ
+    giữa 2 bài (đo: 527 vs 347 triple thừa).
+- **Ảnh hưởng:** triple 10.394 → **10.078** (−316); `sinh_nam` 985 → **732** (722/732 bài có
+  **đúng 1**); `mat_nam` 635 → **628**; self-loop 4 → **0**; trùng lead∩infobox 81 → **0**.
+  Gate 1–5 **không đổi**.
+- **File đã cập nhật:** `src/preprocess/parse_infobox.py`, `tests/test_infobox.py` (+3 test),
+  `docs/09-ke-hoach-thuc-thien.md`, `reports/phase_03_report.md`, file này.
+
+### D-028 — Không trích `danh_bai` từ infobox trận đánh
+
+- **Lý do:** `docs/04` §3.1 quy định `danh_bai`: chủ thể = **người** đánh bại. Thực tế
+  trường `ket qua`/`result` là **câu văn** nêu tên **quốc gia / triều đại / liên minh**
+  ("Campuchia", "Việt Minh", "Nhà Thanh") → không phải `person`. Đo trên **207** trận đánh:
+  trích được **4** cặp, **1 cặp sai** (bài "Trận Đông Dương": suy ra "Campuchia đánh bại
+  Đông Dương", đúng ra bên thắng là "Việt Nam Dân chủ Cộng hòa"), và **4/4** vi phạm
+  `RELATION_SUBJECT_TYPES["danh_bai"] = {person}`.
+- **Quyết định:** xoá hẳn khối cấu hình `battle_result` + hàm `extract_battle_result()`.
+  `danh_bai` sẽ sinh ở **Phase 8** (mô hình RE/LLM), nơi bằng chứng ở mức câu văn.
+  Thiếu 1 quan hệ còn hơn có 1 quan hệ **sai**.
+- **Ảnh hưởng:** 16/18 quan hệ có triple. `anh_em_cua` = 0 vì **không bài nào** trong corpus
+  có trường anh em/sibling (quét wikitext thô: **0** lần) → **hạn chế dữ liệu**, không phải lỗi.
+- **File đã cập nhật:** `src/preprocess/parse_infobox.py`, `configs/infobox_mapping.yaml`,
+  `tests/test_infobox.py` (+1 test), `docs/09-ke-hoach-thuc-thien.md`, file này.
+
+### D-029 — Gộp khoá tham số `_` ↔ khoảng trắng (`_collapse_key`)
+
+- **Lý do:** Wikipedia dùng **hai** cách viết khoá tham số: `| noi_sinh =` và `| noi sinh =`.
+  `normalize_name()` giữ nguyên `_` → hai **khoá khác nhau** → bảng mapping viết một biến
+  thể **không bao giờ** được gọi với biến thể kia.
+- **Quyết định:** thêm `_collapse_key()` — gộp **cả hai phía** (khoá tham số *và* bảng config)
+  → không mất khoá nào. Không sửa `normalize_name()` (dùng chung cho tên hiển thị).
+- **Ảnh hưởng** (đo bằng ablation): tổng 10.074 → **10.078** (+4); `sinh_tai` +3;
+  `mat_tai` +1. `sinh_nam`/`mat_nam` **không đổi** — các trường ngày trong corpus đều dùng
+  khoảng trắng.
+- **File đã cập nhật:** `src/preprocess/parse_infobox.py`, `configs/infobox_mapping.yaml`, file này.
+
+### D-030 — Template mơ hồ → ưu tiên tín hiệu Wikidata (`AMBIGUOUS_TEMPLATES`)
+
+- **Lý do:** `infobox former country` dùng cho **cả** quốc gia ("Nam Kỳ" → `place`) **và**
+  triều đại ("Nhà Trần" → `dynasty`). Tên template ép `place` → 13 bài triều đại bị gán
+  nhầm → `dong_doi_tai` = **0** (vì `docs/04` §3.1 yêu cầu chủ thể `dong_doi_tai` là `dynasty`).
+  `docs/09` §Phase 3 đặt thứ tự "tên template → `wikidata_signal`" — nhưng ở đây tên template
+  **không phân biệt được**, nên phải đảo thứ tự **chỉ cho các template mơ hồ**.
+- **Quyết định:** thêm `AMBIGUOUS_TEMPLATES` (4 template) trong
+  `src/preprocess/infobox_entity_types.py`; `normalize_type()` nhận thêm tham số
+  `wikidata_signal`: template mơ hồ **và** có tín hiệu → ưu tiên tín hiệu; không có tín hiệu
+  → rơi về `type_map`.
+- **Ảnh hưởng** (đo bằng ablation): tổng 10.047 → **10.078** (+31, toàn bộ là
+  `dong_doi_tai`); 13 bài triều đại chuyển `place` → `dynasty` (đúng).
+  `thuoc_trieu_dai` **không đổi** (631) — 13 bài này không có trường `triều đại`/`hoàng tộc` riêng.
+- **File đã cập nhật:** `src/preprocess/infobox_entity_types.py`,
+  `src/preprocess/parse_infobox.py`, `configs/infobox_mapping.yaml`,
+  `tests/test_infobox.py` (+1 test), file này.
+
+---
+
 ## 4. Thang số liệu so sánh
 
 ### 4.1. Coverage bài `person` — 3 mức
@@ -237,6 +367,9 @@ Sau khi chặn: **736 triple / 376 bài**, mọi mẫu đều đúng.
 | Chỉ infobox | 714 / 1.061 | **67,3%** | `infobox_triples.jsonl` |
 | + đoạn dẫn | 980 / 1.061 | **92,4%** | `infobox_triples.jsonl` + `lead_triples.jsonl` |
 | *(kế hoạch dự kiến)* | — | *98,1%* | `docs/09` §Phase 3 — **đạt 92,4%, thấp hơn dự kiến* |
+
+> **Sau audit:** con số này **không đổi** (92,4%). Khử trùng triple (D-027) chỉ loại các bản
+> ghi **lặp** của cùng một sự kiện, không loại bài nào — nên coverage thực tế được giữ nguyên.
 
 **Phân rã 92,4%:**
 
@@ -305,6 +438,41 @@ trong tham số 1–6 (`{{ngày mất và tuổi|1820|9|16|1766|1|3}}`). Xử l�
 `birth_year: 4, birth_month: 5, birth_day: 6` trong config → sinh **hai** triple
 (`mat_nam` confidence 0,97 + `sinh_nam` confidence 0,95 do mốc sinh được **suy** từ tham số phụ).
 
+### 4.6. [Audit] Thang số liệu so sánh — ablation từng fix
+
+Đo bằng **ablation**: tắt **riêng** từng fix (giữ nguyên các fix còn lại), chạy lại
+`build_triples()` trên toàn bộ corpus 2.441 bài.
+
+| Biến thể | Tổng triple | `sinh_nam` | `sinh_tai` | `mat_tai` | `dong_doi_tai` |
+|---|---|---|---|---|---|
+| **FINAL** (đủ 4 fix) | **10.078** | **732** | **1.432** | **953** | **31** |
+| − `_collapse_key` (D-029) | 10.074 | 732 | 1.429 | 952 | 31 |
+| − `AMBIGUOUS_TEMPLATES` (D-030) | 10.047 | 732 | 1.432 | 953 | **0** |
+| − trường thủ đô (A1) | 10.047 | 732 | 1.432 | 953 | **0** |
+| **HEAD** (bản đầu, trước audit) | **10.394** | **985** | 1.435 | 952 | **0** |
+
+**Đọc bảng — hai điều rất khác nhau:**
+
+| Hiện tượng | Diễn giải ĐÚNG | Diễn giải SAI |
+|---|---|---|
+| `sinh_nam` 985 → 732 (−253) | **Khử trùng**: 722/732 bài có **đúng 1** `sinh_nam` | "Mất 253 bài dữ liệu" |
+| `dong_doi_tai` 0 → 31 | **Thu hồi** quan hệ bị mất do template mơ hồ | "Bịa thêm dữ liệu" |
+| Tổng 10.394 → 10.078 (−316) | = −253 (`sinh_nam`) − 7 (`mat_nam`) − 56 (các quan hệ khác bị trùng) | "Chất lượng giảm" |
+
+**Bài học về cách đọc số liệu:** giảm số triple **không** đồng nghĩa giảm chất lượng — phải
+tách "bị loại vì trùng" (đúng) khỏi "bị loại vì thiếu" (xấu). Vì vậy audit dùng **ablation**
+(tắt từng fix) thay vì so sánh tổng trước/sau.
+
+### 4.7. [Audit] Phân bố `sinh_nam` theo số bài
+
+| Số `sinh_nam` / bài | Số bài | Đánh giá |
+|---|---|---|
+| 1 | 722 | ✅ đúng — mỗi bài đúng 1 mốc sinh |
+| 2 | 5 | ⚠️ xem lại — có thể là 2 nguồn ngày sinh **khác nhau** (không phải trùng) |
+| 0 | — | bài không có trường ngày sinh |
+
+Ở HEAD: `sinh_nam` = 985 / 1.764 bài → nhiều bài có **2–3** bản ghi cho cùng một năm.
+
 ---
 
 ## 5. Số liệu đo được (Gate)
@@ -314,28 +482,31 @@ trong tham số 1–6 (`{{ngày mất và tuổi|1820|9|16|1766|1|3}}`). Xử l�
 | Gate 1 — parse rate bài `person` | ≥ 95% | **100,0%** (1.061 / 1.061) | ✅ |
 | Gate 2 — coverage ngày hoặc gia đình | ≥ 90% | **92,4%** (980 / 1.061) | ✅ |
 | Gate 3 — chuẩn hóa ngày (30 mẫu) | ≥ 95% | **100,0%** (30 / 30) | ✅ |
-| Gate 4 — triple đủ trường bắt buộc | 100% | **100,0%** (10.394 / 10.394) | ✅ |
+| Gate 4 — triple đủ trường bắt buộc | 100% | **100,0%** (10.078 / 10.078) | ✅ |
 | Gate 4 — `method="infobox"` | 100% | **100,0%** | ✅ |
 | Gate 4 — `confidence ≥ 0.95` | 100% | **100,0%** | ✅ |
 | Gate 5 — quan hệ ngoài danh mục | 0 | **0** | ✅ |
 | Gate 5 — vi phạm ràng buộc loại chủ thể | 0 | **0** | ✅ |
-| Triple infobox sinh ra | — | 10.394 | |
+| Triple infobox sinh ra | — | **10.078** (10.394 trước audit) | |
 | Triple đoạn dẫn sinh ra | — | 736 | |
 | Entity sinh ra | — | 1.764 | |
-| Quan hệ được sinh (trên 18) | — | 15 | |
+| Quan hệ được sinh (trên 18) | — | **16** (`anh_em_cua` và `danh_bai` = 0) | |
 | Loại node được sinh (trên 7) | — | 6 (`person`, `dynasty`, `event`, `place`, `title`, `year`) | |
 | Thuộc tính node được phủ (mục tiêu 11) | 11 | **11 / 11** | ✅ |
-| Entity có `birth_place` | — | 643 | |
-| Entity có `death_place` | — | 516 | |
+| Entity có `birth_place` | — | **644** | |
+| Entity có `death_place` | — | **517** | |
 | Artifact có `dump_version` + `model_name` | 3 / 3 | **3 / 3** | ✅ |
-| pytest | — | **274 passed** (268 trước + 6 mới) | ✅ |
+| **Gate 6** — triple trùng trong 1 doc | 0 | **0** | ✅ |
+| **Gate 7** — self-loop | 0 | **0** | ✅ |
+| **Gate 8** — trùng ngày lead ∩ infobox | 0 | **0** | ✅ |
+| pytest | — | **280 passed** (274 trước audit + 6 regression mới) | ✅ |
 
 ### Phân bố confidence
 
 | Confidence | Số triple | Nguồn |
 |---|---|---|
-| 0,97 | 10.115 | Trường infobox trực tiếp |
-| 0,95 | 288 | Mốc sinh suy từ tham số phụ của template "X và tuổi" |
+| 0,97 | 10.038 | Trường infobox trực tiếp |
+| 0,95 | 40 | Mốc sinh suy từ tham số phụ của template "X và tuổi" |
 
 ### Phân bố thuộc tính node (`props` trong `infobox_entities.jsonl`)
 
@@ -343,8 +514,8 @@ trong tham số 1–6 (`{{ngày mất và tuổi|1820|9|16|1766|1|3}}`). Xử l�
 |---|---|---|---|---|
 | `birth_year` | 833 | | `temple_name` | 89 |
 | `death_year` | 736 | | `courtesy_name` | 79 |
-| `birth_place` | 643 | | `reign_title` | 104 |
-| `death_place` | 516 | | `gender` | 23 |
+| `birth_place` | 644 | | `reign_title` | 104 |
+| `death_place` | 517 | | `gender` | 23 |
 | `aliases` | 238 | | `founded_year` | 23 |
 | `posthumous_name` | 217 | | | |
 | `reign_start` | 220 | | | |
@@ -354,12 +525,12 @@ trong tham số 1–6 (`{{ngày mất và tuổi|1820|9|16|1766|1|3}}`). Xử l�
 
 | Loại | Số triple |
 |---|---|
-| `place` | 2.924 |
-| `event` | 2.122 |
-| `person` | 2.073 |
-| `year` | 1.620 |
-| `title` | 1.020 |
-| `dynasty` | 639 |
+| `place` | 2.950 |
+| `event` | 2.098 |
+| `person` | 2.063 |
+| `year` | 1.360 |
+| `title` | 976 |
+| `dynasty` | 631 |
 
 ---
 
@@ -382,6 +553,10 @@ trong tham số 1–6 (`{{ngày mất và tuổi|1820|9|16|1766|1|3}}`). Xử l�
 | 13 | **36 template chưa có trong `type_map`** | 43 bài có template lạ → mặc định `person` | `type_map` viết trước khi đo trên corpus | Đo trên 2.441 bài, bổ sung 36 khoá | Bảng mapping phải **đo trên dữ liệu thật** rồi mới hoàn thiện, không đoán từ đầu |
 | 14 | **Thiếu 2/11 thuộc tính node** | `birth_place`/`death_place` không có trong `infobox_entities.jsonl` | Config khai báo `noi sinh`/`noi mat` **chỉ sinh triple**, không ghi thêm `props` | Thêm khoá `prop:` vào config + `add_triple()` trả `bool` để prop chỉ ghi khi triple thực sự sinh (D-025) | "Có quan hệ" ≠ "có thuộc tính" — hai loại kiểm tra khác nhau, phải có test riêng cho từng loại |
 | 15 | **Artifact không truy được về lần chạy** | 3 artifact Phase 3 thiếu `dump_version` + `model_name` | Bỏ sót ràng buộc `AGENTS.md` §5.6 khi viết code | Bổ sung 2 trường cho cả 3 artifact + 3 test bắt buộc (D-026) | Ràng buộc "ghi metadata vào artifact" phải **có test**, nếu không sẽ bị bỏ sót lặp lại ở mỗi phase |
+| 16 | **[Audit] 347 triple trùng trong 1 doc** | `sinh_nam` 985 cho 1.764 bài; có bài có 2–3 bản ghi cùng năm | Wikipedia có **hai** trường cùng nội dung (`Ngày sinh` + `Ngày sinh (từ Ngày mất)`); mỗi trường sinh 1 triple, không có bước gộp | `seen: set[(subject, relation, object)]` — giữ bản **đầu tiên**, đếm `skipped_duplicate` (D-027) | Nguồn có thể **lặp** — phải có idempotency ở tầng sinh, không phải ở tầng ghi file |
+| 17 | **[Audit] 4 self-loop** | Triple có `subject == object` | Infobox ghi nhầm: bài của chính người được ghi là "Tiền nhiệm" của họ | Kiểm tra `subject == object` trong `add_triple()` → `skipped_self_loop` (D-027) | Bất biến schema phải được **kiểm tra ở lúc sinh**, không trông chờ validator ở phase sau |
+| 18 | **[Audit] 81 triple ngày trùng lead ∩ infobox** | Test `test_no_duplicate_lead_and_infobox_dates` **FAIL** | `lead_triples.jsonl` sinh 04:38, `infobox_triples.jsonl` sinh lại 04:40 → `docs_with_dates` **stale** | Ràng buộc thứ tự chạy `parse_infobox` → `extract_lead_dates`, ghi vào `docs/09` + báo cáo (D-027) | Artifact có phụ thuộc thứ tự → **ghi ràng buộc** vào tài liệu, không để trong đầu |
+| 19 | **[Audit] `dong_doi_tai` = 0, 13 bài triều đại gán nhầm `place`** | Không có triple `dynasty → place` nào | `infobox former country` dùng chung cho quốc gia **và** triều đại; tên template ép `place` | `AMBIGUOUS_TEMPLATES` + ưu tiên tín hiệu Wikidata (D-030) | Tên template **không luôn** xác định loại node — cần tín hiệu thứ cấp và cơ chế "mơ hồ" riêng |
 
 ---
 
@@ -430,6 +605,33 @@ trong tham số 1–6 (`{{ngày mất và tuổi|1820|9|16|1766|1|3}}`). Xử l�
     ở cả 3 artifact Phase 3 — vì không có test nào kiểm nó. Sau khi thêm 3 test, quy tắc này
     đã **tự động** áp cho mọi phase sau.
 
+11. **[Audit] Đếm trùng mà không khoá `doc_id` là đếm sai — và sửa sai cũng làm mất dữ liệu.**
+    Đo không khoá `doc_id`: 527 triple thừa / 518 nhóm. Đo có khoá: 347 / 341. Phần chênh là
+    quan hệ **đối xứng hợp lệ** giữa 2 bài ("Quang Trung → Nguyễn Nhạc" và "Nguyễn Nhạc →
+    Quang Trung"). Bài học kép: **phải đo trùng ở đúng phạm vi ngữ nghĩa**, và **khoá dedupe
+    phải khớp phạm vi đó** — dedupe toàn cục sẽ xoá mất thông tin quan hệ đối xứng.
+
+12. **[Audit] "Giảm số liệu" không đồng nghĩa "giảm chất lượng".** `sinh_nam` 985 → 732 (−253)
+    nghe như mất dữ liệu, nhưng thực ra là **khử trùng** (722/732 bài có đúng 1 mốc sinh).
+    Vì vậy audit dùng **ablation** (tắt từng fix riêng lẻ) thay vì so sánh tổng trước/sau —
+    ablation cho biết *từng thay đổi* đóng góp bao nhiêu, còn so sánh tổng chỉ cho biết
+    *tổng cộng* thay đổi.
+
+13. **[Audit] Tên template không luôn xác định được loại node.** `infobox former country` dùng
+    cho cả quốc gia (26 bài) lẫn triều đại (13 bài). Bảng `type_map` không thể biểu diễn
+    "1 template → nhiều loại" → cần khái niệm **template mơ hồ** + tín hiệu thứ cấp
+    (Wikidata). Hệ quả trực tiếp: `dong_doi_tai` 0 → 31.
+
+14. **[Audit] Thiếu một quan hệ còn hơn có một quan hệ sai.** Trích `danh_bai` từ câu kết quả
+    trận đánh cho 4 cặp, trong đó 1 sai và 4/4 vi phạm ràng buộc loại chủ thể. Xoá hẳn và
+    chờ Phase 8 (nơi bằng chứng ở mức câu văn) là quyết định đúng — đặc biệt khi schema
+    `docs/04` §3.1 đã chốt **tập 18 quan hệ không đổi**.
+
+15. **[Audit] Gate đo tỉ lệ, không đo bất biến.** 5 Gate đều xanh mà vẫn có 347 triple trùng,
+    4 self-loop và 81 triple trùng giữa 2 artifact. Thêm 3 Gate **bất biến** (không trùng ·
+    không self-loop · không trùng giữa artifact) mới phát hiện được. Bài học tổng quát: **mỗi
+    lần audit phải thêm Gate mới, không chỉ xác nhận Gate cũ**.
+
 ---
 
 ## 8. Ý tưởng cho slide
@@ -448,6 +650,18 @@ trong tham số 1–6 (`{{ngày mất và tuổi|1820|9|16|1766|1|3}}`). Xử l�
   0) mà vẫn còn node "Hà Nội" bị gán `person`. Phải có lượt rà chéo artifact — đó là nơi
   phát hiện D-024.
 
+- **Slide "Audit: 5 Gate xanh mà dữ liệu vẫn sai"** — 347 triple trùng · 4 self-loop · 81 triple
+  trùng giữa 2 artifact · `dong_doi_tai` = 0 dù có 13 bài triều đại. Bài học: **thêm Gate bất
+  biến**, không chỉ xác nhận Gate cũ.
+- **Slide "Ablation: đo từng fix riêng lẻ"** — `sinh_nam` 985 → 732 là **khử trùng**
+  (722/732 bài có đúng 1 mốc sinh), **không phải** mất dữ liệu. Giảm số liệu ≠ giảm chất lượng.
+- **Slide "Đo trùng phải đúng phạm vi"** — 527 vs 347: phần chênh là quan hệ **đối xứng hợp lệ**
+  giữa 2 bài. Dedup toàn cục sẽ xoá mất thông tin.
+- **Slide "Tên template không phải lúc nào cũng đủ"** — `infobox former country`: 26 quốc gia
+  + 13 triều đại → cần khái niệm "template mơ hồ" + tín hiệu Wikidata. `dong_doi_tai` 0 → 31.
+- **Slide "Thiếu còn hơn sai"** — `danh_bai`: 4 cặp trích được, 1 sai, 4/4 vi phạm schema →
+  xoá hẳn, chờ Phase 8.
+
 ---
 
 ## 9. Việc tiếp theo
@@ -460,5 +674,9 @@ vừa tạo ở Phase 3 (`infobox_entities.jsonl` cho 1.764 node) → `docs/09` 
 | Artifact | Nội dung | Dùng cho |
 |---|---|---|
 | `data/interim/infobox_entities.jsonl` | 1.764 node + `props` (birth_year, death_year, reign_start/end, temple_name, gender, aliases, birth_place, death_place) | Entity linking (Phase 8), node props (Phase 10) |
-| `data/interim/infobox_triples.jsonl` | 10.394 triple confidence ≥ 0,95 | Đường sạch để đo NER/RE |
+| `data/interim/infobox_triples.jsonl` | **10.078** triple confidence ≥ 0,95 | Đường sạch để đo NER/RE |
 | `data/interim/lead_triples.jsonl` | 736 triple confidence 0,85 | Bổ sung coverage |
+
+> **Lưu ý cho Phase 4:** `infobox_entities.jsonl` chỉ có **16** entity loại `dynasty` — quá hẹp
+> để làm nguồn nhãn `DYNASTY` chính. Phase 4 nên dựa chủ yếu vào tín hiệu Wikidata (QLever),
+> dùng `infobox_entities.jsonl` làm nguồn **bổ trợ** cho `PERSON`.
