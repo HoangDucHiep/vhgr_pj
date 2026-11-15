@@ -57,12 +57,109 @@ ner:
   batch_size: 32
   silver_link_min_anchor_match: 0.8
   labels: [PERSON, DYNASTY, EVENT, LOCATION, TIME, TITLE]
+  # Đường dẫn artifact (tương đối repo root).
+  silver_path: data/interim/ner_silver.jsonl
+  splits_path: data/splits/splits.json
+  predictions_path: data/interim/ner_predictions.jsonl
+  # Huấn luyện (Phase 5) — seed cố định 42 theo AGENTS.md §5.6.
+  train:
+    model_name: vinai/phobert-base
+    learning_rate: 3.0e-5
+    epochs: 5
+    batch_size: 32
+    eval_batch_size: 64
+    max_len: 256
+    weight_decay: 0.01
+    warmup_ratio: 0.1
+    max_grad_norm: 1.0
+    early_stopping_patience: 2
+    logging_steps: 100
+    save_steps: 1000
+    save_total_limit: 2
+    seed: 42
+  # Suy luận toàn corpus (Phase 5).
+  infer:
+    model_dir: models/ner
+    batch_size: 64
+    max_len: 256
+    stride: 64
+    score_threshold: 0.5
 
 re:
   model_name: vinai/phobert-base
   marker_style: typed_markers
   max_len: 256
   batch_size: 32
+
+  # --- Phase 7 (D1 phần 1): distant supervision ---
+  # Bảng mapping property Wikidata → quan hệ KG (nguồn sự thật cho mapping).
+  relations_config: configs/wikidata_relations.yaml
+  # Artifact đầu vào/đầu ra của Phase 7.
+  pairs_path: data/interim/wikidata_pairs.jsonl
+  positive_path: data/interim/re_positive.jsonl
+  train_path: data/interim/re_train.jsonl
+  # Đầu vào grounding.
+  coref_path: data/interim/coref_resolved.jsonl
+  infobox_entities_path: data/interim/infobox_entities.jsonl
+  infobox_triples_path: data/interim/infobox_triples.jsonl
+  lead_triples_path: data/interim/lead_triples.jsonl
+  splits_path: data/splits/splits.json
+  # SPARQL: lô QID và nhịp nghỉ giữa các request.
+  sparql_batch_size: 200
+  sparql_min_interval_s: 0.4
+  # Chia truy vấn theo 9 triều đại (docs/09 §Phase 7) — 1 triều đại timeout
+  # không chặn cả phase.
+  chunk_by_dynasty: true
+  # Chỉ lấy negative khi cặp KHÔNG có quan hệ nào trong Wikidata (an toàn).
+  safe_negatives_only: true
+  # Ngưỡng Gate Phase 7 (đọc từ configs/wikidata_relations.yaml khi có).
+  max_neg_pos_ratio: 1.0
+
+coref:
+  # Phase 6 — Coreference rule-based (C1/C2).
+  # Đầu vào: NER của Phase 5 + documents của Phase 2 + infobox entities của Phase 3.
+  predictions_path: data/interim/ner_predictions.jsonl
+  documents_path: data/interim/documents.jsonl
+  infobox_entities_path: data/interim/infobox_entities.jsonl
+  qid_types_path: data/interim/qid_types.json
+  splits_path: data/splits/splits.json
+  output_path: data/interim/coref_resolved.jsonl
+  article_subject_path: data/interim/article_subjects.jsonl
+  honorifics_path: configs/honorifics.yaml
+  gold_path: data/eval/coref_gold_100.jsonl
+  # Dò thêm span danh xưng/đại từ mà NER không bắt (phần việc C1 thật sự).
+  detect_pronouns: true
+  # Sinh entity_id cho named mention chưa có trong gazetteer (D-044).
+  mint_entity_ids: true
+  # Điểm tin cậy gán cho nguồn khác nhau.
+  score_gazetteer: 0.95
+  score_mint: 0.75
+  score_coref_pronoun: 0.70
+  score_coref_honorific: 0.70
+  score_article_subject: 0.60
+  # Ngưỡng R5: đoạn có >= N entity PERSON mà đại từ không có ứng viên rõ -> ambiguous.
+  max_persons_in_paragraph: 3
+  # R4: chỉ gắn đại từ có giới tính khi biết chắc (props.gender / tiền tố tên).
+  gender_strict: true
+  # Thứ tự ưu tiên quy tắc giải quyết đại từ (D-052).
+  # Đo bằng scripts/coref_ablation.py trên gold 100 câu (9 biến thể).
+  #   r1a = ứng viên PERSON trong cùng câu
+  #   r1b = ứng viên PERSON ở câu trước trong cùng đoạn
+  #   r3  = chủ thể bài
+  #   r5  = đoạn có >= N PERSON → ambiguous
+  #   r6  = đoạn có đúng 1 PERSON → fallback
+  #
+  # Đo được: R3 đứng trước R1a làm G5 tốt nhất (0,8729 vs 0,8475).
+  # Lưu ý: chênh lệch này KHÔNG có ý nghĩa thống kê (McNemar p=0,58) →
+  # xem docs/10-nhat-ky/phase-06.md §4.2.
+  pronoun_rule_order: [r3, r1a, r1b, r5, r6]
+  # R1b chỉ dùng khi đoạn có đúng 1 người được nhắc (D-053).
+  r1b_unique_only: false
+  # R3 chỉ dùng khi đoạn không có PERSON nào (điều kiện trong docs/09 §Phase 6).
+  # Mặc định false — biến thể bám sát đặc tả đo G5 thấp hơn (xem ablation).
+  r3_requires_no_person: false
+  # Số câu lấy mẫu cho bộ gold (nguồn: tập dev của splits.json).
+  gold_size: 100
 
 link:
   embedding_model: BAAI/bge-m3

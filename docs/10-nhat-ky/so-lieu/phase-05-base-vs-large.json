@@ -1,0 +1,184 @@
+{
+ "_meta": {
+  "phase": 5,
+  "description": "So sanh 2 arm NER PhoBERT tren dev split (19.049 cau)",
+  "sources": [
+   "reports/kaggle_ner_base/models/ner/metrics.json",
+   "reports/kaggle_ner_large/models/ner/metrics.json"
+  ],
+  "note": "Arm base: 150.450 example x 5 epoch (scope day du). Arm large: 60.124 example x 2 epoch (scope rut gon de nhin trong gioi han 12h/session Kaggle) -> KHONG cung scope nen khong so sanh cong bang ve chat luong."
+ },
+ "arms": {
+  "base": {
+   "micro": {
+    "precision": 0.6597,
+    "recall": 0.7084,
+    "f1": 0.6832,
+    "support": 13774
+   },
+   "macro": {
+    "precision": 0.5408,
+    "recall": 0.585,
+    "f1": 0.5589
+   },
+   "per_label": {
+    "DYNASTY": {
+     "precision": 0.5232,
+     "recall": 0.6531,
+     "f1": 0.5809,
+     "support": 588
+    },
+    "EVENT": {
+     "precision": 0.4332,
+     "recall": 0.5436,
+     "f1": 0.4821,
+     "support": 769
+    },
+    "LOCATION": {
+     "precision": 0.5194,
+     "recall": 0.5262,
+     "f1": 0.5228,
+     "support": 3107
+    },
+    "PERSON": {
+     "precision": 0.5428,
+     "recall": 0.633,
+     "f1": 0.5844,
+     "support": 3877
+    },
+    "TIME": {
+     "precision": 0.9213,
+     "recall": 0.9337,
+     "f1": 0.9275,
+     "support": 5143
+    },
+    "TITLE": {
+     "precision": 0.3048,
+     "recall": 0.2207,
+     "f1": 0.256,
+     "support": 290
+    }
+   },
+   "_meta": {
+    "model_name": "/kaggle/working/repo/models_hf/phobert-base",
+    "dump_version": "20261101",
+    "seed": 42,
+    "split": "dev",
+    "num_labels": 13,
+    "label_list": [
+     "O",
+     "B-PERSON",
+     "B-DYNASTY",
+     "B-EVENT",
+     "B-LOCATION",
+     "B-TIME",
+     "B-TITLE",
+     "I-PERSON",
+     "I-DYNASTY",
+     "I-EVENT",
+     "I-LOCATION",
+     "I-TIME",
+     "I-TITLE"
+    ],
+    "scheme": "BIO",
+    "train_seconds": 10634.3,
+    "n_train_examples": 150450,
+    "n_dev_examples": 19075,
+    "epochs": 5,
+    "max_len": 256,
+    "batch_size": 32,
+    "learning_rate": 3e-05,
+    "fp16": true
+   }
+  },
+  "large": {
+   "micro": {
+    "precision": 0.6387,
+    "recall": 0.6395,
+    "f1": 0.6391,
+    "support": 13774
+   },
+   "macro": {
+    "precision": 0.4843,
+    "recall": 0.4625,
+    "f1": 0.4503
+   },
+   "per_label": {
+    "DYNASTY": {
+     "precision": 0.4015,
+     "recall": 0.534,
+     "f1": 0.4584,
+     "support": 588
+    },
+    "EVENT": {
+     "precision": 0.3892,
+     "recall": 0.3472,
+     "f1": 0.367,
+     "support": 769
+    },
+    "LOCATION": {
+     "precision": 0.5032,
+     "recall": 0.403,
+     "f1": 0.4475,
+     "support": 3107
+    },
+    "PERSON": {
+     "precision": 0.4976,
+     "recall": 0.5331,
+     "f1": 0.5148,
+     "support": 3877
+    },
+    "TIME": {
+     "precision": 0.8645,
+     "recall": 0.9541,
+     "f1": 0.9071,
+     "support": 5143
+    },
+    "TITLE": {
+     "precision": 0.25,
+     "recall": 0.0034,
+     "f1": 0.0068,
+     "support": 290
+    }
+   },
+   "_meta": {
+    "model_name": "/kaggle/working/repo/models_hf/phobert-large",
+    "dump_version": "20261101",
+    "seed": 42,
+    "split": "dev",
+    "num_labels": 13,
+    "label_list": [
+     "O",
+     "B-PERSON",
+     "B-DYNASTY",
+     "B-EVENT",
+     "B-LOCATION",
+     "B-TIME",
+     "B-TITLE",
+     "I-PERSON",
+     "I-DYNASTY",
+     "I-EVENT",
+     "I-LOCATION",
+     "I-TIME",
+     "I-TITLE"
+    ],
+    "scheme": "BIO",
+    "train_seconds": 6148.3,
+    "n_train_examples": 60124,
+    "n_dev_examples": 19075,
+    "epochs": 2,
+    "max_len": 256,
+    "batch_size": 8,
+    "eval_batch_size": 16,
+    "gradient_accumulation_steps": 4,
+    "learning_rate": 3e-05,
+    "fp16": true
+   }
+  }
+ },
+ "verdict": {
+  "best_arm": "base",
+  "reason": "base duoc huan luyen day du (150.450 x 5 epoch) nen F1 cao hon; large bi rut gon con 60.124 x 2 epoch de nhin trong gioi han 12h/session.",
+  "artifact_used": "models/ner/ = phobert-base; predictions = kaggle_ner_base/ner_predictions.jsonl"
+ }
+}

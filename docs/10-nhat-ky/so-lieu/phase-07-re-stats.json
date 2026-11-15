@@ -1,0 +1,96 @@
+{
+  "_meta": {
+    "phase": 7,
+    "mo_ta": "Thống kê tập huấn luyện RE (Phase 7 — D1.1); artifact theo contract docs/09 §Phase 7: 1 record/câu, mảng `pairs` lồng, label chuỗi POSITIVE/NEGATIVE",
+    "nguon": "/media/hoanghiep/All/Codes/NPL/vhgr_pj/data/interim/re_train.jsonl (sinh bởi: python -m src.re.build_re_dataset --config configs/default.yaml)",
+    "ngay_do": "2026-11-15T16:24:16+0700"
+  },
+  "stats": {
+    "sentences": 12877,
+    "total": 29957,
+    "positive": 15580,
+    "negative": 14377,
+    "neg_pos_ratio": 0.9227856225930681,
+    "relations_with_positive": 17,
+    "by_relation": {
+      "cha_cua": 3118,
+      "mat_nam": 1915,
+      "sinh_tai": 1803,
+      "mat_tai": 1711,
+      "giu_chuc_vu": 1207,
+      "ke_vi": 1161,
+      "me_cua": 1115,
+      "vo_cua": 940,
+      "anh_em_cua": 935,
+      "sinh_nam": 679,
+      "thuoc_trieu_dai": 541,
+      "tham_gia_tran": 182,
+      "chong_cua": 110,
+      "chi_huy_tran": 88,
+      "dong_doi_tai": 44,
+      "dien_ra_tai": 18,
+      "lap_ra": 13
+    },
+    "by_split": {
+      "train": 23526,
+      "test": 2940,
+      "dev": 3491
+    },
+    "positive_by_split": {
+      "train": 12194,
+      "test": 1515,
+      "dev": 1871
+    },
+    "negative_by_split": {
+      "test": 1425,
+      "train": 11332,
+      "dev": 1620
+    },
+    "positive_by_source": {
+      "wikidata": 12197,
+      "infobox": 3361,
+      "lead": 22
+    },
+    "out_of_schema_relations": [],
+    "out_of_schema_count": 0,
+    "distinct_sentences": 12877
+  },
+  "gates": [
+    {
+      "id": "G1",
+      "name": "Số mẫu POSITIVE",
+      "expected": ">= 10000",
+      "actual": 15580,
+      "passed": true
+    },
+    {
+      "id": "G2",
+      "name": "Tỉ lệ NEG/POS",
+      "expected": "<= 1.0",
+      "actual": 0.9228,
+      "passed": true
+    },
+    {
+      "id": "G3",
+      "name": "Số quan hệ có POSITIVE",
+      "expected": ">= 8",
+      "actual": 17,
+      "passed": true
+    },
+    {
+      "id": "G4",
+      "name": "Quan hệ ngoài danh mục 18 quan hệ",
+      "expected": "== 0",
+      "actual": 0,
+      "passed": true
+    },
+    {
+      "id": "G5",
+      "name": "Cache SPARQL idempotent (0 request khi chạy lại)",
+      "expected": "== 0 request",
+      "actual": null,
+      "passed": null,
+      "note": "Kiểm bởi scripts/re_gate_check.py"
+    }
+  ]
+}

@@ -1,0 +1,39 @@
+{"sentence_id": "s49066_43_1", "keep": [1, 2, 3, 4, 5, 6, 7], "drop": [0], "notes": "'Ngọc Hoàng Thượng đế' la danh xung (chua toan) cua Trong Huu Nhan, khong phai dia danh -> sai loai LOCATION. Cac mention con lai dung."}
+{"sentence_id": "s42495_101_0", "keep": [], "drop": [0], "notes": "'Danh nhan thoi Dinh' la ten sach, khong phai nguoi -> sai loai PERSON."}
+{"sentence_id": "s116_235_0", "keep": [], "drop": [0], "add": [{"label": "DYNASTY", "text": "Nhà Nguyễn"}, {"label": "PERSON", "text": "Nguyễn Huệ"}], "notes": "'Nha Nguyen' la trieu duong -> DYNASTY (khong phai EVENT). 'Nguyen Hue' bi thieu."}
+{"sentence_id": "s3678090_10_1", "keep": [0], "drop": [1], "add": [{"label": "PERSON", "text": "Chính phủ Việt Nam"}], "notes": "'Chinh phu Viet Nam' la to chuc, khong phai PERSON -> doi nhan thanh PERSON de do nham (hoac bo). Giu '1980' TIME."}
+{"sentence_id": "s33168_1_1", "keep": [1, 2, 3], "drop": [0], "notes": "'Dai Viet su ky toan thu' la ten bo su, khong phai trieu duong -> sai loai DYNASTY. 'XV/XVIII/XIX' TIME dung."}
+{"sentence_id": "s307699_46_0", "keep": [0], "drop": [], "add": [{"label": "LOCATION", "text": "Ninh Bình"}], "notes": "them dia danh 'Ninh Binh' bi thieu."}
+{"sentence_id": "s321161_13_2", "keep": [1], "drop": [0, 2], "notes": "'Revolver' va 'Taxman' la ten album/bai hat, khong phai PERSON -> sai loai. Chi giu '1966' TIME."}
+{"sentence_id": "s68748_53_0", "keep": [], "drop": [0], "add": [{"label": "DYNASTY", "text": "Nhà Trần"}], "notes": "'Nha Tran' la trieu duong -> DYNASTY (khong phai EVENT)."}
+{"sentence_id": "s234915_21_0", "keep": [0, 1], "drop": [2], "add": [{"label": "LOCATION", "text": "Đại Việt"}, {"label": "PERSON", "text": "Đức Bảo"}, {"label": "PERSON", "text": "Cố Nhữ Tu"}, {"label": "PERSON", "text": "Hiển Tông"}], "notes": "'Dai Viet' la ten nuoc -> LOCATION (khong phai EVENT). Thieu 3 nguoi."}
+{"sentence_id": "s800451_12_0", "keep": [0, 2, 3], "drop": [1], "notes": "'thế kỷ 15' bi tach thanh '15' -> nhac loi bien (span sai). 'Du dia chi' la ten sach nen doi thanh EVENT giu nguyen vi la tac pham."}
+{"sentence_id": "s19717865_40_3", "keep": [], "drop": [], "add": [], "notes": "khong co mention nao sai; cau thuoc ve nen, khong co entity ro rang."}
+{"sentence_id": "s116_36_1", "keep": [], "drop": [], "add": [{"label": "PERSON", "text": "Nguyễn Ánh"}], "notes": "'Nguyen Anh' (tuong lai Gia Long) bi thieu."}
+{"sentence_id": "s116_180_0", "keep": [], "drop": [], "add": [{"label": "PERSON", "text": "Nguyễn Quang Bình"}, {"label": "PERSON", "text": "Càn Long"}], "notes": "hai ten nguoi bi thieu."}
+{"sentence_id": "s4997_263_0", "keep": [], "drop": [], "add": [{"label": "PERSON", "text": "Kiên Thái Vương Hồng Cai"}], "notes": "ten nguoi bi thieu."}
+{"sentence_id": "s116_253_0", "keep": [], "drop": [], "add": [{"label": "PERSON", "text": "Nguyễn Quang Thiệu"}, {"label": "PERSON", "text": "Phạm Thị Liên"}], "notes": "hai ten nguoi bi thieu."}
+{"sentence_id": "s92750_38_1", "keep": [], "drop": [], "add": [{"label": "PERSON", "text": "Phạm Du"}, {"label": "LOCATION", "text": "Hồng Châu"}], "notes": "ten nguoi + dia danh bi thieu."}
+{"sentence_id": "s68748_16_9", "keep": [], "drop": [], "add": [{"label": "PERSON", "text": "Trần Nhật Duật"}, {"label": "PERSON", "text": "Trịnh Đình Toản"}], "notes": "hai ten nguoi bi thieu."}
+{"sentence_id": "s1310600_9_2", "keep": [], "drop": [], "add": [{"label": "PERSON", "text": "Phạm Dao"}, {"label": "PERSON", "text": "Phạm Đốc"}], "notes": "hai ten nguoi bi thieu."}
+{"sentence_id": "s411524_116_0", "keep": [], "drop": [], "add": [{"label": "PERSON", "text": "Nguyễn Văn Chương"}, {"label": "LOCATION", "text": "Vĩnh Long"}], "notes": "ten nguoi + dia danh bi thieu."}
+{"sentence_id": "s116_90_3", "keep": [0], "drop": [], "add": [{"label": "PERSON", "text": "Quang Trung"}, {"label": "LOCATION", "text": "Thăng Long"}], "notes": "'Quang Trung' + 'Thang Long' bi thieu."}
+{"sentence_id": "s116_7_4", "keep": [], "drop": [], "add": [{"label": "PERSON", "text": "Nguyễn Phi Phúc"}], "notes": "ten nguoi bi thieu."}
+{"sentence_id": "s34187_36_0", "keep": [], "drop": [], "add": [{"label": "PERSON", "text": "Lưu Nghi"}, {"label": "PERSON", "text": "Nguyễn Thị Đào"}], "notes": "hai ten nguoi bi thieu."}
+{"sentence_id": "s92750_45_3", "keep": [], "drop": [], "add": [{"label": "PERSON", "text": "Quách Bốc"}, {"label": "PERSON", "text": "Lý Thầm"}], "notes": "hai ten nguoi bi thieu."}
+{"sentence_id": "s321161_74_0", "keep": [0], "drop": [], "add": [{"label": "PERSON", "text": "Harrison"}, {"label": "PERSON", "text": "Clapton"}], "notes": "hai ten nguoi bi thieu; '1969' TIME dung."}
+{"sentence_id": "s4997_157_2", "keep": [], "drop": [], "add": [{"label": "PERSON", "text": "Gia Long"}, {"label": "DYNASTY", "text": "Hoàng triều Nguyễn"}], "notes": "ten nguoi + trieu duong bi thieu."}
+{"sentence_id": "s92588_2_0", "keep": [0, 1], "drop": [], "add": [{"label": "PERSON", "text": "Francisco de Pina"}, {"label": "LOCATION", "text": "Guarda"}], "notes": "ten nguoi + dia danh bi thieu."}
+{"sentence_id": "s283212_37_2", "keep": [], "drop": [], "add": [{"label": "PERSON", "text": "Lê Hữu Từ"}], "notes": "ten nguoi bi thieu."}
+{"sentence_id": "s130333_30_0", "keep": [], "drop": [], "add": [{"label": "LOCATION", "text": "Việt Nam Cộng hòa"}], "notes": "dia danh bi thieu."}
+{"sentence_id": "s411524_78_3", "keep": [0], "drop": [], "add": [{"label": "LOCATION", "text": "Campuchia"}, {"label": "LOCATION", "text": "Huế"}, {"label": "LOCATION", "text": "Sài Gòn"}, {"label": "LOCATION", "text": "Bangkok"}, {"label": "PERSON", "text": "Ang Em"}, {"label": "PERSON", "text": "Ang Mey"}, {"label": "PERSON", "text": "Ang Peou"}, {"label": "PERSON", "text": "Ang Sngoun"}, {"label": "PERSON", "text": "Ang Duong"}], "notes": "9 entity bi thieu."}
+{"sentence_id": "s544352_55_6", "keep": [0], "drop": [], "add": [{"label": "LOCATION", "text": "Pháp"}], "notes": "'Phap' (nuoc) bi thieu; '1847' TIME dung."}
+{"sentence_id": "s62544_53_4", "keep": [0], "drop": [], "add": [{"label": "PERSON", "text": "Nguyễn Văn Khuê"}, {"label": "PERSON", "text": "Nguyễn Đức Nhuận"}, {"label": "PERSON", "text": "Nguyễn Trương Hiệu"}], "notes": "ba ten nguoi bi thieu."}
+{"sentence_id": "s1414456_2_2", "keep": [0, 1, 2], "drop": [], "add": [{"label": "PERSON", "text": "Espinoza"}], "notes": "'Espinoza' bi thieu; 'Felipe V cua Tay Ban Nha' la PERSON dung (ke ca chuc danh), 'Manila'/'Philippines' dung."}
+{"sentence_id": "s469316_0_0", "keep": [0], "drop": [], "add": [{"label": "PERSON", "text": "Âu Cơ"}, {"label": "LOCATION", "text": "Hiền Lương"}, {"label": "LOCATION", "text": "Việt Nam"}], "notes": "'Au Co' + 2 dia danh bi thieu."}
+{"sentence_id": "s512057_85_0", "keep": [0, 1], "drop": [], "add": [{"label": "PERSON", "text": "Ngô Đình Diệm"}], "notes": "'Ngo Dinh Diem' bi thieu; 'Tran Van Don' + '1 thang 11' dung."}
+{"sentence_id": "s4997_230_4", "keep": [], "drop": [], "add": [{"label": "LOCATION", "text": "Versailles"}, {"label": "DYNASTY", "text": "triều đình Nguyễn"}], "notes": "'Versailles' + 'trieu dinh Nguyen' bi thieu."}
+{"sentence_id": "s283212_68_0", "keep": [0, 1], "drop": [], "add": [{"label": "PERSON", "text": "Lê Hữu Từ"}], "notes": "'Le Huu Tu' bi thieu."}
+{"sentence_id": "s19506756_83_0", "keep": [], "drop": [], "add": [{"label": "LOCATION", "text": "Biên Hòa"}], "notes": "dia danh bi thieu."}
+{"sentence_id": "s42008_23_0", "keep": [], "drop": [], "add": [], "notes": "cau danh fragment, khong co entity ro rang -> giu nguyen khong mention."}
+{"sentence_id": "s3678090_10_2", "keep": [], "drop": [], "add": [], "notes": "khong co 'Bien Hoa' trong cau nay (review sai) -> bo sung rong, khong co entity ro rang."}

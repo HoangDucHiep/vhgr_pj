@@ -1,0 +1,94 @@
+# Mapping property Wikidata → quan hệ KG (Phase 7 — D1 phần 1)
+#
+# Đây là **nguồn sự thật** cho mapping property → quan hệ. Không hard-code
+# trong Python. Đối chiếu `docs/04-schema-knowledge-graph.md` §6.
+#
+# ---------------------------------------------------------------------------
+# Spec của một property
+# ---------------------------------------------------------------------------
+#   relation:     tên quan hệ trong 18 quan hệ đóng (`src/common/schemas.py`)
+#   direction:    "forward"  — subject → object giữ nguyên
+#                 "inverse"  — đảo subject ↔ object (P40: con → cha)
+#                 "symmetric"— quan hệ đối xứng (P3373: anh em)
+#                 "year"     — object là **giá trị năm** (P569/P570),
+#                               không phải entity; grounding phải tìm chuỗi
+#                               năm trong câu bằng chứng.
+#   object_type:  loại node KG của object khi grounding bằng **tên**
+#                 (dùng để mint `entity_id` đúng loại — `make_entity_id`).
+#                 Bỏ trống = "person".
+#   symmetric:    true nếu quan hệ nằm trong `SYMMETRIC_RELATIONS`
+#                 (dùng để chuẩn hoá orientation khi nạp KG).
+#
+# ---------------------------------------------------------------------------
+# Hướng — đã kiểm chứng trên corpus (15/11/2026)
+# ---------------------------------------------------------------------------
+#   P22 (father)  : forward  — con → cha      (đúng `docs/04` §3.1)
+#   P25 (mother)  : forward  — con → mẹ
+#   P26 (spouse)  : forward  — chồng → vợ
+#   P40 (child)   : inverse  — Wikidata nói cha → con; KG cần con → cha
+#   P3373 (sibling): symmetric
+#   P19/P20       : forward  — person → place
+#   P39           : forward  — person → title
+#   P1344/P710    : forward  — person → event
+#   P569/P570     : year     — person → year_<năm>
+#
+# ---------------------------------------------------------------------------
+# Properties
+# ---------------------------------------------------------------------------
+properties:
+  # --- Gia đình ---
+  P22: {relation: cha_cua, direction: forward}
+  P25: {relation: me_cua, direction: forward}
+  P26: {relation: vo_cua, direction: forward}
+  P3373: {relation: anh_em_cua, direction: symmetric}
+  # `P40` (child) là nghịch đảo của `cha_cua` — xem `docs/04` §3.1.
+  P40: {relation: cha_cua, direction: inverse}
+
+  # --- Nơi chốn ---
+  P19: {relation: sinh_tai, direction: forward, object_type: place}
+  P20: {relation: mat_tai, direction: forward, object_type: place}
+  P551: {relation: sinh_tai, direction: forward, object_type: place}
+
+  # --- Chức vụ ---
+  P39: {relation: giu_chuc_vu, direction: forward, object_type: title}
+
+  # --- Chiến tranh / sự kiện ---
+  P1344: {relation: tham_gia_tran, direction: forward, object_type: event}
+  P710: {relation: tham_gia_tran, direction: forward, object_type: event}
+
+  # --- Năm (object là giá trị năm, không phải entity) ---
+  P569: {relation: sinh_nam, direction: year}
+  P570: {relation: mat_nam, direction: year}
+
+# ---------------------------------------------------------------------------
+# Hướng mở rộng (dùng khi chạy `build_distant_supervision --extended`)
+# ---------------------------------------------------------------------------
+# Đo trên corpus 15/11/2026: các property dưới đây **chỉ** sinh tổng cộng
+# 59 mẫu grounded (P1344/P710 đã tính ở trên) → **không đủ để đóng Gap**,
+# nên mặc định KHÔNG bật. Xem `docs/10-nhat-ky/phase-07.md` §4.
+extended_properties:
+  P166: {relation: danh_bai, direction: forward, object_type: event}
+  P112: {relation: lap_ra, direction: forward, object_type: dynasty}
+  P607: {relation: tham_gia_tran, direction: forward, object_type: event}
+  P463: {relation: thuoc_trieu_dai, direction: forward, object_type: dynasty}
+  P361: {relation: thuoc_trieu_dai, direction: forward, object_type: dynasty}
+  P276: {relation: dien_ra_tai, direction: forward, object_type: place}
+
+# ---------------------------------------------------------------------------
+# Ngưỡng Gate của Phase 7 (docs/09 §Phase 7)
+# ---------------------------------------------------------------------------
+gates:
+  min_positive: 10000
+  max_neg_pos_ratio: 1.0
+  min_relations_with_positive: 8
+  max_negatives_per_positive: 1
+
+# ---------------------------------------------------------------------------
+# Ngưỡng grounding
+# ---------------------------------------------------------------------------
+grounding:
+  # Chuỗi năm dạng "1753" được tìm trong câu bằng chứng cho `sinh_nam`/`mat_nam`.
+  year_min_digits: 3
+  year_max_digits: 4
+  # Độ dài tối đa của chuỗi năm (4 ký tự) để tránh khớp nhầm số dài.
+  year_token_max_len: 4

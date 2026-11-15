@@ -342,3 +342,339 @@ theo từ khoá với **ưu tiên cụm dài** và **danh sách cụm loại tr�
 
 **Hệ quả:** bảng map có **~2.400 lớp**, phủ **94,2%** QID mục tiêu.
 Chi tiết: `reports/deviations.md` D-035.
+
+---
+
+## D-044 — Mint `entity_id` sớm ở Phase 6 (không chờ Phase 9)
+
+**Ngày:** 15/11/2026 · **Trạng thái:** đã chốt
+
+**Bối cảnh:** 62.462 named mention có tên nhưng chưa có trong KB Phase 3.
+Không có `entity_id` thì không đo được resolve rate, và Phase 7/9 sẽ phải mint lại.
+
+**Quyết định:** mint `entity_id` ngay ở Phase 6 bằng `make_entity_id(type_ner, name)`
+— **đúng hàm Phase 9 sẽ dùng** → id giống hệt, tái lập được.
+
+**Hệ quả:** `coref_resolved.jsonl` dùng id giống hệt Phase 9 sẽ sinh.
+
+---
+
+## D-045 — `article_subject` nằm ở file riêng
+
+**Ngày:** 15/11/2026 · **Trạng thái:** đã chốt
+
+**Quyết định:** `data/interim/article_subjects.jsonl` (1 record/doc), không nhân bản
+vào `coref_resolved.jsonl`.
+
+**Lý do:** output contract của `coref_resolved.jsonl` đã chốt; thêm trường vào
+186.960 record là rủi ro không cần thiết.
+
+---
+
+## D-046 — Bỏ `"y"` khỏi từ điển danh xưng
+
+**Ngày:** 15/11/2026 · **Trạng thái:** đã chốt
+
+**Đo được:** 205/401 span "y" trong corpus là **false-positive** ("y tế",
+"Trường Y", "y học"). Giữ "y" sẽ làm hỏng cả G3 lẫn G5.
+
+---
+
+## D-047 — Điều kiện R3: dùng như **tiên đề**, không giới hạn "đoạn không có PERSON"
+
+**Ngày:** 15/11/2026 · **Trạng thái:** đã chốt · **sai lệch có chủ đích** so với `docs/09`
+
+**Đặc tả** (`docs/09` §Phase 6): *"R3 — Chủ thể bài: dùng khi đoạn **không** có
+entity `PERSON` nào"*.
+
+**Đo được** (9 biến thể ablation trên gold 100 câu):
+
+| Biến thể | Điều kiện R3 | G5 | G3 |
+|---|---|---|---|
+| B (đã chọn) | R3 là tiên đề (dùng luôn) | **0,8729** | 69,62% |
+| H / I (bám sát đặc tả) | chỉ khi đoạn không có `PERSON` | **0,6864** | 66,76% |
+
+**Quyết định:** giữ điều kiện linh hoạt. Thêm cờ `coref.r3_requires_no_person`
+(mặc định `false`) để **đo được** biến thể bám sát đặc tả.
+
+**Lý do:** đặc tả ở mức ý tưởng. Điều kiện "đoạn không có `PERSON`" giới hạn
+R3 vào đoạn trống → mất phần lớn giá trị của tiên đề chủ thể bài (−16,65 điểm G5).
+
+**Công khai:** `reports/deviations.md` D-047 — sai lệch **có chủ đích**, có số liệu
+so sánh, không phải "quên làm".
+
+---
+
+## D-048 — Đại từ số nhiều → `null` + `ambiguous`
+
+**Ngày:** 15/11/2026 · **Trạng thái:** đã chốt
+
+**Hiện tượng đo được:** "các ông", "các triều vua Trần", "các vua Trần Thái Tông" —
+đây là **số nhiều**, không tham chiếu một thực thể đơn lẻ.
+
+**Quyết định:** dò dấu hiệu số nhiều (`các`) đứng trước đại từ → trả `null`,
+`resolved_by="ambiguous"`.
+
+**Lý do:** gắn 1 entity đơn lẻ cho đại từ số nhiều là **sai** — vi phạm nguyên tắc
+không bịa. Ảnh hưởng: **5.201 mention** chuyển từ "gắn sai" sang "bỏ qua".
+
+---
+
+## D-049 — R3 chỉ dùng cho đại từ nhãn `PERSON` khi chủ thể là **người**
+
+**Ngày:** 15/11/2026 · **Trạng thái:** đã chốt
+
+**Hiện tượng:** trong bài về **sự kiện** ("Đảo chính Việt Nam Cộng hòa 1963"),
+"ông" bị gắn nhầm sang `ent_dao_chinh_viet_nam_cong_hoa_1963` — entity sự kiện,
+không phải người.
+
+**Quyết định:** R3 chỉ kích hoạt khi `subject.type == "person"`.
+
+---
+
+## D-050 — `p31_direct` là tín hiệu **dự phòng cuối cùng**
+
+**Ngày:** 15/11/2026 · **Trạng thái:** đã chốt
+
+**Bối cảnh:** lớp P31 trực tiếp của Wikidata (`Q5` = human) có độ chính xác
+**cao hơn** `infobox_type`. Đo được **26 bài lệch**, ví dụ: Hồ Bắc (nhạc sĩ),
+Trần Long Ẩn, Đa Minh Phạm Trọng Khảm, Giuse Hoàng Lương Cảnh.
+
+**Vấn đề:** ground-truth của Gate G6 theo plan (`docs/09` §Phase 6) là
+`infobox_type`/`wikidata_signal`. Đo được khi ưu tiên P31:
+
+| Thứ tự | G6 | G3 |
+|---|---|---|
+| `infobox_type` → … → `p31_direct` (cuối) | **1,0000** | **69,62%** |
+| `p31_direct` → `infobox_type` → … | 0,3859 | 60,30% |
+
+**Quyết định:** `p31_direct` đứng **cuối cùng**, chỉ dùng khi 3 tín hiệu chính
+không có gì. Ghi nhận đây là **giới hạn của ground-truth G6**, không phải giới
+hạn của hệ thống — nêu công khai trong `reports/deviations.md`.
+
+---
+
+## D-051 — R3 và R6 phải **tôn trọng giới tính**
+
+**Ngày:** 15/11/2026 · **Trạng thái:** đã chốt
+
+**Hiện tượng (phát hiện khi viết test):** R6 (fallback "đoạn có đúng 1 PERSON")
+gắn entity **nữ** cho đại từ "ông" và ngược lại — vi phạm Gate G4.
+
+**Quyết định:** cả R3 và R6 đều lọc theo giới tính đại từ; nếu entity duy nhất
+mâu thuẫn giới tính → trả `null` + `ambiguous` (an toàn hơn gắn sai).
+
+---
+
+## D-052 — Thứ tự ưu tiên quy tắc R phải **cấu hình được**, không hard-code
+
+**Ngày:** 15/11/2026 · **Trạng thái:** đã chốt
+
+**Bối cảnh:** Bảng ablation đầu tiên của Phase 6 dùng **monkeypatch** (vá hàm
+`_resolve_pronoun`) để đảo R3. Bản vá chạy R3 **trước** chốt an toàn "đại từ
+số nhiều" (R5-pre) → đo **sai**, ra con số 0,7797 không tồn tại trên hệ thống
+thật, và khiến kết luận thiết kế **đảo ngược**.
+
+**Quyết định:** tách mỗi quy tắc thành một nhánh `_apply_pronoun_rule()` và
+điều phối theo `coref.pronoun_rule_order` (mặc định `[r3, r1a, r1b, r5, r6]`).
+Ablation ghi đè mục này vào config → chạy trên **đúng đường dẫn code thật**.
+
+**Lý do:** mọi con số trong báo cáo phải **tái lập được từ code đang chạy**.
+Một ablation chạy trên đường dẫn khác với production là **số liệu giả**.
+
+**Hệ quả:** 9 biến thể đo lại; kết luận đảo ngược (R3 trước R1a tốt hơn,
+G5 0,8475 → 0,8729). Thêm 5 test ở `tests/test_coref.py`
+(`TestConfigurableRuleOrder`).
+
+---
+
+## D-053 — R1b chỉ dùng khi đoạn có **đúng 1 người** (đo được, nhưng **không** bật)
+
+**Ngày:** 15/11/2026 · **Trạng thái:** đã chốt (giữ cờ, mặc định tắt)
+
+**Bối cảnh:** R1b ("người cuối cùng được nhắc ở câu trước") là quy tắc **yếu
+nhất**: đưa nó lên đầu làm G5 tụt còn 0,8390 (biến thể D). Nguyên nhân quan
+sát được: ứng viên thường là người *được nhắc* ("đời Thiệu Trị", "Sau khi
+Thành Thái lên ngôi"), không phải chủ thể *đang được nói đến*.
+
+**Đo được:** thêm cờ `coref.r1b_unique_only` → G5 0,8475 → 0,8559 (biến thể E).
+Kiểm định McNemar: **p = 1,00** (chỉ 1 mention đổi chiều) → **không có ý nghĩa
+thống kê**.
+
+**Quyết định:** **không bật** trong cấu hình chính (`r1b_unique_only: false`).
+Giữ cờ + 2 test làm **phương án dự phòng đo được** cho Phase 7+ (khi có bộ
+gold lớn hơn).
+
+---
+
+## D-054 — Công khai sai lệch có chủ đích với `docs/09` (điều kiện R3)
+
+**Ngày:** 15/11/2026 · **Trạng thái:** đã chốt
+
+**Quyết định:** ghi sai lệch D-047 (điều kiện R3) vào `reports/deviations.md` với
+đầy đủ số liệu so sánh (biến thể H/I: G5 0,6864 vs 0,8729), **không** sửa số
+liệu để "cho xanh" và **không** im lặng lệch khỏi đặc tả.
+
+**Lý do:** nguyên tắc của dự án — lệch kế hoạch phải được **công khai kèm số
+liệu**, để người đọc báo cáo biết giới hạn nào là do hệ thống, giới hạn nào là
+do đặc tả.
+
+---
+
+## D-055 — Báo cáo `coref_quality.md` phải lược bỏ ký tự Hán (Trung Quốc)
+
+**Ngày:** 15/11/2026 · **Trạng thái:** đã chốt
+
+**Quyết định:** `src/coref/quality_report.py` thay mọi ký tự Hán trong văn bản
+corpus bằng `<bỏ dấu>` trước khi render ra Markdown (dùng cùng ký hiệu với
+`src/preprocess/extract_lead_dates.py`).
+
+**Lý do:** corpus Wikipedia tiếng Việt trích nguyên văn chữ Hán trong ngoặc
+(vd. `chữ Hán: <chu Han>`) — đo được **1.030/2.441 bài** có ký tự Hán trong
+`clean_text` (23.832 ký tự). Báo cáo Phase 6 render **nguyên văn** câu mẫu
+nên đã làm phát sinh ký tự Trung Quốc trong `reports/coref_quality.md` — vi
+phạm quy tắc `.cursor/rules/no-chinese.mdc` ("tuyệt đối không sử dụng tiếng
+Trung trong bất kỳ phản hồi, giải thích, tài liệu nào").
+
+**Cách làm:** hàm `sanitize_han()` trong `src/coref/quality_report.py`, áp cho
+cả phần text câu và phần text mention; thêm 3 test regression
+(`tests/test_coref.py::TestNoChineseInReport`) chặn hồi quy — trong đó có
+test đọc trực tiếp file `reports/coref_quality.md` đã sinh.
+
+**Ảnh hưởng:** `coref_resolved.jsonl` **không** đổi (chỉ là lớp render báo
+cáo) → MD5 vẫn `cb86fd32fbdb679c0213a29030f76743`, Gate G1–G8 không đổi. Số
+test suite: 436 → **439**.
+
+**Bài học:** bước rà soát "không có tiếng Trung" phải quét **cả file sinh ra
+tự động**, không chỉ file viết tay — nội dung do corpus mang vào sẽ lọt qua
+mắt thường.
+
+
+---
+
+## D-056 — Hợp nhất **3 nguồn** nhãn POSITIVE (Wikidata + Infobox + Lead)
+
+**Ngày:** 15/11/2026 · **Trạng thái:** đã chốt
+
+**Quyết định:** `data/interim/re_positive.jsonl` gộp 3 nguồn — Wikidata
+(12.197 mẫu), Infobox Phase 3 (3.361), Lead Phase 3 (22). Dedupe theo khoá
+4 thành phần `(sentence_id, subject, relation, object)`, ưu tiên nguồn
+`wikidata > infobox > lead`.
+
+**Lý do:** Đo được — Wikidata thuần cho **12.197** mẫu / **10** quan hệ và
+thiếu 6 quan hệ (`ke_vi`, `thuoc_trieu_dai`, `chi_huy_tran`, `dong_doi_tai`,
+`lap_ra`, `dien_ra_tai`) mà Wikidata không có. Chỉ hợp nhất nguồn nội bộ mới
+đạt **15.580** mẫu / **17** quan hệ → vượt Gate G1 (10.000) **55,8%** và Gate
+G3 (8 quan hệ) hơn 2×.
+
+**Ảnh hưởng:** `src/re/ground_triples.py` có 2 hàm grounding riêng
+(`ground_wikidata_pairs`, `ground_triples` cho infobox/lead) + bước merge.
+Artifact có trường `source` để truy vết nguồn nhãn.
+
+**File đã cập nhật:** `src/re/ground_triples.py`, `src/re/build_re_dataset.py`,
+`docs/DECISIONS.md`.
+
+---
+
+## D-057 — Negative "an toàn": chỉ cặp **có cả hai QID** và **không** mang quan hệ
+
+**Ngày:** 15/11/2026 · **Trạng thái:** đã chốt
+
+**Quyết định:** Negative chỉ lấy từ cặp entity đồng câu mà **cả hai đầu đều có
+QID** và **không** cặp QID nào của chúng mang quan hệ nào trong 13 property
+lõi. Quan hệ đối xứng được coi là "đã có" theo **cả hai chiều**.
+
+**Lý do:** Đo được trên 86.934 cặp entity đồng câu — **12.562** cặp an toàn
+(cả 2 đầu có QID + không có quan hệ), **1.815** cặp bị loại vì đang mang
+quan hệ, **72.557** cặp bị loại vì một đầu không rõ QID. "Không có trong
+Wikidata" ≠ "không có trong thực tế" → cho phép cặp "không rõ" vào negative
+sẽ tạo false negative ở tỉ lệ rất cao.
+
+**Ảnh hưởng:** `collect_negative_candidates()` trong `src/re/build_re_dataset.py`
+lọc trước khi lấy mẫu; có test
+`test_negative_excludes_pairs_holding_a_relation` và
+`test_negative_excludes_pairs_without_qid`.
+
+**File đã cập nhật:** `src/re/build_re_dataset.py`, `tests/test_re_dataset.py`,
+`docs/DECISIONS.md`.
+
+---
+
+## D-058 — Tái dùng `src/preprocess/wikidata_query.py`, không viết client SPARQL mới
+
+**Ngày:** 15/11/2026 · **Trạng thái:** đã chốt
+
+**Quyết định:** `src/re/build_distant_supervision.py` dùng `run_query()` của
+Phase 1 (fallback QLever → WDQS, throttle, retry, cache đĩa) thay vì tạo
+`src/re/wikidata_client.py` như gợi ý trong `docs/09`. Vì WDQS **và** QLever
+đều không trả tên property khi dùng `UNION` (biến predicate rơi khỏi kết
+quả), phải hỏi **từng property một**, chia lô 200 QID.
+
+**Lý do:** Module Phase 1 đã có đủ toàn bộ cơ chế (throttle, retry, cache,
+fallback endpoint) — viết thêm sẽ phải sao chép logic và tạo hai nơi sửa khi
+WDQS lại 429. Số liệu đo được: 428 file cache; chạy lại builder = **0 request
+HTTP** (97,7 s) → Gate G5 đạt.
+
+**Ảnh hưởng:** Query chia theo property × chunk triều đại; cache dùng chung
+`data/interim/wikidata_cache/`. Cần thêm 2 hàm chuẩn hoá: `_binding_value()`
+(bóc `.value` cho cả 2 endpoint) và `_clean_label()` (bỏ `"` và hậu tố `@vi`).
+
+**File đã cập nhật:** `src/re/build_distant_supervision.py`,
+`configs/default.yaml` (khối `re:`), `docs/DECISIONS.md`.
+
+---
+
+## D-059 — Hướng `P40` là `inverse` (Wikidata nói "cha → con", KG cần "con → cha")
+
+**Ngày:** 15/11/2026 · **Trạng thái:** đã chốt
+
+**Quyết định:** `P40` (child) ánh xạ tới `cha_cua` với `direction: inverse` —
+grounding đảo subject ↔ object.
+
+**Lý do:** Nếu giữ `forward`, nhãn `cha_cua` sẽ bị **đảo ngược** — mô hình
+học "cha là con". Đo được: `P40` sinh 1.083 cặp thô → 1.577 mẫu ground; giữ
+forward sẽ gán nhãn sai chiều cho toàn bộ 1.577 mẫu.
+
+**Ảnh hưởng:** `configs/wikidata_relations.yaml` (`P40: direction: inverse`),
+`src/re/ground_triples.py` (đảo hai đầu khi `inverse`).
+
+**File đã cập nhật:** `configs/wikidata_relations.yaml`,
+`src/re/ground_triples.py`, `tests/test_re_dataset.py`, `docs/DECISIONS.md`.
+
+## D-060 — `re_train.jsonl` là **record theo câu** với mảng `pairs` lồng (đồng bộ `docs/09` + `data-contracts`)
+
+**Ngày:** 15/11/2026 · **Trạng thái:** đã chốt
+
+**Quyết định:** `data/interim/re_train.jsonl` ghi **1 record/câu** (không phải
+1 record/cặp), gồm `run_id`, `sentence_id`, `doc_id`, `page_id`, `split`, `text`
+và mảng `pairs` lồng. Nhãn là **chuỗi** `"POSITIVE"`/`"NEGATIVE"`. Mỗi cặp
+mang `mention` (dạng bề mặt trong câu, giữ dấu), `entity_id`, `name` (tên chuẩn)
+và offset `start`/`end` thỏa `text[start:end] == mention`.
+
+**Lý do:** Bản đầu của phase ghi **phẳng theo cặp** với nhãn số `1`/`0` và
+không có `run_id`. Điều đó **vi phạm 3 hợp đồng đã chốt**:
+
+1. `docs/09` §Phase 7 (output contract) và `.cursor/rules/data-contracts.mdc`
+   §Định dạng chung yêu cầu `run_id` cho mọi record.
+2. Lệnh kiểm thử **chính thức** trong `docs/09` và plan đọc
+   `r['pairs']` / `p['label']=='POSITIVE'` → lệnh này **crash** với bản phẳng.
+3. `data-contracts.mdc` §Offset yêu cầu offset luôn kiểm được
+   `text[start:end] == span_text` → bản phẳng không có offset nào.
+
+Ngoài ra, gom theo câu giúp Phase 8 chỉ cần **tokenize `text` một lần** cho
+mọi cặp thay vì lặp lại theo từng cặp.
+
+**Ảnh hưởng:** `src/re/build_re_dataset.py` (sinh record theo câu),
+`src/re/re_dataset_stats.py` + `scripts/re_gate_check.py` (đọc mảng `pairs`
+lồng), `src/re/ground_triples.py` (mang offset span + tên có dấu),
+`tests/test_re_dataset.py` (test contract mới), `docs/09` §Phase 7 (contract
+được viết lại cho khớp), `AGENTS.md` §7.
+
+**Số liệu đo được:** 12.877 câu / 29.957 cặp; **59.914/59.914** offset thỏa
+`text[start:end] == mention` (0 sai lệch, 0 thiếu span) — trước khi sửa có
+**43.841 sai lệch** và **455** cặp thiếu span.
+
+**File đã cập nhật:** `src/re/build_re_dataset.py`, `src/re/ground_triples.py`,
+`src/re/re_dataset_stats.py`, `scripts/re_gate_check.py`,
+`tests/test_re_dataset.py`, `docs/09-ke-hoach-thuc-thien.md`, `AGENTS.md`,
+`docs/DECISIONS.md`.

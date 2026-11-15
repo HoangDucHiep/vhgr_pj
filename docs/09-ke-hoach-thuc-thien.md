@@ -500,14 +500,29 @@ PY
 - `pageid_to_qid.json` (Phase 1).
 - Bộ QID 9 triều đại đã verify (mục 0) nạp vào `configs/wikidata_queries.yaml`.
 
-**Output contract** — `data/interim/re_train.jsonl`:
+**Output contract** — `data/interim/re_train.jsonl` (1 record **theo câu**, có `run_id`):
 ```json
-{"sentence_id":"s1_0_3","text":"Lê Lợi là con của Lê Khánh Dư.",
- "pairs":[{"subject":{"mention":"Lê Lợi","entity_id":"ent_le_loi_1a2b3c4d"},
+{"run_id":"r20261115-161600","sentence_id":"s1_0_3","doc_id":"doc_1","page_id":1,
+ "split":"train","text":"Lê Lợi là con của Lê Khánh Dư.",
+ "pairs":[{"subject":{"mention":"Lê Lợi","entity_id":"ent_le_loi_1a2b3c4d","name":"Lê Lợi","start":0,"end":6},
+           "object":{"mention":"Lê Khánh Dư","entity_id":"ent_le_khanh_du_...","name":"Lê Khánh Dư","start":16,"end":27},
+           "relation":"cha_cua","label":"POSITIVE","source":"wikidata","property":"P22"},
+          {"subject":{"mention":"Lê Lợi","entity_id":"ent_le_loi_1a2b3c4d"},
            "object":{"mention":"Lê Khánh Dư","entity_id":"ent_le_khanh_du_..."},
-           "relation":"cha_cua","label":"POSITIVE"}]}
+           "relation":"me_cua","label":"NEGATIVE","source":"distant_supervision"}]}
 ```
 > Mỗi câu có nhiều cặp; cặp không có quan hệ → `"label":"NEGATIVE"`.
+
+Quy tắc bắt buộc cho contract này:
+
+- **1 record/câu** (không phải 1 record/cặp) → Phase 8 tokenize `text` một lần cho mọi cặp.
+- `label` là **chuỗi** `"POSITIVE"`/`"NEGATIVE"` (không phải `1`/`0`).
+- Mọi record có `run_id` (`r<YYYYMMDD-HHMMSS>`) — theo `.cursor/rules/data-contracts.mdc` §Định dạng chung.
+- `split` ∈ `train`/`dev`/`test` theo `data/splits/splits.json` (chia theo bài → không rò rỉ).
+- Mỗi cặp có `source` (wikidata / infobox / lead / distant_supervision) để truy nguồn nhãn.
+- Offset `start`/`end` là **chỉ số ký tự Python** trong `text` của record; phải thỏa `text[start:end] == mention` (xem `data-contracts.mdc` §Offset).
+- `mention` là **dạng bề mặt trong câu** (giữ dấu); `name` là tên chuẩn của entity trong KG.
+- `relation` của mẫu NEGATIVE vẫn là quan hệ **được hỏi** (candidate relation), không phải quan hệ "không có".
 
 **Việc phải làm**
 1. `src/re/wikidata_client.py`: bọc SPARQL endpoint `https://query.wikidata.org/sparql`.
@@ -530,9 +545,11 @@ PY
 **Lệnh kiểm thử**
 ```bash
 python -m src.re.build_distant_supervision --config configs/default.yaml
+python -m src.re.ground_triples --config configs/default.yaml
 python -m src.re.build_re_dataset --config configs/default.yaml
 python -m src.re.re_dataset_stats
 pytest -q tests/test_re_dataset.py
+python scripts/re_gate_check.py
 python - <<'PY'
 import json,collections
 rows=[json.loads(l) for l in open('data/interim/re_train.jsonl')]

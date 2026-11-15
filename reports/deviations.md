@@ -404,3 +404,272 @@
 - Ảnh hưởng: sau khi sửa, chỉ mục category phủ **10.264 / 15.580** đích link (trước: 10.791 → sai nhãn); phân bố entity đổi: PERSON 36.477 → **37.242** (+765), TITLE 2.887 → **2.170** (−717), TIME 57.184 → **53.654** (−3.530). Gate 5 (baseline F1) **tăng**: gazetteer dev F1 **0,7990** (giữ nguyên sau sửa lần cuối), và `PERSON` lại là lớp phổ biến nhất trong nhóm entity gắn từ link (37.242 > 30.818 LOCATION).
 - Xử lý: Bổ sung `\b` vào **mọi** nhánh thay thế trong `CATEGORY_PATTERNS`; tách "Quan lại nhà X"/"Hoàng đế" sang `PERSON`; bỏ mẫu `^nam (sinh|mat|tu)`; thêm `^nha (hoat dong|...)` vào `PERSON`; chuyển `^quan l[aai]i$` (đứng một mình) sang `TITLE`.
 - Cập nhật file: `src/ner/category_types.py`, `reports/phase_04_report.md`, `docs/10-nhat-ky/phase-04.md`
+## D-036 — Huấn luyện offline trên Kaggle GPU thay vì máy local (Phase 5 — 15/11/2026)
+- Ngày: 2026-11-15
+- Phase: 5
+- Loại: kỹ thuật
+- Kế hoạch: `docs/09` §Phase 5 không chỉ định nơi chạy.
+- Thực tế: máy local **không có GPU** (`torch.cuda.is_available() = False`, 8 CPU core). Benchmark CPU đo được: `phobert-base` bs=64/len48 → ~9 seq/s → ≈ 4,6 h/epoch; `max_len=256` → ≈ 29 h/epoch → **không khả thi**.
+- Lý do: nguyên tắc 7 của `AGENTS.md` §5 — việc nặng (fine-tune) chạy offline, ghi artifact; tầng online chỉ đọc artifact.
+- Ảnh hưởng: toàn bộ train + suy luận chạy trên Kaggle kernel; code viết chung cho local CPU (smoke test) và Kaggle GPU.
+- Xử lý: `src/ner/train_ner.py`, `src/ner/infer_ner.py` nhận `--config/--model/--out/--batch-size/...`; `scripts/make_kaggle_notebook.py` sinh notebook từ tham số; `scripts/poll_kaggle_ner.sh` theo dõi + tải artifact.
+- Cập nhật file: `src/ner/train_ner.py`, `src/ner/infer_ner.py`, `scripts/make_kaggle_notebook.py`, `scripts/poll_kaggle_ner.sh`, `reports/phase_05_report.md`, `docs/10-nhat-ky/phase-05.md`
+
+## D-037 — Fast tokenizer bắt buộc, kèm kiểm tra vocab (Phase 5 — 15/11/2026)
+- Ngày: 2026-11-15
+- Phase: 5
+- Loại: kỹ thuật
+- Kế hoạch: `docs/09` §Phase 5 không chỉ định loại tokenizer.
+- Thực tế: `AutoTokenizer.from_pretrained("vinai/phobert-base")` trả **slow** `PhobertTokenizer` → **không có `word_ids()`** → không map được nhãn word→subword (đã kiểm chứng raise `ValueError`).
+- Lý do: cần `word_ids()` để gán nhãn BIO ở mức word (subword đầu mang nhãn word, subword sau mang `I-X`).
+- Xử lý: `src/ner/data_convert.py::load_tokenizer` dùng `PreTrainedTokenizerFast` **có** kiểm tra `len(tokenizer) <= config.vocab_size`, nếu không → `RuntimeError` rõ ràng.
+- Ghi chú (L9): fast tokenizer của `vinai/phobert-base` có vocab **66.119** ≠ kích thước embedding **64.001** → sinh id vượt embedding → `IndexError` khi suy luận. Vì vậy repo dùng **slow tokenizer** bọc trong `WordTokenizer` (token hóa **theo word**) → quyết định D-040.
+- Cập nhật file: `src/ner/data_convert.py`, `reports/phase_05_report.md`, `docs/10-nhat-ky/phase-05.md`
+
+## D-038 — Bundle weight model trong dataset Kaggle private (Phase 5 — 15/11/2026)
+- Ngày: 2026-11-15
+- Phase: 5
+- Loại: kỹ thuật
+- Kế hoạch: `docs/09` §Phase 5 nói "mount dataset".
+- Thực tế: kernel Kaggle **không có DNS** ra internet → `from_pretrained("vinai/phobert-base")` không tải được.
+- Xử lý: `scripts/pack_kaggle_dataset.py` đóng gói `models_hf/phobert-base` + `models_hf/phobert-large` vào dataset private `vhgr-ner-data`; kernel mount dataset, dùng đường dẫn local.
+- Cập nhật file: `scripts/pack_kaggle_dataset.py`, `scripts/make_kaggle_notebook.py`, `reports/phase_05_report.md`, `docs/10-nhat-ky/phase-05.md`
+
+## D-039 — `phobert-large`: giảm batch + gradient accumulation (Phase 5 — 15/11/2026)
+- Ngày: 2026-11-15
+- Phase: 5
+- Loại: kỹ thuật
+- Thực tế: `torch.OutOfMemoryError: Tried to allocate 32.00 MiB. GPU 1 has a total capacity of 14.56 GiB` tại `batch_size=32, max_len=256` trên T4.
+- Xử lý: `batch_size=8`, `eval_batch_size=16`, `gradient_accumulation_steps=4` (effective batch = 32, **giữ nguyên** so với arm `base`), suy luận `micro_batch_size=8` + `torch.autocast(float16)`.
+- Cập nhật file: `notebooks/kaggle/ner_train_phobert_large*/notebook.ipynb`, `scripts/make_kaggle_notebook.py`, `reports/phase_05_report.md`, `docs/10-nhat-ky/phase-05.md`
+
+## D-040 — Token hóa **theo word** ở cả train lẫn infer (Phase 5 — 15/11/2026)
+- Ngày: 2026-11-15
+- Phase: 5
+- Loại: kỹ thuật
+- Kế hoạch: `docs/09` §Phase 5 nói "token hóa raw text → `offset_mapping` là chỉ số ký tự thật".
+- Thực tế: token hóa raw text khác token hóa word ở **1.883 / 2.000** câu đo được (do xử lý khoảng trắng/dấu câu) → phân bố subword giữa train và infer **lệch** → mô hình suy luận trên phân bố chưa từng thấy.
+- Xử lý: cả train lẫn infer dùng chung `src.ner.build_silver.tokenize` → phân bố subword giống hệt; span ký tự suy ra từ `word_starts`/`word_ends` của chính hàm đó → đảm bảo `text[start:end] == entity["text"]` **100%** (không cần đoán lại offset từ `offset_mapping`).
+- Kết quả đo được: **0 / 143.108** span sai offset trên toàn corpus.
+- Cập nhật file: `src/ner/data_convert.py`, `src/ner/infer_ner.py`, `reports/phase_05_report.md`, `docs/10-nhat-ky/phase-05.md`
+
+## D-041 — F1 dev 0,6832 < ngưỡng Gate 0,85 — chấp nhận minh bạch, không train lại (Phase 5 — 15/11/2026)
+- Ngày: 2026-11-15
+- Phase: 5
+- Loại: ngưỡng chất lượng
+- Kế hoạch: `docs/09` §Phase 5 Gate yêu cầu F1 dev ≥ **0,85**.
+- Thực tế: arm `base` đạt micro F1 **0,6832** (macro 0,5589) trên dev 19.049 câu.
+- Nguyên nhân gốc (đo được, không phải suy đoán): audit 100 câu dev cho thấy nhãn bạc **thiếu 66,67%** mention (60 mention bị thiếu / 90 mention có) và **sai 12,22%** → mọi mô hình đều bị trần ở đại lượng này. Bằng chứng quyết định: F1 so với **bộ gold tay** = **0,6329** ≈ F1 so với nhãn bạc = 0,6832 → mô hình học **đúng** phần nhãn bạc có; vấn đề ở **recall**.
+- Xử lý: theo chỉ đạo người dùng (mục tiêu thực tế 60–70%, không train lại vì thời gian) → **chấp nhận** 0,6832, ghi rõ số thực tế, **không** sửa số liệu để "cho xanh". Cải thiện sẽ đến từ việc cải thiện nhãn bạc, không phải từ model.
+- Cập nhật file: `reports/phase_05_report.md`, `docs/10-nhat-ky/phase-05.md`, `docs/PROGRESS.md`
+
+## D-042 — Arm `large` rút gọn scope để nằm trong giới hạn 12 h/session Kaggle (Phase 5 — 15/11/2026)
+- Ngày: 2026-11-15
+- Phase: 5
+- Loại: kỹ thuật
+- Kế hoạch: `docs/09` §Phase 5 Bước 5 nói chạy 2 arm "cùng seed 42, cùng hyperparam, chỉ khác `model_name`".
+- Thực tế: scope đầy đủ của `phobert-large` (150.230 câu × 5 epoch + suy luận 186.960 câu) ước tính ≈ 15 h train + ≈ 20 h infer → **> 35 h**, vượt giới hạn **12 h/session** của Kaggle → kernel bị giết, mất trắng toàn bộ.
+- Xử lý: `--max-train 60000 --epochs 2`, **bỏ** cell suy luận toàn corpus. Thực tế đo được: `large` train **6.148 s** (≈ 1,71 h), kernel tổng **6.828 s**.
+- Hệ quả (công khai): 2 arm **KHÔNG cùng scope** → bảng so sánh phải ghi rõ phạm vi scope, **không** kết luận `large` tốt hơn `base`. Artifact toàn corpus lấy từ arm `base` (scope đầy đủ).
+- Cập nhật file: `scripts/make_kaggle_notebook.py`, `notebooks/kaggle/ner_train_phobert_large*/notebook.ipynb`, `docs/10-nhat-ky/so-lieu/phase-05-base-vs-large.json`, `reports/phase_05_report.md`, `docs/10-nhat-ky/phase-05.md`
+
+## D-043 — Sửa lỗi off-by-one `end_token` khi sinh bộ gold 100 câu (Phase 5 — 15/11/2026)
+- Ngày: 2026-11-15
+- Phase: 5
+- Loại: sửa lỗi nội bộ
+- Kế hoạch: `docs/09` §Phase 5 Bước 7 yêu cầu bộ gold 100 câu để đo F1 phụ.
+- Thực tế: lần đầu đo F1 trên bộ gold ra **0,0759** — bất thường so với F1 dev 0,6832.
+- Nguyên nhân gốc: `src/ner/build_silver.py::bioes_to_mentions` quy ước `end_token` **exclusive**, nhưng `scripts/ner_audit_sample.py::apply_manual_review` dùng `range(start, end + 1)` → mỗi mention bị phủ **dư 1 token** → nhãn BIO lệch → gần như mọi span đều không khớp.
+- Xử lý: (a) nhánh giữ mention → `range(start, end)`; (b) nhánh thêm tay → `_find_token_span` trả chỉ số **cuối** (inclusive) nên chuyển `end = last + 1`; (c) thêm `tests/test_ner_audit.py` (3 test) chặn hồi quy.
+- Kết quả sau sửa: F1 bộ gold **0,0759 → 0,6329** (P 0,7653 · R 0,5396 · macro 0,5029), khớp với F1 dev 0,6832 như kỳ vọng.
+- Cập nhật file: `scripts/ner_audit_sample.py`, `tests/test_ner_audit.py`, `data/eval/ner_gold_100.jsonl`, `reports/ner_gold_100_metrics.json`, `reports/ner_silver_noise_100.json`, `reports/phase_05_report.md`, `docs/10-nhat-ky/phase-05.md`
+
+---
+
+# Phase 6 — Coreference (C1, C2) — 15/11/2026
+
+## D-044 — Mint `entity_id` sớm ở Phase 6, không chờ Phase 9 (Phase 6 — 15/11/2026)
+- Ngày: 2026-11-15
+- Phase: 6
+- Loại: kỹ thuật
+- Kế hoạch: `docs/09` §Phase 6 Bước 3 nói mint `entity_id` cho named mention chưa có trong gazetteer.
+- Thực tế: triển khai đúng kế hoạch — dùng **đúng hàm** `make_entity_id(type_ner, name)` mà Phase 9 sẽ dùng → id giống hệt, tái lập được.
+- Xử lý: không cần xử lý.
+- Cập nhật file: `src/coref/resolve_coref.py`, `docs/DECISIONS.md` (D-044)
+
+## D-045 — `article_subject` nằm ở file riêng, không nhân bản vào `coref_resolved.jsonl` (Phase 6 — 15/11/2026)
+- Ngày: 2026-11-15
+- Phase: 6
+- Loại: kỹ thuật
+- Kế hoạch: `docs/09` §Phase 6 Bước 4 nói rõ output `data/interim/article_subjects.jsonl`.
+- Thực tế: file riêng, 1 record/doc: `{doc_id, title, type, entity_id, method, confidence, qid}` — 2.441 bài.
+- Xử lý: không cần xử lý; giữ nguyên output contract của `coref_resolved.jsonl`.
+- Cập nhật file: `src/coref/article_subject.py`, `src/coref/resolve_coref.py`, `docs/DECISIONS.md` (D-045)
+
+## D-046 — Bỏ `"y"` khỏi từ điển danh xưng (Phase 6 — 15/11/2026)
+- Ngày: 2026-11-15
+- Phase: 6
+- Loại: sửa lỗi dữ liệu
+- Kế hoạch: `docs/09` §Phase 6 ghi "đặc biệt không đưa `y` vào danh xưng" → đã làm đúng.
+- Thực tế: đo được 205/401 span "y" trong corpus là **false-positive** ("y tế", "Trường Y", "y học").
+- Xử lý: loại "y" khỏi `configs/honorifics.yaml`.
+- Cập nhật file: `configs/honorifics.yaml`, `docs/DECISIONS.md` (D-046)
+
+## D-047 — Điều kiện R3 **không** giới hạn ở "đoạn không có `PERSON`" (Phase 6 — 15/11/2026) — **sai lệch có chủ đích**
+- Ngày: 2026-11-15
+- Phase: 6
+- Loại: lệch đặc tả (có chủ đích, có số liệu so sánh)
+- Kế hoạch: `docs/09` §Phase 6 — *"R3 — Chủ thể bài: dùng khi đoạn **không** có entity `PERSON` nào"*.
+- Thực tế: R3 hoạt động như **tiên đề** (prior) — dùng được cả khi đoạn đã có `PERSON`.
+- Số liệu so sánh (9 biến thể ablation trên gold 100 câu, `scripts/coref_ablation.py`):
+
+| Biến thể | Điều kiện R3 | G5 | G3 |
+|---|---|---|---|
+| B (đã chọn) | R3 là tiên đề | **0,8729** (103/118) | 69,62% |
+| H | R3 chỉ khi đoạn không có `PERSON` | **0,6864** (81/118) | 66,76% |
+| I | R1a → R3(đặc tả) → R1b | **0,6864** (81/118) | 66,76% |
+
+- Xử lý: giữ điều kiện linh hoạt; thêm cờ `coref.r3_requires_no_person` (mặc định `false`) để **đo được** biến thể bám sát đặc tả.
+- Lý do: đặc tả ở mức ý tưởng; điều kiện này vô hiệu hóa phần lớn giá trị của tiên đề chủ thể bài (−16,65 điểm G5).
+- Cập nhật file: `src/coref/resolve_coref.py`, `configs/default.yaml`, `scripts/coref_ablation.py`, `docs/DECISIONS.md` (D-047, D-054), `reports/phase_06_report.md`, `docs/10-nhat-ky/phase-06.md`
+
+## D-048 — Bổ sung quy tắc "đại từ số nhiều → `null` + `ambiguous`" (Phase 6 — 15/11/2026)
+- Ngày: 2026-11-15
+- Phase: 6
+- Loại: bổ sung ngoài kế hoạch
+- Kế hoạch: bảng R0–R6 trong `docs/09` không có quy tắc cho đại từ số nhiều.
+- Thực tế: "các ông", "các triều vua Trần", "các vua Trần Thái Tông" — không tham chiếu một thực thể đơn lẻ.
+- Xử lý: dò dấu hiệu số nhiều (`các`) đứng trước đại từ → `null` + `resolved_by="ambiguous"`. Ảnh hưởng **5.201 mention**.
+- Lý do: gắn 1 entity đơn lẻ cho đại từ số nhiều là **sai** — vi phạm nguyên tắc "không bịa" (`AGENTS.md` §5.3).
+- Cập nhật file: `src/coref/honorifics.py`, `src/coref/resolve_coref.py`, `configs/honorifics.yaml`, `docs/DECISIONS.md` (D-048)
+
+## D-049 — R3 chỉ dùng cho đại từ nhãn `PERSON` khi chủ thể là **người** (Phase 6 — 15/11/2026)
+- Ngày: 2026-11-15
+- Phase: 6
+- Loại: sửa lỗi nội bộ
+- Kế hoạch: `docs/09` §Phase 6 nói R3 dùng cho type `person`/`event`/`dynasty`.
+- Thực tế: trong bài về **sự kiện** ("Đảo chính Việt Nam Cộng hòa 1963"), "ông" bị gắn nhầm sang `ent_dao_chinh_viet_nam_cong_hoa_1963`.
+- Xử lý: R3 với nhãn `PERSON` chỉ kích hoạt khi `subject.type == "person"`; với nhãn khác vẫn cho dùng `event`/`dynasty`.
+- Cập nhật file: `src/coref/resolve_coref.py`, `docs/DECISIONS.md` (D-049)
+
+## D-050 — Tín hiệu `p31_direct` (P31 trực tiếp) làm dự phòng cuối cùng (Phase 6 — 15/11/2026)
+- Ngày: 2026-11-15
+- Phase: 6
+- Loại: bổ sung ngoài kế hoạch + công khai giới hạn ground-truth
+- Kế hoạch: `docs/09` §Phase 6 Bước 4 nói suy chủ thể từ `infobox_type`/`wikidata_signal`.
+- Thực tế: lớp P31 trực tiếp của Wikidata (`Q5` = human) **chính xác hơn** `infobox_type` — đo được **26 bài lệch** (Hồ Bắc (nhạc sĩ), Trần Long Ẩn, Đa Minh Phạm Trọng Khảm, Giuse Hoàng Lương Cảnh...).
+- Vấn đề: ground-truth của Gate G6 theo plan **là** `infobox_type`/`wikidata_signal`. Đo được:
+
+| Thứ tự | G6 | G3 |
+|---|---|---|
+| `infobox_type` → `wikidata_signal` → `qid_types` → `p31_direct` (cuối) | **1,0000** | 69,62% |
+| `p31_direct` → `infobox_type` → `wikidata_signal` → `qid_types` | 0,3859 | 60,30% |
+
+- Xử lý: đặt `p31_direct` **cuối cùng**, chỉ dùng khi 3 tín hiệu chính không có gì.
+- Công khai: đây là **giới hạn của ground-truth G6**, không phải giới hạn của hệ thống — G6 đang đo sự khớp với tín hiệu Phase 1–3, không phải sự thật siêu hình.
+- Cập nhật file: `src/coref/article_subject.py`, `docs/DECISIONS.md` (D-050)
+
+## D-051 — R3 và R6 phải tôn trọng giới tính đại từ (Phase 6 — 15/11/2026)
+- Ngày: 2026-11-15
+- Phase: 6
+- Loại: sửa lỗi nội bộ
+- Kế hoạch: `docs/09` §Phase 6 R4 — "ông chỉ gắn vào `PERSON` nam; bà chỉ vào nữ".
+- Thực tế: R6 (fallback "đoạn có đúng 1 PERSON") gắn entity **nữ** cho đại từ "ông" và ngược lại — vi phạm Gate G4. Lỗi phát hiện khi viết test R4, **không** phải bộ gold 100 câu bắt được.
+- Xử lý: cả R3 và R6 đều lọc theo giới tính đại từ; nếu entity duy nhất mâu thuẫn → `null` + `ambiguous`.
+- Kết quả: G4 = **0 lỗi** / 326 đại từ có giới tính được kiểm định (toàn corpus).
+- Cập nhật file: `src/coref/resolve_coref.py`, `tests/test_coref.py`, `docs/DECISIONS.md` (D-051)
+
+## D-052 — Thứ tự ưu tiên quy tắc R phải **cấu hình được** (Phase 6 — 15/11/2026) — **sửa lỗi công cụ đo**
+- Ngày: 2026-11-15
+- Phase: 6
+- Loại: sửa lỗi công cụ đo (quan trọng)
+- Kế hoạch: `docs/09` §Phase 6 yêu cầu có thang số liệu so sánh phương án.
+- Thực tế: bảng ablation đầu tiên dùng **monkeypatch** (vá hàm `_resolve_pronoun`) để đảo R3 → bản vá chạy R3 **trước** chốt an toàn "đại từ số nhiều" (R5-pre) → đo **sai**, ra con số **0,7797 không tồn tại** trên hệ thống thật, và khiến kết luận thiết kế **đảo ngược**.
+- Nguyên nhân gốc: ablation chạy trên **đường dẫn khác** với production → số liệu không tái lập được từ code đang chạy.
+- Xử lý: tách mỗi quy tắc thành một nhánh `_apply_pronoun_rule()`; điều phối theo `coref.pronoun_rule_order` → ablation ghi đè mục này vào config và chạy trên **đúng đường dẫn code thật**.
+- Kết quả sau sửa (9 biến thể): A = 0,8475 · **B = 0,8729 (đã chọn)** · C = 0,8559 · D = 0,8390 · E/F = 0,8559 · G = 0,8729 · H/I = 0,6864.
+- Bài học: **công cụ đo sai làm đảo ngược cả quyết định thiết kế.**
+- Cập nhật file: `src/coref/resolve_coref.py`, `configs/default.yaml`, `scripts/coref_ablation.py`, `scripts/coref_diff_variants.py`, `tests/test_coref.py`, `docs/DECISIONS.md` (D-052)
+
+## D-053 — Thêm cờ `r1b_unique_only` (R1b chỉ dùng khi đoạn có đúng 1 người) nhưng **không bật** (Phase 6 — 15/11/2026)
+- Ngày: 2026-11-15
+- Phase: 6
+- Loại: bổ sung ngoài kế hoạch (giữ dự phòng, mặc định tắt)
+- Kế hoạch: không có.
+- Thực tế: R1b là quy tắc yếu nhất — đưa lên đầu làm G5 tụt còn 0,8390. Nguyên nhân: ứng viên thường là người *được nhắc* ("đời Thiệu Trị", "Sau khi Thành Thái lên ngôi"), không phải chủ thể *đang được nói đến*.
+- Xử lý: thêm cờ `coref.r1b_unique_only` → G5 0,8475 → 0,8559. **Nhưng** kiểm định McNemar cho p = 1,00 (chỉ 1 mention đổi chiều) → **không có ý nghĩa thống kê** → **không bật** trong cấu hình chính, giữ làm phương án dự phòng đo được cho Phase 7+.
+- Cập nhật file: `src/coref/resolve_coref.py`, `configs/default.yaml`, `tests/test_coref.py`, `docs/DECISIONS.md` (D-053)
+
+## D-054 — Chênh lệch G5 giữa các thứ tự ưu tiên R **không có ý nghĩa thống kê** trên bộ gold 100 câu (Phase 6 — 15/11/2026)
+- Ngày: 2026-11-15
+- Phase: 6
+- Loại: công khai giới hạn của bộ đánh giá
+- Vấn đề: biến thể B hơn A chỉ **3/118 mention**. Kiểm định bằng `scripts/coref_bootstrap.py`:
+  - McNemar exact 2 phía: **p = 0,5811** (A đúng/B sai = 5 · B đúng/A sai = 8)
+  - Bootstrap theo câu (10.000 lần, seed 42): A CI 95% **[0,7685; 0,9159]** · B CI 95% **[0,8053; 0,9323]** → **chồng nhau**
+- Xử lý: vẫn chọn B (điểm số cao nhất **và** an toàn hơn về nguyên tắc — chủ thể bài có nguồn gốc rõ từ Wikipedia, không phải suy đoán mơ hồ), nhưng **công khai rõ** đây là chọn theo điểm số, không phải kết luận đã kiểm định.
+- Việc tiếp theo: mở rộng bộ gold 100 → 300–500 câu ở Phase 7+ rồi đo lại thứ tự ưu tiên.
+- Cập nhật file: `scripts/coref_bootstrap.py`, `docs/10-nhat-ky/so-lieu/phase-06-coref-significance*.json`, `reports/phase_06_report.md`, `docs/10-nhat-ky/phase-06.md`, `docs/DECISIONS.md` (D-054)
+
+## D-055 — Báo cáo `coref_quality.md` chứa ký tự Hán (Trung Quốc) — vi phạm quy tắc `no-chinese.mdc` (Phase 6 — 15/11/2026)
+- Ngày: 2026-11-15
+- Phase: 6
+- Loại: vi phạm quy tắc dự án (không phải lỗi số liệu)
+- Vấn đề: `src/coref/quality_report.py` render **nguyên văn** câu mẫu từ corpus. Corpus Wikipedia tiếng Việt trích nguyên văn chữ Hán trong ngoặc — đo được **1.030/2.441 bài** có ký tự Hán trong `clean_text` (23.832 ký tự). Kết quả: `reports/coref_quality.md` chứa **5 ký tự Trung Quốc** (5 ký tự Hán) → vi phạm quy tắc `.cursor/rules/no-chinese.mdc`.
+- Xử lý: thêm hàm `sanitize_han()` → thay mọi ký tự Hán bằng `<bỏ dấu>` (cùng ký hiệu với `src/preprocess/extract_lead_dates.py`); áp cho cả text câu và text mention; thêm **3 test regression** trong `tests/test_coref.py::TestNoChineseInReport` (trong đó có test đọc trực tiếp file báo cáo đã sinh để chặn hồi quy).
+- Ảnh hưởng: **không** đổi số liệu Phase 6 — `coref_resolved.jsonl` và `article_subjects.jsonl` giữ nguyên MD5 (`cb86fd32…` / `783178f1…`); chỉ lớp render báo cáo thay đổi. Gate G1–G8 giữ nguyên **8/8**. Test suite: 436 → **439**.
+- Cập nhật file: `src/coref/quality_report.py`, `tests/test_coref.py`, `reports/coref_quality.md`, `docs/DECISIONS.md` (D-055)
+
+## D-056 — Nguồn nhãn POSITIVE phải hợp nhất **3 nguồn**, không chỉ Wikidata (Phase 7 — 15/11/2026)
+- Ngày: 2026-11-15
+- Phase: 7
+- Loại: lệch phạm vi đặc tả (cần thiết để đạt Gate)
+- Kế hoạch: `docs/09` §Phase 7 — "sinh tập huấn luyện RE (Wikidata DS)", ước lượng **≈ 10.231** mẫu POSITIVE.
+- Thực tế: Wikidata thuần (ground theo tên) cho **12.197** mẫu / **10** quan hệ. Hợp nhất thêm Infobox (3.361) + Lead (22) của Phase 3 → **15.580** mẫu / **17** quan hệ.
+- Nguyên nhân gốc: 6 quan hệ (`ke_vi`, `thuoc_trieu_dai`, `chi_huy_tran`, `dong_doi_tai`, `lap_ra`, `dien_ra_tai`) **không tồn tại trong Wikidata** cho các nhân vật lịch sử Việt Nam — chúng chỉ có trong infobox Wikipedia.
+- Xử lý: giữ 3 nguồn, ghi `source` trong mỗi record để truy vết; dedupe theo khoá `(sentence_id, subject, relation, object)`.
+- Kết quả: G1 đạt **15.580 / 10.000** (biên **+55,8%**), G3 đạt **17 / 8**.
+- Cập nhật file: `src/re/ground_triples.py`, `src/re/build_re_dataset.py`, `docs/DECISIONS.md` (D-056)
+
+## D-057 — Negative "an toàn": loại cặp không rõ QID (72.557/86.934 cặp) (Phase 7 — 15/11/2026)
+- Ngày: 2026-11-15
+- Phase: 7
+- Loại: giới hạn thiết kế do chất lượng nhãn (ngoài đặc tả)
+- Vấn đề: "Wikidata không ghi quan hệ" ≠ "không có quan hệ". Trong 86.934 cặp entity đồng câu, chỉ **12.562** cặp có **cả hai** đầu có QID và không mang quan hệ nào.
+- Xử lý: negative chỉ lấy từ 12.562 cặp đó; **loại** 1.815 cặp đang mang quan hệ + **72.557** cặp không rõ QID. Tỉ lệ NEG/POS cuối = **0,9228**.
+- Ảnh hưởng: giảm được số negative khả dụng → tỉ lệ NEG/POS **0,9228** (thấp hơn ngưỡng 1,0 của G2, vẫn đạt). Số false negative đo được = **0**.
+- Cập nhật file: `src/re/build_re_dataset.py`, `tests/test_re_dataset.py`, `docs/DECISIONS.md` (D-057)
+
+## D-058 — Phải hỏi SPARQL **từng property một** thay vì dùng `UNION` (Phase 7 — 15/11/2026)
+- Ngày: 2026-11-15
+- Phase: 7
+- Loại: sửa lỗi công cụ đo / điều chỉnh cách truy vấn
+- Vấn đề: query `UNION` 13 property trả 2.429 dòng **không có** cột `?p` → không xác định được dòng nào thuộc property nào. Cả WDQS **và** QLever đều không hỗ trợ biến predicate trong `UNION`.
+- Nguyên nhân gốc: giới hạn của SPARQL 1.1 trên cả 2 endpoint.
+- Xử lý: hỏi **từng property một**, mỗi lần một lô `VALUES` 200 QID → giữ được liên kết property ↔ đối tượng. Chi phí: số request nhiều hơn, nhưng **cache đĩa** chia sẻ với Phase 1 nên chạy lại = **0 request** (G5 đạt).
+- Bài học: trước khi kết luận "endpoint chết" (QLever trả HTTP 400), phải kiểm tra **dạng query** trước.
+- Cập nhật file: `src/re/build_distant_supervision.py`, `configs/default.yaml`, `docs/DECISIONS.md` (D-058)
+
+## D-059 — Bỏ `src/re/wikidata_client.py` khỏi kế hoạch, tái dùng module SPARQL của Phase 1 (Phase 7 — 15/11/2026)
+- Ngày: 2026-11-15
+- Phase: 7
+- Loại: bỏ sung ngoài kế hoạch (tái dùng code sẵn có)
+- Kế hoạch: `docs/09` §Phase 7 liệt kê file `src/re/wikidata_client.py`.
+- Thực tế: dùng `run_query()` của `src/preprocess/wikidata_query.py` (đã có fallback QLever → WDQS, throttle, retry, cache đĩa).
+- Lý do: viết client mới sẽ phải sao chép logic → hai nơi phải sửa khi WDQS lại 429. Số liệu: 428 file cache dùng chung; chạy lại builder = **0 request HTTP** / 97,7 s.
+- Cập nhật file: `src/re/build_distant_supervision.py`, `configs/default.yaml`, `docs/DECISIONS.md` (D-058)
+
+## D-060 — `re_train.jsonl` đổi từ record **phẳng theo cặp** sang record **theo câu** (Phase 7 — 15/11/2026)
+- Ngày: 2026-11-15
+- Phase: 7
+- Loại: sửa lỗi **hợp đồng dữ liệu** (contract)
+- Kế hoạch: `docs/09` §Phase 7 + plan định nghĩa output contract là **1 record/câu** với mảng `pairs` lồng, nhãn chuỗi `"POSITIVE"`/`"NEGATIVE"`, có `run_id`; `data-contracts.mdc` §Offset yêu cầu `text[start:end] == span_text`.
+- Thực tế (bản đầu): ghi **phẳng theo cặp**, nhãn số `1`/`0`, **không có `run_id`**, **không có offset**.
+- Sai lệch đo được:
+  - Lệnh kiểm thử chính thức trong `docs/09` và plan (`r['pairs']`, `p['label']=='POSITIVE'`) **crash** với bản phẳng.
+  - Thiếu `run_id` → vi phạm `data-contracts.mdc` §Định dạng chung.
+  - Không có offset → không kiểm được `text[start:end] == mention` (vi phạm `data-contracts.mdc` §Offset).
+  - Sau khi thêm offset nhưng chưa sửa cách lấy `mention`: **43.841/59.459** offset sai lệch + **455** cặp thiếu span.
+- Lý do sửa: contract đã chốt ở `docs/09` và `data-contracts.mdc` là nguồn sự thật; bản phẳng là **sai lệch so với kế hoạch**, không phải biến thể hợp lệ. Gom theo câu còn giúp Phase 8 tokenize `text` **một lần** cho mọi cặp.
+- Kết quả sau khi sửa: 12.877 câu / 29.957 cặp; **59.914/59.914** offset thỏa `text[start:end] == mention` (0 sai lệch, 0 thiếu span); 5/5 Gate đạt; `pytest -q tests/` = **480 passed**.
+- Cập nhật file: `src/re/build_re_dataset.py`, `src/re/ground_triples.py`, `src/re/re_dataset_stats.py`, `scripts/re_gate_check.py`, `tests/test_re_dataset.py`, `docs/09-ke-hoach-thuc-thien.md`, `AGENTS.md`, `docs/DECISIONS.md` (D-060)

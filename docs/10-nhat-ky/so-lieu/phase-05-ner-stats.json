@@ -1,0 +1,325 @@
+{
+ "_meta": {
+  "phase": 5,
+  "description": "Số liệu huấn luyện NER PhoBERT + suy luận toàn corpus",
+  "sources": [
+   "reports/kaggle_ner_<arm>/models/ner/metrics.json",
+   "reports/ner_predictions_validate.json",
+   "reports/ner_gold_100_metrics.json",
+   "reports/ner_silver_noise_100.json"
+  ]
+ },
+ "arms": {
+  "base": {
+   "_meta": {
+    "model_name": "/kaggle/working/repo/models_hf/phobert-base",
+    "dump_version": "20261101",
+    "seed": 42,
+    "split": "dev",
+    "num_labels": 13,
+    "label_list": [
+     "O",
+     "B-PERSON",
+     "B-DYNASTY",
+     "B-EVENT",
+     "B-LOCATION",
+     "B-TIME",
+     "B-TITLE",
+     "I-PERSON",
+     "I-DYNASTY",
+     "I-EVENT",
+     "I-LOCATION",
+     "I-TIME",
+     "I-TITLE"
+    ],
+    "scheme": "BIO",
+    "train_seconds": 10634.3,
+    "n_train_examples": 150450,
+    "n_dev_examples": 19075,
+    "epochs": 5,
+    "max_len": 256,
+    "batch_size": 32,
+    "learning_rate": 3e-05,
+    "fp16": true
+   },
+   "micro": {
+    "precision": 0.6597,
+    "recall": 0.7084,
+    "f1": 0.6832,
+    "support": 13774
+   },
+   "macro": {
+    "precision": 0.5408,
+    "recall": 0.585,
+    "f1": 0.5589
+   },
+   "per_label": {
+    "DYNASTY": {
+     "precision": 0.5232,
+     "recall": 0.6531,
+     "f1": 0.5809,
+     "support": 588
+    },
+    "EVENT": {
+     "precision": 0.4332,
+     "recall": 0.5436,
+     "f1": 0.4821,
+     "support": 769
+    },
+    "LOCATION": {
+     "precision": 0.5194,
+     "recall": 0.5262,
+     "f1": 0.5228,
+     "support": 3107
+    },
+    "PERSON": {
+     "precision": 0.5428,
+     "recall": 0.633,
+     "f1": 0.5844,
+     "support": 3877
+    },
+    "TIME": {
+     "precision": 0.9213,
+     "recall": 0.9337,
+     "f1": 0.9275,
+     "support": 5143
+    },
+    "TITLE": {
+     "precision": 0.3048,
+     "recall": 0.2207,
+     "f1": 0.256,
+     "support": 290
+    }
+   },
+   "n_sentences": 19049,
+   "n_gold_entities": 13774,
+   "n_pred_entities": 14790
+  },
+  "large": {
+   "_meta": {
+    "model_name": "/kaggle/working/repo/models_hf/phobert-large",
+    "dump_version": "20261101",
+    "seed": 42,
+    "split": "dev",
+    "num_labels": 13,
+    "label_list": [
+     "O",
+     "B-PERSON",
+     "B-DYNASTY",
+     "B-EVENT",
+     "B-LOCATION",
+     "B-TIME",
+     "B-TITLE",
+     "I-PERSON",
+     "I-DYNASTY",
+     "I-EVENT",
+     "I-LOCATION",
+     "I-TIME",
+     "I-TITLE"
+    ],
+    "scheme": "BIO",
+    "train_seconds": 6148.3,
+    "n_train_examples": 60124,
+    "n_dev_examples": 19075,
+    "epochs": 2,
+    "max_len": 256,
+    "batch_size": 8,
+    "eval_batch_size": 16,
+    "gradient_accumulation_steps": 4,
+    "learning_rate": 3e-05,
+    "fp16": true
+   },
+   "micro": {
+    "precision": 0.6387,
+    "recall": 0.6395,
+    "f1": 0.6391,
+    "support": 13774
+   },
+   "macro": {
+    "precision": 0.4843,
+    "recall": 0.4625,
+    "f1": 0.4503
+   },
+   "per_label": {
+    "DYNASTY": {
+     "precision": 0.4015,
+     "recall": 0.534,
+     "f1": 0.4584,
+     "support": 588
+    },
+    "EVENT": {
+     "precision": 0.3892,
+     "recall": 0.3472,
+     "f1": 0.367,
+     "support": 769
+    },
+    "LOCATION": {
+     "precision": 0.5032,
+     "recall": 0.403,
+     "f1": 0.4475,
+     "support": 3107
+    },
+    "PERSON": {
+     "precision": 0.4976,
+     "recall": 0.5331,
+     "f1": 0.5148,
+     "support": 3877
+    },
+    "TIME": {
+     "precision": 0.8645,
+     "recall": 0.9541,
+     "f1": 0.9071,
+     "support": 5143
+    },
+    "TITLE": {
+     "precision": 0.25,
+     "recall": 0.0034,
+     "f1": 0.0068,
+     "support": 290
+    }
+   },
+   "n_sentences": 19049,
+   "n_gold_entities": 13774,
+   "n_pred_entities": 13790
+  }
+ },
+ "comparison": {
+  "rows": [
+   {
+    "arm": "base",
+    "model_name": "/kaggle/working/repo/models_hf/phobert-base",
+    "micro_f1": 0.6832,
+    "micro_precision": 0.6597,
+    "micro_recall": 0.7084,
+    "macro_f1": 0.5589,
+    "train_seconds": 10634.3,
+    "epochs": 5,
+    "batch_size": 32,
+    "gradient_accumulation_steps": null
+   },
+   {
+    "arm": "large",
+    "model_name": "/kaggle/working/repo/models_hf/phobert-large",
+    "micro_f1": 0.6391,
+    "micro_precision": 0.6387,
+    "micro_recall": 0.6395,
+    "macro_f1": 0.4503,
+    "train_seconds": 6148.3,
+    "epochs": 2,
+    "batch_size": 8,
+    "gradient_accumulation_steps": 4
+   }
+  ],
+  "best_arm": "base"
+ },
+ "gate_predictions": {
+  "n_sentences_predicted": 186960,
+  "n_sentences_corpus": 186960,
+  "n_sentences_covered": 186960,
+  "coverage": 1.0,
+  "n_entities": 143108,
+  "n_bad_offset": 0,
+  "n_bad_label": 0,
+  "n_empty_text": 0,
+  "label_distribution": {
+   "TIME": 54955,
+   "PERSON": 39633,
+   "LOCATION": 29883,
+   "EVENT": 9739,
+   "DYNASTY": 6747,
+   "TITLE": 2151
+  },
+  "examples_bad_offset": [],
+  "gate_offsets_ok": true,
+  "gate_labels_ok": true,
+  "gate_coverage_ok": true
+ },
+ "gold_100": {
+  "micro": {
+   "precision": 0.7653,
+   "recall": 0.5396,
+   "f1": 0.6329,
+   "support": 139
+  },
+  "macro": {
+   "precision": 0.5516,
+   "recall": 0.5002,
+   "f1": 0.5029
+  },
+  "per_label": {
+   "DYNASTY": {
+    "precision": 0.25,
+    "recall": 0.1429,
+    "f1": 0.1818,
+    "support": 7
+   },
+   "EVENT": {
+    "precision": 0.6667,
+    "recall": 1.0,
+    "f1": 0.8,
+    "support": 2
+   },
+   "LOCATION": {
+    "precision": 0.6552,
+    "recall": 0.5588,
+    "f1": 0.6032,
+    "support": 34
+   },
+   "PERSON": {
+    "precision": 0.871,
+    "recall": 0.403,
+    "f1": 0.551,
+    "support": 67
+   },
+   "TIME": {
+    "precision": 0.8667,
+    "recall": 0.8966,
+    "f1": 0.8814,
+    "support": 29
+   },
+   "TITLE": {
+    "precision": 0.0,
+    "recall": 0.0,
+    "f1": 0.0,
+    "support": 0
+   }
+  },
+  "n_sentences": 100,
+  "n_gold_entities": 139,
+  "n_pred_entities": 98,
+  "n_gold_sentences": 100,
+  "n_matched_sentences": 48
+ },
+ "silver_noise_100": {
+  "n_sentences_total": 100,
+  "n_sentences_reviewed": 39,
+  "n_mentions_silver": 90,
+  "n_mentions_kept": 79,
+  "n_mentions_dropped": 11,
+  "n_mentions_added": 60,
+  "by_label": {
+   "TIME": {
+    "silver": 30,
+    "wrong": 1
+   },
+   "PERSON": {
+    "silver": 31,
+    "wrong": 4
+   },
+   "LOCATION": {
+    "silver": 20,
+    "wrong": 2
+   },
+   "EVENT": {
+    "silver": 5,
+    "wrong": 3
+   },
+   "DYNASTY": {
+    "silver": 4,
+    "wrong": 1
+   }
+  },
+  "noise_rate_mention": 0.12222222222222222,
+  "missing_rate_mention": 0.6666666666666666
+ }
+}

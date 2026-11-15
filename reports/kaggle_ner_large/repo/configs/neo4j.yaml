@@ -1,0 +1,36 @@
+# Cấu hình Neo4j 5 Community
+# Lưu ý: Neo4j Community KHÔNG có RBAC → bảo vệ chỉ đọc được thực hiện bằng
+# session `default_access_mode=READ_ACCESS` (server từ chối ghi, kể cả superuser).
+# Xem docs/CONTEXT.md §2.7 và reports/deviations.md D-002.
+
+uri: ${NEO4J_URI:-bolt://localhost:7687}
+user: ${NEO4J_USER:-neo4j}
+password: ${NEO4J_PASSWORD:-neo4jpass}
+database: ${NEO4J_DATABASE:-neo4j}
+
+# Tài khoản dành cho tầng online (API). Vẫn bị chặn ghi nhờ READ_ACCESS.
+read_only_user: ${NEO4J_READER_USER:-reader}
+read_only_password: ${NEO4J_READER_PASSWORD:-readerpass}
+
+# Bảo vệ chỉ đọc ở tầng driver.
+read_only_session: true
+default_access_mode: READ_ACCESS
+
+batch_size: 500
+max_hops: 3
+max_limit: 100
+timeout_s: 10
+
+# Nhãn node hợp lệ (7 label)
+labels: [Person, Dynasty, Event, Place, Title, Year, Article]
+
+# Thứ tự nạp (idempotent bằng MERGE theo entity_id)
+load_order: [entities, triples]
+
+docker:
+  image: neo4j:5-community
+  heap_max: 1G
+  page_cache: 512M
+  ports:
+    http: 7474
+    bolt: 7687

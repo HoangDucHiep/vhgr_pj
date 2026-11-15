@@ -1,0 +1,56 @@
+{
+  "_meta": {
+    "phase": 6,
+    "dump_version": "20261101",
+    "mo_ta": "Đánh giá coreference Phase 6 (G4/G5/G6)",
+    "nguon": "python scripts/coref_eval.py --config configs/default.yaml → data/eval/coref_gold_100.jsonl + data/interim/coref_resolved.jsonl",
+    "ngay_do": "2026-11-15"
+  },
+  "gold": {
+    "so_sentence_doi_chieu": 100,
+    "so_mention_gold": 137,
+    "so_mention_co_nhan_vang": 118,
+    "so_dung": 103,
+    "do_chinh_xac": 0.8729,
+    "he_thong_resolve": 122,
+    "he_thong_bo_sot": 6,
+    "gold_khong_co_dich_va_he_thong_co": 10,
+    "gold_khong_co_dich": 19,
+    "theo_resolved_by": {
+      "ambiguous": {
+        "so_mention": 15,
+        "so_dung": 0,
+        "do_chinh_xac": 0.0
+      },
+      "article_subject": {
+        "so_mention": 74,
+        "so_dung": 62,
+        "do_chinh_xac": 0.8378
+      },
+      "coref_honorific": {
+        "so_mention": 43,
+        "so_dung": 39,
+        "do_chinh_xac": 0.907
+      },
+      "coref_pronoun": {
+        "so_mention": 5,
+        "so_dung": 2,
+        "do_chinh_xac": 0.4
+      }
+    },
+    "kiem_tra_gioi_tinh": {
+      "so_mention": 109,
+      "so_loi": 0,
+      "chi_tiet": []
+    }
+  },
+  "chu_the_bai": {
+    "so_bai": 2441,
+    "so_bai_co_ground_truth": 1687,
+    "so_dung": 1687,
+    "do_chinh_xac": 1.0,
+    "do_chinh_xac_bai_nhan_vat": 1.0,
+    "so_bai_nhan_vat": 1231,
+    "sai_lech": []
+  }
+}

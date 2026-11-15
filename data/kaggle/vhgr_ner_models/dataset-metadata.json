@@ -1,0 +1,23 @@
+{
+ "title": "VHGR Phase 5 — PhoBERT pretrained (offline)",
+ "id": "hoangduchiep/vhgr-ner-models",
+ "licenses": [
+  {
+   "name": "MIT"
+  }
+ ],
+ "keywords": [
+  "vietnamese",
+  "phobert"
+ ],
+ "subtitle": "vinai/phobert-base + vinai/phobert-large (vocab, bpe, weights)",
+ "description": "Model PhoBERT pretrained đóng gói sẵn để kernel Kaggle dùng **offline**.\n\nLý do: kernel Kaggle trong phiên 14/11/2026 không có internet (`pypi.org`/`huggingface.co` timeout DNS) nên không tải được model từ HuggingFace.\n\n- `phobert-base/`: config.json, pytorch_model.bin, tokenizer.json, vocab.txt, bpe.codes\n- `phobert-large/`: tương tự\n\nNguồn: `vinai/phobert-base`, `vinai/phobert-large` trên HuggingFace (MIT).",
+ "resources": [
+  {
+   "path": "phobert-base"
+  },
+  {
+   "path": "phobert-large"
+  }
+ ]
+}

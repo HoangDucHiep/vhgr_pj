@@ -7,16 +7,18 @@
 
 | Hạng mục | Trạng thái |
 |---|---|
-| Giai đoạn | **Đang triển khai** — Phase 1 xong 13/11/2026 |
-| Phase hiện tại | **Phase 2 — Làm sạch wikitext, tách câu/đoạn, trích hyperlink** (code xong, chưa chạy pipeline) |
-| Tài liệu | `docs/00` … `docs/09` đã hoàn thành |
+| Giai đoạn | **Đang triển khai** — Phase 1–7 xong (15/11/2026) |
+| Phase hiện tại | **Phase 8 — Mô hình RE, LLM bulk, hợp nhất triple (D1/D2/D3)** (chưa bắt đầu) |
+| Phase đã xong | 0 Bootstrap · 1 Lọc bài · 2 Làm sạch+tách câu · 3 Infobox · 4 Nhãn bạc NER · 5 Huấn luyện+suy luận NER · **6 Coreference (C1/C2)** · **7 Wikidata DS + tập train RE (D1.1)** |
+| Tài liệu | `docs/00` … `docs/09` đã hoàn thành · `docs/10-nhat-ky/` nhật ký triển khai chi tiết theo phase |
 | Môi trường | Python 3.12.3, Docker 29.9.2, Node 24.15, RAM 23GB, đĩa 2.5TB, **không GPU local** |
 | Hạ tầng | `.venv` đã tạo + cài `requirements.txt` ✅ · Neo4j 5.26.32 Community ở `:7474`/`:7687` ✅ · user `reader` đã tạo ✅ |
 | Backend | FastAPI chạy ở `:8000` — `/api/health` → `{"status":"ok","neo4j":"up"}` ✅ |
 | Frontend | Vite + React 18 + TS — `npm run build` 0 lỗi ✅ |
 | Kaggle | `KAGGLE_USERNAME=hoangduchiep` + `KAGGLE_KEY` trong `.env` ✅ (auth bằng `Authorization: Bearer`) |
 | API key | `GEMINI_API_KEY`, `GROQ_API_KEY` trong `.env` ✅ |
-| Test | `pytest -q tests/` → **56 passed** (Phase 0) · thêm 18 test Phase 2 (`test_clean_text.py`, `test_sentence_split.py`) |
+| Test | `pytest -q tests/` → **480 passed** (Phase 7) |
+| Số liệu hiện tại | 2.441 bài · 186.960 câu · 10.078 triple infobox · 143.108 entity NER · **197.610 mention coref** (resolve 69,62%) · **15.580 mẫu POSITIVE RE** / 17 quan hệ |
 
 ## 2. Quyết định đã chốt (KHÔNG đổi nếu không có lý do ghi vào DECISIONS.md)
 
@@ -61,7 +63,40 @@ Trích xuất LLM trên toàn corpus → **Kaggle GPU**.
 | Phạm vi | 9 triều đại đã chốt, 2.000–5.000 bài |
 | Chia tập | theo **bài** (80/10/10), seed 42, lưu `data/splits/splits.json` |
 | Nhãn bạc | hyperlink nội bộ → QID → `P31` → nhãn |
-| Nguồn nhãn RE | Wikidata distant supervision (cache JSONL, chunk theo triều đại) |
+| Nguồn nhãn RE | **3 nguồn**: Wikidata distant supervision (cache JSONL, chunk theo triều đại) + Infobox Phase 3 + Lead Phase 3 |
+
+**Relation Extraction — distant supervision (Phase 7) — các quyết định đã chốt:**
+
+| Quyết định | Giá trị | Mã |
+|---|---|---|
+| Mapping property ↔ quan hệ | `configs/wikidata_relations.yaml` — 13 property lõi + 6 property mở rộng (mở rộng **không** bật mặc định) | — |
+| Hướng mapping | `forward` (P22/P25/P26/P19/P20/P39/P710) · `inverse` (P40 → `cha_cua`) · `symmetric` (P3373) · `year` (P569/P570 → `sinh_nam`/`mat_nam`) | D-059 |
+| Nguồn nhãn POSITIVE | hợp nhất **3 nguồn**, dedupe theo `(sentence_id, subject, relation, object)`, ưu tiên `wikidata > infobox > lead` | D-056 |
+| Grounding | khớp `entity_id` **và** fallback theo tên (nhãn tiếng Việt của Wikidata) → 4.834 → 12.197 mẫu (+152%) | D-056 |
+| Negative "an toàn" | chỉ cặp **có cả hai QID** và **không** mang quan hệ nào (đối xứng kiểm cả 2 chiều) | D-057 |
+| Tỉ lệ NEG/POS | cân bằng theo **hạn ngạch mỗi quan hệ** (tỉ lệ theo số POSITIVE của quan hệ đó) | D-057 |
+| SPARQL client | tái dùng `run_query()` của `src/preprocess/wikidata_query.py` (QLever → WDQS, cache đĩa dùng chung) | D-058 |
+| Dạng query | **từng property một** (`UNION` làm mất tên predicate trên cả QLever lẫn WDQS), lô 200 QID | D-058 |
+| Contract output RE | **1 record/câu** (`run_id`/`text` + mảng `pairs` lồng), nhãn **chuỗi** `POSITIVE`/`NEGATIVE`, mỗi cặp có offset `start`/`end` thỏa `text[start:end] == mention` | D-060 |
+| Artifact | `data/interim/re_train.jsonl` — **12.877 câu / 29.957 cặp** (POS 15.580 / NEG 14.377), split theo `page_id`; contract: 1 record/câu, `pairs` lồng, nhãn chuỗi `POSITIVE`/`NEGATIVE`, có `run_id` | D-060 |
+| Số quan hệ còn thiếu POSITIVE | `danh_bai` (0) — cần nguồn nhãn khác (Wikidata P166, LLM) | — |
+
+**Coreference (Phase 6) — các quyết định đã chốt:**
+
+| Quyết định | Giá trị | Mã |
+|---|---|---|
+| Nguồn `canonical_id` | gazetteer hợp nhất: `infobox_entities.jsonl` (1.764 entity, nguồn A) ∪ tiêu đề bài `documents.jsonl` (1.687 bài, nguồn B) | D-045 |
+| Mint `entity_id` | sớm ở Phase 6, dùng **đúng** `make_entity_id(type_ner, name)` mà Phase 9 dùng → id giống hệt | D-044 |
+| Chủ thể bài | file riêng `data/interim/article_subjects.jsonl` (1 record/doc, 2.441 bài) | D-045 |
+| Thứ tự ưu tiên quy tắc R | **cấu hình** qua `coref.pronoun_rule_order` = `[r3, r1a, r1b, r5, r6]` (đo trên gold 100 câu) | D-052 |
+| Điều kiện R3 | dùng như **tiên đề** (không giới hạn "đoạn không có `PERSON`") — biến thể bám sát đặc tả chỉ đạt G5 0,6864 | D-047 |
+| Điều kiện R3 (loại) | chỉ dùng khi `subject.type == "person"` | D-049 |
+| Điều kiện R3 (giới tính) | entity đích phải khớp giới tính đại từ, nếu không → `null` + `ambiguous` | D-051 |
+| Điều kiện R6 (giới tính) | tương tự R3 | D-051 |
+| Đại từ số nhiều | "các ông", "các vua Trần" → `null` + `ambiguous` (5.201 mention) | D-048 |
+| Chốt an toàn R5-pre | đại từ số nhiều luôn được chặn **trước** mọi quy tắc cạnh tranh, bất kể thứ tự cấu hình | D-052 |
+| Tín hiệu chủ thể bài | `infobox_type` → `wikidata_signal` → `qid_types` → `p31_direct` (**cuối**) | D-050 |
+| Cờ dự phòng | `coref.r1b_unique_only` (mặc định `false`) · `coref.r3_requires_no_person` (mặc định `false`) | D-053, D-047 |
 
 ### 2.4. Đánh giá
 
@@ -73,6 +108,9 @@ Trích xuất LLM trên toàn corpus → **Kaggle GPU**.
 | Bộ câu hỏi QA | sinh tự động từ facts Wikidata (200–400 câu, ≥ 5 dạng) + 40–60 câu viết tay |
 | Đo faithfulness | LLM-judge trên 30 câu, tỉ lệ "không bịa" ≥ 0.90 |
 | Báo cáo | số liệu thực tế + phân tích lỗi top 20; **không sửa số liệu** để đạt mục tiêu |
+| Bộ gold coref | **100 câu dev** gán tay (`data/eval/coref_gold_100.jsonl`, 137 mention) — chỉ giữ mention `source ∈ {pronoun, pronoun_name}` để đo đúng AC C1 |
+| Kiểm định khác biệt | khi so sánh 2 phương án trên bộ nhỏ: **McNemar exact** + **bootstrap theo câu** (CI 95%) — không kết luận từ chênh lệch điểm số đơn thuần |
+| Ablation | phải chạy trên **đúng đường dẫn code thật** — cấu hình tham số để đo, **không monkeypatch** |
 
 ### 2.5. Schema KG
 
@@ -149,11 +187,15 @@ Chi tiết đầy đủ: `docs/04-schema-knowledge-graph.md`.
 
 ## 3. Chỉ số mục tiêu
 
-| Chỉ số | Mục tiêu |
-|---|---|
-| NER F1 (token-level) | ≥ 0.85 |
-| RE F1 | ≥ 0.70 |
-| Entity linking accuracy | ≥ 0.85 |
+| Chỉ số | Mục tiêu | Thực tế |
+|---|---|---|
+| NER F1 (token-level) | ≥ 0.85 | 0,6832 (Phase 5) |
+| RE F1 | ≥ 0.70 | — |
+| Số mẫu POSITIVE RE (distant supervision) | ≥ 10.000 | **15.580** (Phase 7) |
+| Tỉ lệ NEG/POS (RE) | ≤ 1,0 | **0,9228** (Phase 7) |
+| Số quan hệ có POSITIVE | ≥ 8 | **17** / 18 (Phase 7) |
+| Quan hệ ngoài danh mục 18 quan hệ | 0 | **0** (Phase 7) |
+| Entity linking accuracy | ≥ 0.85 | — |
 | Text-to-Cypher execution accuracy | ≥ 0.70 |
 | Cypher p95 | < 2s |
 | End-to-end p50 | < 10s |
@@ -164,6 +206,8 @@ Chi tiết đầy đủ: `docs/04-schema-knowledge-graph.md`.
 | # | Câu hỏi | Chặn ở đâu | Gợi ý xử lý |
 |---|---|---|---|
 | 1 | Key Gemini/Groq tạo được model nào còn quota? | Phase 8, 11, 13 | dùng `gemini-3.5-flash-lite`; nếu 404 → kiểm tra tên model qua AI Studio |
+| 6 | Nhãn POSITIVE RE có đủ tin cậy để huấn luyện? | Phase 8 | audit 100 mẫu tay; rủi ro cao: `vo_cua`/`chong_cua` (hướng phụ thuộc giới tính — corpus chỉ 23 entity có `gender`) và `P40` (chiều inverse) |
+| 7 | Quan hệ `danh_bai` (0 POSITIVE) và 5 quan hệ có <50 mẫu lấy nhãn ở đâu? | Phase 8 | Wikidata `P166`/`P1344` hoặc LLM bulk trên Kaggle |
 | 2 | Kaggle có dataset mirror sẵn để tránh tải dump 2GB? | Phase 1 | tải dump ở local (đủ RAM 23GB) rồi upload artifact |
 | 3 | Có tạo được `reader` user Neo4j trong container không? | Phase 10 | ✅ **Đã kiểm chứng 11/2026: KHÔNG.** Neo4j Community không có RBAC → `CREATE USER … SET ROLE reader` lỗi cú pháp. User `reader` tạo được nhưng vẫn ghi được. Cơ chế bảo vệ thật là **session `default_access_mode=READ_ACCESS`** (server từ chối ghi, kể cả superuser) — xem §2.7 và D-008 |
 | 4 | Có kịp gán 100 câu tay? | Phase 13 | không kịp → chỉ auto-gold, nêu rõ trong báo cáo |

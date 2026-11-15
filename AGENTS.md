@@ -115,7 +115,9 @@ reports/      # kết quả đánh giá, phase reports
 | `data/splits/splits.json` | 4 | chia tập theo `page_id`: train/dev/test 80/10/10, seed 42 |
 | `data/interim/ner_predictions.jsonl` | 5 | NER dự đoán (offset ký tự) |
 | `data/interim/coref_resolved.jsonl` | 6 | mention + canonical_id |
-| `data/interim/re_train.jsonl` | 7 | tập huấn luyện RE (Wikidata DS) |
+| `data/interim/re_train.jsonl` | 7 | tập huấn luyện RE — **1 record/câu** (`run_id`/`sentence_id`/`doc_id`/`page_id`/`split`/`text` + mảng `pairs` lồng), POSITIVE (Wikidata + Infobox + Lead, 15.580) + NEGATIVE an toàn (14.377), label chuỗi `POSITIVE`/`NEGATIVE` |
+| `data/interim/wikidata_pairs.jsonl` | 7 | cặp quan hệ thô từ Wikidata (13 property lõi × lô 200 QID), có cache đĩa dùng chung Phase 1 |
+| `data/interim/re_positive.jsonl` | 7 | mẫu POSITIVE đã grounding vào câu corpus (15.580, 17 quan hệ, trường `source` truy vết nguồn nhãn) |
 | `data/interim/triples_merged.jsonl` | 8 | triple hợp nhất |
 | `data/knowledge_base/entities.jsonl` | 9 | entity + alias + QID |
 | `data/knowledge_base/graph.jsonl` | 10 | nodes + edges cho Neo4j |

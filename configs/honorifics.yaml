@@ -1,0 +1,139 @@
+# Từ điển danh xưng / đại từ cho Phase 6 (coreference C1).
+#
+# Vì sao cần: mô hình NER (Phase 5) chủ yếu bắt **tên riêng**, bỏ sót toàn bộ
+# danh xưng + đại từ ("ông", "bà", "vua", "hoàng đế"...). Đo trên corpus:
+#   - 20.326 surface danh xưng/đại từ KHÔNG trùng span NER nào.
+#   - Chỉ 172/20.498 surface trùng span NER (chủ yếu bị NER gán nhầm LOCATION).
+# Đây đúng là phần việc thật của C1: gắn danh xưng/đại từ về một entity.
+#
+# Mỗi mục gồm:
+#   surface      : chuỗi khớp (không phân biệt hoa thường, bỏ dấu khi so khớp)
+#   label        : nhãn NER gán cho span danh xưng (PERSON | TITLE)
+#   gender       : male | female | null  (dùng cho quy tắc R4 — giới tính)
+#   requires_name_next : true nếu danh xưng này chỉ hợp lệ khi đi kèm tên
+#                   riêng ngay sau ("vua Lê", "ông Nguyễn") — span danh xưng
+#                   được tách riêng và trỏ tới entity của tên đó.
+#   blocklist    : danh sách regex chặn ngữ cảnh sai (theo chữ sau danh xưng).
+#                   Rỗng = không chặn.
+#
+# Ghi chú D-046: **không** đưa "y" vào danh sách. Đo trên corpus, 205/401
+# standalone "y" đứng trước "tế"/"học"/"khoa" (y tế, Trường Y, Y khoa) —
+# tỉ lệ false-positive quá cao, thành mention sai còn tệ hơn bỏ sót.
+
+honorifics:
+  # --- Đại từ nam ---
+  - surface: "ông ấy"
+    label: PERSON
+    gender: male
+    requires_name_next: false
+    blocklist: []
+  - surface: "ông ta"
+    label: PERSON
+    gender: male
+    requires_name_next: false
+    blocklist: []
+  - surface: "ông"
+    label: PERSON
+    gender: male
+    requires_name_next: false
+    # "ông" + tên riêng = danh xưng đi kèm tên (hợp lệ) → không chặn.
+    blocklist: []
+
+  # --- Đại từ nữ ---
+  - surface: "bà ấy"
+    label: PERSON
+    gender: female
+    requires_name_next: false
+    blocklist: []
+  - surface: "bà"
+    label: PERSON
+    gender: female
+    requires_name_next: false
+    blocklist: []
+
+  # --- Danh xưng hoàng gia (luôn là người nam trong lịch sử VN) ---
+  - surface: "hoàng đế"
+    label: PERSON
+    gender: male
+    requires_name_next: false
+    blocklist: []
+  - surface: "đại vương"
+    label: PERSON
+    gender: male
+    requires_name_next: false
+    blocklist: []
+  - surface: "vua"
+    label: PERSON
+    gender: male
+    requires_name_next: false
+    # "vua" + tên riêng (vua Lê, vua Trần) là **mẫu rất phổ biến** (8.109/13.874).
+    # Không chặn — nhưng span "vua" sẽ được chiếu sang entity của tên đi kèm.
+    blocklist: []
+
+  # --- Tước hiệu / chức vụ → TITLE ---
+  - surface: "thái tử"
+    label: TITLE
+    gender: male
+    requires_name_next: false
+    blocklist: []
+  - surface: "đại tướng"
+    label: TITLE
+    gender: male
+    requires_name_next: false
+    blocklist: []
+  - surface: "thượng tướng"
+    label: TITLE
+    gender: male
+    requires_name_next: false
+    blocklist: []
+  - surface: "tể tướng"
+    label: TITLE
+    gender: male
+    requires_name_next: false
+    blocklist: []
+  - surface: "quận công"
+    label: TITLE
+    gender: male
+    requires_name_next: false
+    blocklist: []
+  - surface: "hầu tước"
+    label: TITLE
+    gender: male
+    requires_name_next: false
+    blocklist: []
+  - surface: "công tước"
+    label: TITLE
+    gender: male
+    requires_name_next: false
+    blocklist: []
+
+  # --- Gọi thân mật ---
+  - surface: "chàng trai"
+    label: PERSON
+    gender: male
+    requires_name_next: false
+    blocklist: []
+  - surface: "cô gái"
+    label: PERSON
+    gender: female
+    requires_name_next: false
+    blocklist: []
+
+# Danh xưng **không có dấu** — rất dễ nhầm với tên địa danh / từ thường.
+# Đo trên corpus: "ba" đứng trước tên riêng 1.337 lần và gần như toàn bộ là
+# địa danh (Ba Vì, Ba Đình, Ba Lan, Ba Xuyên, Ba Giồng, Ba Thắc, Ba Việt).
+# Vì vậy mục "ba" (không dấu) bị loại khỏi từ điển hoàn toàn.
+#
+# Tương tự, "tổng" (7.135 lần) gần như toàn bộ là từ thường trong cụm
+# "tổng thống" (1.333), "tổng đốc" (437), "tổng cộng" (385), "tổng số" (363),
+# "tổng giám" (292) — nên cũng bị loại (D-047).
+unaccented_blocklist:
+  # "Ba" + tên riêng → gần như luôn là địa danh.
+  - surface: "ba"
+    next_capitalized: block
+  # "y" → "y tế", "Trường Y", "Y khoa" (D-046).
+  - surface: "y"
+    next_capitalized: block
+  # "tổng" → "tổng thống", "tổng số", "tổng cộng" (D-047).
+  - surface: "tổng"
+    next_capitalized: block

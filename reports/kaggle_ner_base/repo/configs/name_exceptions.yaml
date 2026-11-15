@@ -1,0 +1,47 @@
+# Bảng ngoại lệ tên riêng cho bộ tách câu (fallback của Phase 2).
+#
+# Vì sao cần: một số tên riêng tiếng Việt có dấu phẩy bên trong
+# (vd "Trần Công Hiến, tướng quân nhà Trần") khiến bộ tách câu theo regex
+# dễ cắt nhầm. Mỗi tên ở đây được coi là **một đơn vị không được tách**.
+#
+# Dùng khi: `pysbd` tách sai nhiều → chuyển sang regex fallback
+# (mục "Lùi" của Phase 2 trong `docs/09-ke-hoach-thuc-thien.md`).
+
+names:
+  - Lê Lợi
+  - Lê Thái Tổ
+  - Trần Hưng Đạo
+  - Trần Quốc Tuấn
+  - Trần Công Hiến
+  - Nguyễn Trãi
+  - Nguyễn Huệ
+  - Hồ Chí Minh
+  - Võ Nguyên Giáp
+  - Đặng Thùy Trâm
+  - Nguyễn Du
+  - Trương Vĩnh Ký
+  - Phạm Văn Xá
+  - Trịnh Tránh
+  - Hoàng Công Chân
+  - Nguyễn Thị Lộ
+  - Lê Khánh Dư
+  - Lê Thanh Tông
+  - Lê Hiến Tông
+  - Ngô Quyền
+  - Đinh Tiên Hoàng
+  - Lê Đại Hành
+  - Lý Thái Tổ
+  - Trần Thái Tông
+  - Trần Hiến Tông
+  - Trần Anh Tông
+  - Trần Minh Mạng
+  - Nguyễn Ánh
+  - Gia Long
+  - Minh Mạng
+  - Tự Đức
+  - Thành Thái
+  - Duy Tân
+  - Khải Định
+  - Bảo Đại
+  - Quang Trung
+  - Nguyễn Nhạc

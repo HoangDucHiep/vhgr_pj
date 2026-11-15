@@ -1,0 +1,155 @@
+{
+  "_meta": {
+    "phase": 6,
+    "mo_ta": "Ablation thứ tự ưu tiên quy tắc R (G5) — Phase 6",
+    "nguon": "python scripts/coref_ablation.py --config configs/default.yaml",
+    "ngay_do": "2026-11-15",
+    "ghi_chu": "Thứ tự quy tự được đo trên đúng đường dẫn code thật (coref.pronoun_rule_order) — không monkeypatch."
+  },
+  "thang_so_sanh": [
+    {
+      "bien_the": "A · R1a→R1b→R3→R5→R6",
+      "thu_tu": [
+        "r1a",
+        "r1b",
+        "r3",
+        "r5",
+        "r6"
+      ],
+      "r1b_unique_only": false,
+      "r3_requires_no_person": false,
+      "g5_do_chinh_xac": 0.8475,
+      "g5_so_dung": 100,
+      "g5_so_mention_co_nhan_vang": 118,
+      "g3_resolve_rate_pct": 69.63
+    },
+    {
+      "bien_the": "B · R3→R1a→R1b→R5→R6",
+      "thu_tu": [
+        "r3",
+        "r1a",
+        "r1b",
+        "r5",
+        "r6"
+      ],
+      "r1b_unique_only": false,
+      "r3_requires_no_person": false,
+      "g5_do_chinh_xac": 0.8729,
+      "g5_so_dung": 103,
+      "g5_so_mention_co_nhan_vang": 118,
+      "g3_resolve_rate_pct": 69.62
+    },
+    {
+      "bien_the": "C · R1a→R3→R1b→R5→R6",
+      "thu_tu": [
+        "r1a",
+        "r3",
+        "r1b",
+        "r5",
+        "r6"
+      ],
+      "r1b_unique_only": false,
+      "r3_requires_no_person": false,
+      "g5_do_chinh_xac": 0.8559,
+      "g5_so_dung": 101,
+      "g5_so_mention_co_nhan_vang": 118,
+      "g3_resolve_rate_pct": 69.62
+    },
+    {
+      "bien_the": "D · R1b→R1a→R3→R5→R6",
+      "thu_tu": [
+        "r1b",
+        "r1a",
+        "r3",
+        "r5",
+        "r6"
+      ],
+      "r1b_unique_only": false,
+      "r3_requires_no_person": false,
+      "g5_do_chinh_xac": 0.839,
+      "g5_so_dung": 99,
+      "g5_so_mention_co_nhan_vang": 118,
+      "g3_resolve_rate_pct": 69.63
+    },
+    {
+      "bien_the": "E · R1a→R1b(duy nhất)→R3→R5→R6",
+      "thu_tu": [
+        "r1a",
+        "r1b",
+        "r3",
+        "r5",
+        "r6"
+      ],
+      "r1b_unique_only": true,
+      "r3_requires_no_person": false,
+      "g5_do_chinh_xac": 0.8559,
+      "g5_so_dung": 101,
+      "g5_so_mention_co_nhan_vang": 118,
+      "g3_resolve_rate_pct": 69.23
+    },
+    {
+      "bien_the": "F · R1a→R3→R1b(duy nhất)→R5→R6",
+      "thu_tu": [
+        "r1a",
+        "r3",
+        "r1b",
+        "r5",
+        "r6"
+      ],
+      "r1b_unique_only": true,
+      "r3_requires_no_person": false,
+      "g5_do_chinh_xac": 0.8559,
+      "g5_so_dung": 101,
+      "g5_so_mention_co_nhan_vang": 118,
+      "g3_resolve_rate_pct": 69.23
+    },
+    {
+      "bien_the": "G · R3→R1a→R1b(duy nhất)→R5→R6",
+      "thu_tu": [
+        "r3",
+        "r1a",
+        "r1b",
+        "r5",
+        "r6"
+      ],
+      "r1b_unique_only": true,
+      "r3_requires_no_person": false,
+      "g5_do_chinh_xac": 0.8729,
+      "g5_so_dung": 103,
+      "g5_so_mention_co_nhan_vang": 118,
+      "g3_resolve_rate_pct": 69.23
+    },
+    {
+      "bien_the": "H · R3(đặc tả: đoạn không có PERSON)→R1a→R1b→R5→R6",
+      "thu_tu": [
+        "r3",
+        "r1a",
+        "r1b",
+        "r5",
+        "r6"
+      ],
+      "r1b_unique_only": false,
+      "r3_requires_no_person": true,
+      "g5_do_chinh_xac": 0.6864,
+      "g5_so_dung": 81,
+      "g5_so_mention_co_nhan_vang": 118,
+      "g3_resolve_rate_pct": 66.76
+    },
+    {
+      "bien_the": "I · R1a→R3(đặc tả)→R1b→R5→R6",
+      "thu_tu": [
+        "r1a",
+        "r3",
+        "r1b",
+        "r5",
+        "r6"
+      ],
+      "r1b_unique_only": false,
+      "r3_requires_no_person": true,
+      "g5_do_chinh_xac": 0.6864,
+      "g5_so_dung": 81,
+      "g5_so_mention_co_nhan_vang": 118,
+      "g3_resolve_rate_pct": 66.76
+    }
+  ]
+}

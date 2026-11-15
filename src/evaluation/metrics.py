@@ -1,4 +1,4 @@
-"""Hàm đánh giá dùng chung (Phase 4/5/12).
+"""Hàm đánh giá dùng chung (Phase 4/5/8/12).
 
 Hiện có:
 
@@ -6,8 +6,10 @@ Hiện có:
   **entity-level** (span) và theo **type**.
 - :func:`span_f1` — F1 span-level tổng quát (dùng cho so sánh span).
 - :func:`prf1` — Precision / Recall / F1 từ cặp đếm.
+- :func:`relation_f1_multilabel` — F1 cho bài toán RE **đa nhãn** (Phase 8).
 
-Dùng lại ở Phase 5 (đánh giá mô hình NER) và Phase 12 (đánh giá Text-to-Cypher).
+Dùng lại ở Phase 5 (đánh giá mô hình NER), Phase 8 (đánh giá mô hình RE)
+và Phase 12 (đánh giá Text-to-Cypher).
 
 Lưu ý về scheme nhãn: dùng **BIO** (``B-``/``I-``/``O``) — 13 lớp
 (6 nhãn × 2 + ``O``), khớp với ``docs/CONTEXT.md`` §2.4.
@@ -237,3 +239,196 @@ def token_f1(
             elif not pred_pos and gold_pos:
                 false_negative += 1
     return prf1(true_positive, false_positive, false_negative)
+
+
+# ---------------------------------------------------------------------------
+# Relation Extraction đa nhãn (Phase 8 — D1.2)
+# ---------------------------------------------------------------------------
+
+
+def relation_f1_multilabel(
+    pred: Iterable[dict[str, Any]],
+    gold: Iterable[dict[str, Any]],
+    *,
+    relations: Sequence[str] | None = None,
+    na_label: str = "NA",
+) -> dict[str, Any]:
+    """Tính F1 cho bài toán RE **đa nhãn** (mô hình 18 quan hệ + ``NA``).
+
+    Vì sao cần hàm riêng
+    --------------------
+    Bài toán RE ở Phase 8 là **đa nhãn**: một cặp (subject, object) trong một
+    câu có thể đồng thời thỏa nhiều quan hệ (đo được ở Phase 7: 1.777/26.030
+    input có ≥ 2 quan hệ POSITIVE, trong đó 53,7% là cặp ``cha_cua`` +
+    ``me_cua`` — quan hệ *song sinh* hợp lệ). Vì vậy:
+
+    - Một input có thể có **nhiều** nhãn đúng → so khớp theo **tập** quan hệ.
+    - Quan hệ chưa được giám sát cho input đó là **ẩn (masked)**, không phải
+      "không có quan hệ" → không được tính vào false negative.
+
+    Định dạng input
+    ---------------
+    Mỗi record (một *input*) gồm:
+
+    - ``key``: khóa định danh input (thường là
+      ``(sentence_id, subject_entity_id, object_entity_id)``).
+    - ``relations``: tập quan hệ **đúng** (gold) — rỗng nghĩa là chỉ có ``NA``.
+    - ``masked``: tập quan hệ **ẩn** (chưa giám sát) — không tính vào FN.
+    - ``predicted``: tập quan hệ **dự đoán** (model đã lọc ``NA`` rồi).
+
+    Chuẩn hoá orientation được xử lý ở tầng gọi (đảm bảo cùng key cho
+    quan hệ đối xứng).
+
+    Args:
+        pred: Danh sách record dự đoán.
+        gold: Danh sách record gold, cùng định dạng.
+        relations: Danh sách quan hệ cần báo cáo per-relation. Mặc định là
+            hợp nhất các quan hệ xuất hiện ở gold hoặc pred.
+        na_label: Nhãn dùng cho đầu ra "không có quan hệ".
+
+    Returns:
+        Dict gồm ``micro``, ``macro``, ``per_relation``, ``na``,
+        ``n_inputs``, ``n_gold_pairs``.
+    """
+    pred_list = list(pred)
+    gold_list = list(gold)
+
+    def _key_of(record: dict[str, Any]) -> Any:
+        """Lấy khóa input của một record.
+
+        Args:
+            record: Record đầu vào.
+
+        Returns:
+            Khóa input.
+        """
+        if "key" in record:
+            return record["key"]
+        return (
+            record.get("sentence_id"),
+            record.get("subject"),
+            record.get("object"),
+        )
+
+    gold_by_key: dict[Any, set[str]] = {}
+    masked_by_key: dict[Any, set[str]] = {}
+    for record in gold_list:
+        key = _key_of(record)
+        gold_by_key.setdefault(key, set()).update(record.get("relations") or ())
+        masked_by_key.setdefault(key, set()).update(record.get("masked") or ())
+
+    pred_by_key: dict[Any, set[str]] = {}
+    for record in pred_list:
+        key = _key_of(record)
+        pred_by_key.setdefault(key, set()).update(record.get("predicted") or ())
+
+    all_keys = set(gold_by_key) | set(pred_by_key)
+
+    if relations is None:
+        relation_set: set[str] = set()
+        for key in all_keys:
+            relation_set |= gold_by_key.get(key, set())
+            relation_set |= pred_by_key.get(key, set())
+        relation_list = sorted(relation_set)
+    else:
+        relation_list = list(relations)
+
+    counts: dict[str, dict[str, int]] = {
+        relation: {"tp": 0, "fp": 0, "fn": 0, "support": 0}
+        for relation in relation_list
+    }
+
+    na_tp = na_fp = na_fn = 0
+
+    for key in all_keys:
+        gold_set = gold_by_key.get(key, set())
+        masked = masked_by_key.get(key, set())
+        pred_set = pred_by_key.get(key, set())
+
+        # Quan hệ đúng mà mô hình bỏ sót → FN (trừ phần bị mask).
+        for relation in gold_set:
+            if relation in masked:
+                continue
+            if relation not in pred_set:
+                counts.setdefault(
+                    relation, {"tp": 0, "fp": 0, "fn": 0, "support": 0}
+                )["fn"] += 1
+
+        # Quan hệ mô hình bịa ra → FP (chỉ tính quan hệ có trong tập theo dõi).
+        for relation in pred_set:
+            if relation in gold_set:
+                continue
+            if relation in masked:
+                continue
+            if relation in counts:
+                counts[relation]["fp"] += 1
+
+        for relation in gold_set:
+            if relation in masked:
+                continue
+            counts.setdefault(
+                relation, {"tp": 0, "fp": 0, "fn": 0, "support": 0}
+            )["support"] += 1
+            if relation in pred_set:
+                counts[relation]["tp"] += 1
+
+        # Đầu NA: đúng khi input không có quan hệ nào trong gold.
+        gold_na = not gold_set
+        pred_na = not pred_set
+        if gold_na and pred_na:
+            na_tp += 1
+        elif pred_na and not gold_na:
+            na_fn += 1
+        elif gold_na and not pred_na:
+            na_fp += 1
+
+    per_relation: dict[str, dict[str, float]] = {}
+    for relation, count in counts.items():
+        stats = prf1(count["tp"], count["fp"], count["fn"])
+        stats["support"] = count["support"]
+        per_relation[relation] = stats
+
+    total_tp = sum(c["tp"] for c in counts.values())
+    total_fp = sum(c["fp"] for c in counts.values())
+    total_fn = sum(c["fn"] for c in counts.values())
+    micro = prf1(total_tp, total_fp, total_fn)
+
+    evaluated = [s["f1"] for s in per_relation.values() if s["support"] > 0]
+    macro = {
+        "precision": round(
+            sum(
+                s["precision"]
+                for s in per_relation.values()
+                if s["support"] > 0
+            )
+            / len(evaluated),
+            4,
+        )
+        if evaluated
+        else 0.0,
+        "recall": round(
+            sum(
+                s["recall"]
+                for s in per_relation.values()
+                if s["support"] > 0
+            )
+            / len(evaluated),
+            4,
+        )
+        if evaluated
+        else 0.0,
+        "f1": round(sum(evaluated) / len(evaluated), 4) if evaluated else 0.0,
+    }
+
+    return {
+        "micro": micro,
+        "macro": macro,
+        "per_relation": per_relation,
+        "na": prf1(na_tp, na_fp, na_fn),
+        "n_inputs": len(all_keys),
+        "n_gold_pairs": sum(
+            len(gold_by_key.get(key, set()) - masked_by_key.get(key, set()))
+            for key in gold_by_key
+        ),
+        "na_label": na_label,
+    }

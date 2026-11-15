@@ -1,0 +1,158 @@
+# Seed cho bộ lọc Phase 1 (T1 category + T3 BFS).
+#
+# Nguồn: đã kiểm chứng 11/2026 trên dump viwiki — các category "Vua Việt Nam",
+# "Địa danh Việt Nam", "Người Việt Nam" có số bài lớn và đúng phạm vi.
+# Category như "Thời đại Lê", "Nhà Lê", "Vua" trả 0 hoặc toàn bài nước ngoài
+# → KHÔNG dùng. Xem docs/05-du-lieu-va-nguon.md §2.4 và reports/deviations.md.
+
+# --- T1: category seed (khớp chính xác tên, không phải tiền tố) ---
+# Đã verify tên trên `linktarget.sql.gz` của dump viwiki 20261101 ngày 13/11/2026.
+# Category "Nhân vật thời Lê" KHÔNG tồn tại → dùng "Nhân vật thời Lê sơ" + "Nhân vật thời Nguyễn".
+category_seeds:
+  - "Vua Việt Nam"
+  - "Địa danh Việt Nam"
+  - "Người Việt Nam"
+  - "Chiến tranh Việt Nam"
+  - "Thành cổ Việt Nam"
+  - "Lăng tẩm"
+  - "Lịch sử Việt Nam"
+  - "Nhân vật thời Ngô"
+  - "Nhân vật thời Đinh"
+  - "Nhân vật thời Tiền Lê"
+  - "Nhân vật thời Lý"
+  - "Nhân vật thời Trần"
+  - "Nhân vật thời Hồ"
+  - "Nhân vật thời Lê sơ"
+  - "Nhân vật thời Tây Sơn"
+  - "Nhân vật thời Nguyễn"
+
+# Độ sâu mở rộng đệ quy subcategory (T1) — xây từ pages-meta-current
+category_max_depth: 3
+
+# --- T2: whitelist loại infobox (đã chuẩn hóa) ---
+infobox_whitelist:
+  - person
+  - dynasty
+  - battle
+  - event
+  - place
+
+# Cửa sổ lịch sử dùng để chặn bài hiện đại ở T2.
+# 9 triều đại trải từ Ngô Quyền (938) đến nhà Nguyễn (1945).
+# Bài có infobox đầy đủ nhưng mọi mốc năm nằm ngoài cửa sổ này → loại.
+history_year_min: 850
+history_year_max: 1945
+
+# Ngưỡng năm sinh tối đa cho nhân vật (T0). Nhà Nguyễn kết thúc 1945 nhưng
+# phần lớn nhân vật thời Nguyễn sinh trước 1900 → cắt ở 1900 để loại
+# nhân vật thế kỷ 20 (hiện đại) vốn chiếm đa số bài có infobox đầy đủ.
+person_year_max: 1900
+
+# Số trường lịch sử tối thiểu trong infobox, theo từng loại node (T2).
+# `person` cần nhiều hơn vì bài "người nổi tiếng" hiện đại cũng có infobox
+# đầy đủ; `battle`/`event` chỉ cần 1 (ngày).
+infobox_min_history_fields:
+  person: 3
+  place: 2
+  dynasty: 2
+  battle: 1
+  event: 1
+
+# Các trường infobox được tính là "trường lịch sử" (đủ 2 là đạt T2)
+history_fields:
+  - "sinh"
+  - "mất"
+  - "triều đại"
+  - "thời gian"
+  - "thủ đô"
+  - "người đứng đầu"
+
+# --- T3: seed bài (mở rộng BFS theo hyperlink nội bộ) ---
+# Đây là các bài "lõi" của 9 triều đại — nguồn đã kiểm chứng trên Wikipedia.
+seed_articles:
+  # Ngô
+  - "Ngô Quyền"
+  - "Ngô Xương Xí"
+  # Đinh
+  - "Đinh Tiên Hoàng"
+  - "Đinh Bộ Lĩnh"
+  # Tiền Lê
+  - "Lê Đại Hành"
+  - "Lê Trung Hưng"
+  # Lý
+  - "Lý Thái Tổ"
+  - "Lý Thái Tông"
+  # Trần
+  - "Trần Thái Tông"
+  - "Trần Anh Tông"
+  - "Trần Quốc Tuấn"
+  # Hồ
+  - "Hồ Quý Ly"
+  - "Hồ Hán Thương"
+  # Lê sơ
+  - "Lê Thái Tổ"
+  - "Lê Thái Tông"
+  - "Lê Hiến Tông"
+  - "Nguyễn Trãi"
+  # Tây Sơn
+  - "Nguyễn Nhạc"
+  - "Nguyễn Huệ"
+  - "Quang Trung"
+  # Nguyễn
+  - "Gia Long"
+  - "Minh Mạng"
+  - "Tự Đức"
+  - "Thành Thái"
+  - "Duy Tân"
+  # Sự kiện / trận đánh nổi bật
+  - "Trận Bạch Đằng (938)"
+  - "Trận Bạch Đằng (1406)"
+  - "Trận Chi Lăng-Xương Giang"
+  - "Trận Tốt Động-Chúc Động"
+  - "Trận Đống Đa"
+  - "Trận Ngọc Hồi-Đống Đa"
+  - "Trận Rạch Gầm-Xoài Mút"
+  - "Trận Tây Đô"
+  # Địa danh
+  - "Hoành Diệu"
+  - "Cố đô Huế"
+  - "Thăng Long"
+
+# Chiều sâu tối đa của BFS theo hyperlink nội bộ (T3)
+bfs_max_depth: 2
+
+# --- T0: bộ lọc Wikidata ---
+# Nhóm quan hệ dùng làm tín hiệu "người lịch sử" (đã đếm trên QLever 13/11/2026):
+#   P22            → 203 người có cha (tín hiệu mạnh nhất, đúng 9 triều đại)
+#   P22|P25|P26    → 293 người
+#   P22|P25|P26|P39→ 783 người
+#   "" (không lọc)  → 1996 người (quá rộng, chủ yếu là người thế kỷ 19-20)
+wikidata_relation_filter: "P22"
+
+# Năm sinh tối đa để tính đến (sinh trước năm này mới tính là nhân vật lịch sử)
+wikidata_max_birth_year: 1950
+
+# --- T4: loại trừ ---
+exclude_categories:
+  - "Danh sách"
+  - "Bảng"
+  - "Dự án Wikimedia"
+  - "Bài viết dẫn nhập"
+  - "Bài viết dẫn nhập 2"
+  - "Trang định hướng"
+  - "Cổng thông tin"
+  - "Chủ đề"
+
+# Tiền tố tiêu đề bị loại (bài viết ngoài phạm vi lịch sử)
+exclude_title_prefixes:
+  - "Danh sách"
+  - "Bảng "
+  - "Wikipedia:"
+  - "Thời gian"
+  - "Dòng thời gian"
+  - "So sánh"
+  - "Từ điển"
+
+# Số bài mục tiêu
+target_min_articles: 2000
+target_max_articles: 5000

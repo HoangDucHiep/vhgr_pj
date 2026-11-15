@@ -1,0 +1,20 @@
+{
+ "id": "dathungdao2004/vhgr-phase-5-ner-train-phobert-large",
+ "title": "VHGR Phase 5 - NER train PhoBERT (large)",
+ "code_file": "notebook.ipynb",
+ "language": "python",
+ "kernel_type": "notebook",
+ "is_private": true,
+ "enable_gpu": true,
+ "enable_tpu": false,
+ "enable_internet": true,
+ "dataset_sources": [
+  "dathungdao2004/vhgr-ner-data"
+ ],
+ "keywords": [
+  "vietnamese",
+  "wikipedia"
+ ],
+ "competition_sources": [],
+ "model_sources": []
+}

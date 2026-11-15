@@ -1,0 +1,123 @@
+{
+  "_meta": {
+    "phase": 6,
+    "mo_ta": "Kiểm định Gate G1-G8 Phase 6 — đọc trực tiếp artifact đã sinh",
+    "nguon": "python scripts/coref_gate_check.py --config configs/default.yaml",
+    "ngay_do": "2026-11-15"
+  },
+  "gates": {
+    "G1": {
+      "mo_ta": "100% canonical_id là ent_<slug>_<hash8> hoặc null",
+      "so_mention": 197610,
+      "so_vi_pham": 0,
+      "vi_pham_mau": [],
+      "dat": true
+    },
+    "G2": {
+      "mo_ta": "make_entity_id deterministic",
+      "so_mau": 6,
+      "dat": true,
+      "chi_tiet": [
+        {
+          "type": "person",
+          "name": "Lê Lợi",
+          "ids": [
+            "ent_le_loi_c820c0c9"
+          ],
+          "deterministic": true
+        },
+        {
+          "type": "person",
+          "name": "Nguyễn Huệ",
+          "ids": [
+            "ent_nguyen_hue_46288b33"
+          ],
+          "deterministic": true
+        },
+        {
+          "type": "event",
+          "name": "Đảo chính Việt Nam Cộng hòa 1963",
+          "ids": [
+            "ent_dao_chinh_viet_nam_cong_hoa_1963_efb2d273"
+          ],
+          "deterministic": true
+        },
+        {
+          "type": "dynasty",
+          "name": "Nhà Trần",
+          "ids": [
+            "ent_nha_tran_756be166"
+          ],
+          "deterministic": true
+        },
+        {
+          "type": "place",
+          "name": "Hoa Lư",
+          "ids": [
+            "ent_hoa_lu_9a215c88"
+          ],
+          "deterministic": true
+        },
+        {
+          "type": "person",
+          "name": "Ngô Quyền",
+          "ids": [
+            "ent_ngo_quyen_70732bc0"
+          ],
+          "deterministic": true
+        }
+      ]
+    },
+    "G3": {
+      "mo_ta": "Tỉ lệ mention resolve >= 60%",
+      "so_mention": 197610,
+      "so_resolve": 137584,
+      "ty_le": 0.6962,
+      "ty_le_khong_tinh_time": 0.9635,
+      "nguong": 0.6,
+      "dat": true
+    },
+    "G4": {
+      "mo_ta": "0 lỗi gắn sai giới tính",
+      "so_dai_tu_kiem_dinh": 326,
+      "so_loi": 0,
+      "loi_mau": [],
+      "dat": true
+    },
+    "G5": {
+      "mo_ta": "Độ chính xác gán đại từ (C1) >= 0,80",
+      "so_mention_co_nhan_vang": 118,
+      "so_dung": 103,
+      "do_chinh_xac": 0.8729,
+      "nguong": 0.8,
+      "dat": true
+    },
+    "G6": {
+      "mo_ta": "Độ chính xác article_subject (C2) >= 0,90",
+      "so_bai_co_ground_truth": 1687,
+      "so_dung": 1687,
+      "do_chinh_xac": 1.0,
+      "nguong": 0.9,
+      "dat": true
+    },
+    "G7": {
+      "mo_ta": "100% offset đúng: text[start:end] == mention_text",
+      "so_mention": 197610,
+      "so_loi": 0,
+      "loi_mau": [],
+      "dat": true
+    },
+    "G8": {
+      "mo_ta": "pytest tests/ không fail",
+      "so_test_pass": 439,
+      "summary": "439 passed in 57.40s",
+      "returncode": 0,
+      "dat": true
+    }
+  },
+  "tong_ket": {
+    "so_gate_dat": 8,
+    "so_gate": 8,
+    "dat_tat_ca": true
+  }
+}

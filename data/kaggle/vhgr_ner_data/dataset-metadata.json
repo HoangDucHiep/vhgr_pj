@@ -1,0 +1,22 @@
+{
+ "title": "VHGR Phase 5 — NER silver labels (viwiki 20261101)",
+ "id": "hoanghiep421/vhgr-ner-data",
+ "licenses": [
+  {
+   "name": "CC BY-SA 4.0"
+  }
+ ],
+ "keywords": [
+  "vietnamese",
+  "wikipedia",
+  "ner",
+  "named-entity-recognition"
+ ],
+ "subtitle": "186.960 câu nhãn bạc BIO 13 lớp + mã nguồn pipeline",
+ "description": "Dữ liệu huấn luyện NER cho dự án Knowledge Graph lịch sử Việt Nam.\n\n- `ner_silver.jsonl.gz`: 186.960 câu, 138.860 mention, scheme BIO 13 lớp\n- `splits.json`: chia theo bài (80/10/10), seed 42\n- `src/`, `configs/`: mã nguồn pipeline Phase 5\n- `models_hf/`: weight PhoBERT base/large (kernel không có DNS nên\n  không tải được từ huggingface.co)\n- `manifest.json`: mô tả artifact\n\nNguồn: Wikipedia tiếng Việt dump 20261101 (CC BY-SA 4.0).\nModel: vinai/phobert-base, vinai/phobert-large (MIT).",
+ "resources": [
+  {
+   "path": "ner_silver.jsonl.gz"
+  }
+ ]
+}

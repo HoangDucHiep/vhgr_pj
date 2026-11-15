@@ -1,0 +1,17 @@
+{
+ "_meta": {
+  "phase": 5,
+  "muc_tieu": "Huấn luyện mô hình NER PhoBERT (BIO 13 lớp)",
+  "dump_version": "20261101",
+  "nguon_du_lieu": "data/interim/ner_silver.jsonl",
+  "cau_hinh_lop": "NER: PERSON, DYNASTY, EVENT, LOCATION, TIME, TITLE",
+  "schema_nhan": "BIO",
+  "so_lop": 13,
+  "seed": 42
+ },
+ "files": [
+  "ner_silver.jsonl.gz",
+  "requirements.txt",
+  "splits.json"
+ ]
+}

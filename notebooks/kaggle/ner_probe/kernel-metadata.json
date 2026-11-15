@@ -1,0 +1,21 @@
+{
+ "id": "hoangduchiep/vhgr-phase-5-ner-probe-gpu",
+ "title": "Vhgr Phase 5 Ner Probe Gpu",
+ "code_file": "notebook.ipynb",
+ "language": "python",
+ "kernel_type": "notebook",
+ "is_private": true,
+ "enable_gpu": true,
+ "enable_tpu": false,
+ "enable_internet": true,
+ "dataset_sources": [
+  "hoangduchiep/vhgr-ner-data"
+ ],
+ "keywords": [
+  "vietnamese"
+ ],
+ "competition_sources": [],
+ "model_sources": [],
+ "docker_image": "gcr.io/kaggle-images/python@sha256:f4b6dd72d4ac48c76fbb02bce0798b80b284102886ad37e6041e9ab721dc8873",
+ "docker_image_pinning_type": "latest"
+}

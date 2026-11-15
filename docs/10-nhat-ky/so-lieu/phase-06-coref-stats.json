@@ -1,0 +1,60 @@
+{
+  "_meta": {
+    "phase": 6,
+    "dump_version": "20261101",
+    "mo_ta": "Số liệu chất lượng coreference Phase 6 (C1/C2)",
+    "nguon": "python -m src.coref.quality_report --config configs/default.yaml → data/interim/coref_resolved.jsonl",
+    "ngay_do": "2026-11-15"
+  },
+  "thong_ke": {
+    "so_sentence": 186960,
+    "so_mention": 197610,
+    "so_mention_resolved": 137584,
+    "resolve_rate_pct": 69.62,
+    "resolve_rate_non_time_pct": 96.35,
+    "so_mention_non_time": 142655,
+    "so_mention_non_time_resolved": 137454,
+    "phoi_resolved_by": {
+      "explicit": 88283,
+      "unlinked": 54825,
+      "article_subject": 32341,
+      "coref_honorific": 14521,
+      "ambiguous": 5201,
+      "coref_pronoun": 2439
+    },
+    "phoi_label": {
+      "PERSON": 91578,
+      "TIME": 54955,
+      "LOCATION": 29883,
+      "EVENT": 9739,
+      "DYNASTY": 6747,
+      "TITLE": 4708
+    },
+    "resolved_by_label": {
+      "PERSON": 86450,
+      "LOCATION": 29883,
+      "EVENT": 9739,
+      "DYNASTY": 6747,
+      "TITLE": 4635,
+      "TIME": 130
+    },
+    "phoi_source": {
+      "ner": 143108,
+      "pronoun": 54502
+    },
+    "resolved_by_source": {
+      "ner": 88283,
+      "pronoun": 49301
+    },
+    "so_sentence_co_danh_xung": 42018,
+    "so_danh_xung": 54502,
+    "so_danh_xung_resolved": 49301,
+    "resolve_rate_danh_xung_pct": 90.46,
+    "vi_pham": {
+      "canonical_id_sai_dinh_dang": 0,
+      "offset_khong_khop": 0,
+      "nhan_ngoai_danh_muc": 0,
+      "resolved_by_ngoai_danh_muc": 0
+    }
+  }
+}

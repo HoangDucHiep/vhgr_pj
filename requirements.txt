@@ -29,6 +29,12 @@ datasets>=3.0
 accelerate>=1.0
 seqeval>=1.2
 torch>=2.4
+# Fast tokenizer cho PhoBERT (cần `word_ids()` + `offset_mapping`).
+# `AutoTokenizer` trả slow tokenizer -> phải nạp bằng `PreTrainedTokenizerFast`.
+sentencepiece>=0.2
+
+# ---- Kaggle (đẩy dataset / kernel lên Kaggle GPU) ----
+kaggle>=2.2
 
 # ---- Test ----
 pytest>=8.3

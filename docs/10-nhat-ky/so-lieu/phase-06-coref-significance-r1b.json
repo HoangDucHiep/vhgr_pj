@@ -1,0 +1,51 @@
+{
+  "_meta": {
+    "phase": 6,
+    "mo_ta": "Kiểm định ý nghĩa chênh lệch G5 giữa 2 thứ tự quy tắc R",
+    "nguon": "python scripts/coref_bootstrap.py --order-a r1a,r1b,r3,r5,r6 --order-b r1a,r1b,r3,r5,r6",
+    "ngay_do": "2026-11-15"
+  },
+  "bien_the_a": {
+    "thu_tu": [
+      "r1a",
+      "r1b",
+      "r3",
+      "r5",
+      "r6"
+    ],
+    "r1b_unique_only": false,
+    "g5": 0.8475,
+    "g5_ci95": [
+      0.7685,
+      0.9159
+    ]
+  },
+  "bien_the_b": {
+    "thu_tu": [
+      "r1a",
+      "r1b",
+      "r3",
+      "r5",
+      "r6"
+    ],
+    "r1b_unique_only": true,
+    "g5": 0.8559,
+    "g5_ci95": [
+      0.7818,
+      0.9206
+    ]
+  },
+  "mcnemar": {
+    "a_dung_b_sai": 1,
+    "b_dung_a_sai": 2,
+    "p_value": 1.0,
+    "ket_luan": "KHONG co y nghia thong ke"
+  },
+  "bootstrap": {
+    "n_lan": 10000,
+    "seed": 42,
+    "xac_suat_a_tot_hon_b": 0.2651,
+    "xac_suat_b_tot_hon_a": 0.534,
+    "hoa": 0.2009
+  }
+}
