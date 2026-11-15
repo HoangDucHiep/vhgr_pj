@@ -7,18 +7,18 @@
 
 | Hạng mục | Trạng thái |
 |---|---|
-| Giai đoạn | **Đang triển khai** — Phase 1–7 xong (15/11/2026) |
-| Phase hiện tại | **Phase 8 — Mô hình RE, LLM bulk, hợp nhất triple (D1/D2/D3)** — 🟡 đang làm (7/8 Gate đạt, model đang train trên Kaggle GPU) |
-| Phase đã xong | 0 Bootstrap · 1 Lọc bài · 2 Làm sạch+tách câu · 3 Infobox · 4 Nhãn bạc NER · 5 Huấn luyện+suy luận NER · **6 Coreference (C1/C2)** · **7 Wikidata DS + tập train RE (D1.1)** |
+| Giai đoạn | **Đang triển khai** — Phase 1–12 xong (16/11/2026) |
+| Phase hiện tại | **Phase 8 — Mô hình RE, LLM bulk, hợp nhất triple (D1/D2/D3)** — 🟢 **đã đóng** (19/19 Gate, 12/12 mục objective đối chiếu PASS) |
+| Phase đã xong | 0 Bootstrap · 1 Lọc bài · 2 Làm sạch+tách câu · 3 Infobox · 4 Nhãn bạc NER · 5 Huấn luyện+suy luận NER · **6 Coreference (C1/C2)** · **7 Wikidata DS + tập train RE (D1.1)** · **8 Mô hình RE + LLM + hợp nhất triple (D1/D2/D3)** · 9 Entity linking · 10 Đồ thị + Neo4j · 11 Text-to-Cypher backend · 12 Giao diện web |
 | Tài liệu | `docs/00` … `docs/09` đã hoàn thành · `docs/10-nhat-ky/` nhật ký triển khai chi tiết theo phase |
 | Môi trường | Python 3.12.3, Docker 29.9.2, Node 24.15, RAM 23GB, đĩa 2.5TB, **không GPU local** |
 | Hạ tầng | `.venv` đã tạo + cài `requirements.txt` ✅ · Neo4j 5.26.32 Community ở `:7474`/`:7687` ✅ · user `reader` đã tạo ✅ |
 | Backend | FastAPI chạy ở `:8000` — `/api/health` → `{"status":"ok","neo4j":"up"}` ✅ |
 | Frontend | Vite + React 18 + TS — `npm run build` 0 lỗi ✅ |
-| Kaggle | `KAGGLE_USERNAME=hoangduchiep` + `KAGGLE_KEY` trong `.env` ✅ (auth bằng `Authorization: Bearer`) |
+| Kaggle | `KAGGLE_USERNAME=hoangduchiep` + `KAGGLE_KEY` trong `.env` ✅ (auth bằng `Authorization: Bearer`) — ⚠️ CLI ≥ 2.2: `~/.kaggle/access_token` **đè** env ⇒ phải `env -u KAGGLE_USERNAME -u KAGGLE_KEY KAGGLE_API_TOKEN=<tok>` (D-089) |
 | API key | `GEMINI_API_KEY`, `GROQ_API_KEY` trong `.env` ✅ |
-| Test | `pytest -q tests/` → **556 passed** (480 Phase 7 + 76 Phase 8) |
-| Số liệu hiện tại | 2.441 bài · 186.960 câu · 10.078 triple infobox · 143.108 entity NER · **197.610 mention coref** (resolve 69,62%) · **15.580 mẫu POSITIVE RE** / 17 quan hệ · **25.947** ví dụ train RE (19 đầu) · **12.313** triple hợp nhất |
+| Test | `pytest -q tests/` → **625 passed** (480 Phase 7 + 76 Phase 8 + 7 entity linker + 8 kaggle LLM notebook + 1 `alt_evidence` regression) |
+| Số liệu hiện tại | 2.441 bài · 186.960 câu · 10.078 triple infobox · 143.108 entity NER · **197.610 mention coref** (resolve 69,62%) · **15.580 mẫu POSITIVE RE** / 17 quan hệ · **25.947** ví dụ train RE (19 đầu) · **13.379** triple hợp nhất (13 trường) · KG **19.548 node / 13.379 edge** |
 
 ## 2. Quyết định đã chốt (KHÔNG đổi nếu không có lý do ghi vào DECISIONS.md)
 
@@ -100,7 +100,12 @@ Trích xuất LLM trên toàn corpus → **Kaggle GPU**.
 | LLM bulk | Kaggle GPU, `Qwen/Qwen3-8B` 4-bit, chunk **15 câu/request** | — |
 | LLM API baseline | Gemini `gemini-3.5-flash-lite` → fallback Groq `openai/gpt-oss-20b`, tập con **1.500 câu** (tập `test`) | — |
 | Ràng buộc evidence | `evidence` phải là **substring** nguyên văn của câu → nếu không, **loại** và **đếm** số lượt loại | — |
-| Cache LLM | SQLite `data/interim/llm_cache.sqlite`, key = sha256(model + prompt + params) → **idempotent** | — |
+| Cache LLM | SQLite `data/interim/llm_cache.sqlite`, key = sha256(model + prompt + params) → **idempotent** (chạy lại = **0 request**) — nhưng **không bền**: DB bị thay thế giữa các lần chạy ⇒ tốn request thật; tái lập tuyệt đối cần lưu kèm `n_requests`/`elapsed_s` | D-094 |
+| Trường output triple | **13 trường** (`docs/09` §Phase 8) — gồm `alt_evidence` (bằng chứng thay thế sau dedupe). Bỏ trường này ⇒ mất dữ liệu **âm thầm** | D-093 |
+| Chất lượng RE | metric theo đặc tả (bỏ qua slot mask) **che mất** lỗi over-firing ⇒ thêm `scripts/eval_re_strict.py` (P 0,0854 · R 0,9652 · F1 0,1569) và chuyển ràng buộc sang **bộ lọc hậu xử lý 4 lớp** | D-080 → D-086 |
+| QA năm sinh/mất | dùng `OPTIONAL MATCH` + `coalesce(thuộc_tính, quan_hệ)` — thuộc tính `birth_year` chỉ có ở **721/11.021** node, quan hệ `sinh_nam`/`mat_nam` phủ **1.126/1.059** cạnh | D-087, D-088 |
+| Payload LLM mở | chuẩn hoá **mọi** hình dạng (array top-level, dict thay thế, object đơn) → `{"triples": [...]}`; "parse không lỗi" ≠ "parse đúng schema" | D-091 |
+| Ngân sách thời gian kernel | `LLM_TIME_BUDGET_S` + `flush()`/`os.fsync()` từng request ⇒ hết quota không mất output | D-090 |
 
 **Coreference (Phase 6) — các quyết định đã chốt:**
 
