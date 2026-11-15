@@ -1,0 +1,23 @@
+{
+ "id": "dathungdao2004/vhgr-phase-8-llm-extract-qwen3-8b-4bit",
+ "title": "VHGR Phase 8 - LLM extract Qwen3-8B 4bit",
+ "code_file": "notebook.ipynb",
+ "language": "python",
+ "kernel_type": "notebook",
+ "is_private": true,
+ "enable_gpu": true,
+ "enable_tpu": false,
+ "enable_internet": true,
+ "dataset_sources": [
+  "dathungdao2004/vhgr-re-data"
+ ],
+ "keywords": [
+  "vietnamese",
+  "llm",
+  "relation-extraction"
+ ],
+ "competition_sources": [],
+ "model_sources": [
+  "manojkumarcs28/qwen3-8b/PyTorch/qwen3-8b/1"
+ ]
+}

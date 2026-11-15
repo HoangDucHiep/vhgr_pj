@@ -1,0 +1,379 @@
+{
+  "_meta": {
+    "phase": 8,
+    "ngay": "2026-11-16",
+    "mo_ta": "So lieu chung cap triple Phase 8 (D-080 -> D-086) + do lai nghiem chat luong mo hinh RE.",
+    "nguon": [
+      "python scripts/eval_re_strict.py --split dev",
+      "python -m src.re.merge_triples --out /tmp/triples_stats.jsonl",
+      "python -m src.graph.recover_entities",
+      "python -m src.graph.build_graph --add-missing-entities",
+      "python scripts/validate_graph.py",
+      "pytest -q tests/"
+    ],
+    "mo_hinh": "vinai/phobert-base — 3 epoch, seed 42, nguong 0.55, 20382 cau train"
+  },
+  "re_model_metrics": {
+    "theo_dac_ta_phase_8_masked_bce": {
+      "micro_f1": 0.937529,
+      "macro_f1": 0.918978,
+      "micro_precision": 0.937578,
+      "micro_recall": 0.936705,
+      "na_f1": 0.914527,
+      "eval_loss": 0.167561,
+      "threshold": 0.55,
+      "na_threshold": 0.5,
+      "relations_f1_ge_070": 16,
+      "relations_total": 18,
+      "ghi_chu": "Slot bi mask khong bi phat => phai doc cung so lieu 'nghiem' ben duoi."
+    },
+    "do_lai_nghiem_slot_mask_tinh_la_FP": {
+      "split": "dev",
+      "n_pairs": 2987,
+      "precision": 0.0854,
+      "recall": 0.9652,
+      "f1": 0.1569,
+      "tp": 1805,
+      "fp": 19339,
+      "fp_trong_slot_mask": 19220,
+      "fp_masked_ratio": 0.9939,
+      "fn": 65,
+      "n_pairs_co_quan_he_du_doan": 1731,
+      "pairs_fired_ratio": 0.58,
+      "so_quan_he_fire_trung_binh_moi_cap": 13.5,
+      "fire_per_pair_top": [
+        {
+          "n_relations": 16,
+          "n_pairs": 976
+        },
+        {
+          "n_relations": 7,
+          "n_pairs": 260
+        },
+        {
+          "n_relations": 8,
+          "n_pairs": 174
+        },
+        {
+          "n_relations": 6,
+          "n_pairs": 131
+        },
+        {
+          "n_relations": 4,
+          "n_pairs": 34
+        }
+      ]
+    }
+  },
+  "distillation": {
+    "buoc_1_vao_5_nguon": {
+      "tong": 538227,
+      "theo_method": {
+        "phobert_re": 511567,
+        "distant_supervision": 15497,
+        "infobox": 10078,
+        "rule": 736,
+        "llm": 349
+      }
+    },
+    "buoc_2_loc_4_lop_nguon_mo_hinh": {
+      "phobert_re": {
+        "n_input": 511567,
+        "n_dropped_type": 15804,
+        "n_dropped_extra": 455202,
+        "n_dropped_ungrounded": 9291,
+        "n_dropped_no_evidence": 0,
+        "n_dropped_no_trigger": 12736,
+        "n_dropped_source_type": 13549,
+        "n_kept": 4985,
+        "keep_ratio": 0.0097
+      },
+      "llm": {
+        "n_input": 349,
+        "n_dropped_type": 20,
+        "n_dropped_extra": 1,
+        "n_dropped_ungrounded": 45,
+        "n_dropped_no_evidence": 0,
+        "n_dropped_no_trigger": 130,
+        "n_dropped_source_type": 5,
+        "n_kept": 148,
+        "keep_ratio": 0.4241
+      }
+    },
+    "buoc_3_dedupe": {
+      "n_input": 31444,
+      "n_duplicates": 15619,
+      "n_merged": 15825
+    },
+    "buoc_4_loc_ten_chung": {
+      "n_input": 15825,
+      "n_dropped_generic": 2446,
+      "n_kept": 13379
+    },
+    "buoc_5_ket_qua_cuoi": {
+      "n_triples": 13379,
+      "by_method": {
+        "infobox": 8987,
+        "phobert_re": 2378,
+        "distant_supervision": 1187,
+        "rule": 686,
+        "llm": 141
+      },
+      "theo_quan_he": {
+        "sinh_tai": 1853,
+        "chi_huy_tran": 1673,
+        "cha_cua": 1189,
+        "mat_tai": 1144,
+        "sinh_nam": 1126,
+        "mat_nam": 1059,
+        "vo_cua": 1045,
+        "giu_chuc_vu": 1036,
+        "anh_em_cua": 1000,
+        "thuoc_trieu_dai": 695,
+        "dien_ra_tai": 509,
+        "ke_vi": 328,
+        "tham_gia_tran": 315,
+        "me_cua": 305,
+        "chong_cua": 62,
+        "lap_ra": 22,
+        "dong_doi_tai": 12,
+        "danh_bai": 6
+      },
+      "validation": {
+        "missing_required_fields": 0,
+        "invalid_confidence": 0,
+        "invalid_relation": 0,
+        "self_loops": 0,
+        "empty_evidence": 0,
+        "duplicate_keys": 0
+      }
+    },
+    "ty_le_giam_tong": 0.9751
+  },
+  "entity_recovery_D085": {
+    "n_entity_chi_co_trong_triple": 2871,
+    "n_khoi_phuc_ten_va_kieu": 2826,
+    "recovery_rate": 0.985,
+    "n_khoi_phuc_tu_infobox_lead": 2459,
+    "n_fallback_chi_slug": 45,
+    "n_candidate_surface_names": 60116,
+    "n_schema_types_thu": 7,
+    "node_label_Entity_truoc": 2897,
+    "node_label_Entity_sau": 162
+  },
+  "kg_sau_khi_nap": {
+    "n_nodes": 19548,
+    "n_edges": 13379,
+    "n_orphan_edges": 0,
+    "n_entities_file": 15931,
+    "n_entities_recovered": 2871,
+    "n_year_nodes_added": 752,
+    "validate_graph_pass": "13/13",
+    "validate_graph_critical_errors": 0,
+    "idempotent_reload_delta_nodes": 0,
+    "idempotent_reload_delta_edges": 0,
+    "nodes_with_description": 1199,
+    "nodes_with_reign_start": 217
+  },
+  "qa_mau_do_thuc_te": [
+    {
+      "question": "Lê Lợi sinh năm nào?",
+      "answer": "1385",
+      "ms": 111
+    },
+    {
+      "question": "Lê Lợi là vua nhà nào?",
+      "answer": "nhà Lê sơ",
+      "ms": 111
+    },
+    {
+      "question": "Nguyễn Huệ chỉ huy trận nào?",
+      "answer": "Trận Ngọc Hồi – Đống Đa",
+      "ms": 122
+    },
+    {
+      "question": "Trần Thái Tông sinh năm bao nhiêu?",
+      "answer": "1218",
+      "ms": 120
+    },
+    {
+      "question": "Trần Thái Tông là ai?",
+      "answer": "Trần Thái Tông, tên thật là Trần Cảnh (1218–1277)",
+      "ms": 137
+    },
+    {
+      "question": "Lê Thái Tổ mất năm nào?",
+      "answer": "1433",
+      "ms": 111
+    },
+    {
+      "question": "Vua nhà Nguyễn nào làm chức vụ Hoàng đế?",
+      "answer": "12 monarchs",
+      "ms": 3382
+    },
+    {
+      "question": "Nhà Trần có bao nhiêu vua?",
+      "answer": "19 (đếm node có reign_start khác null; trước D-087 là 44)",
+      "ms": 120
+    },
+    {
+      "question": "Lý Thường Kiệt sinh năm nào?",
+      "answer": "1019 (D-087: trước là 'Không có trong dữ liệu')",
+      "ms": 111
+    },
+    {
+      "question": "Lý Thường Kiệt mất năm nào?",
+      "answer": "1105 (D-087)",
+      "ms": 115
+    },
+    {
+      "question": "Trần Hưng Đạo sinh năm nào?",
+      "answer": "1230 (D-087)",
+      "ms": 113
+    },
+    {
+      "question": "Nguyễn Huệ sinh ở đâu?",
+      "answer": "Bình Định",
+      "ms": 120
+    }
+  ],
+  "qa_do_phu_thuoc_tinh_vs_quan_he_D087": {
+    "n_person_total": 11021,
+    "n_person_co_birth_year": 721,
+    "ty_le_co_birth_year": 0.0654,
+    "n_canh_sinh_nam": 1126,
+    "n_canh_mat_nam": 1059,
+    "cau_hoi_co_duoc_sau_khi_sua": 4,
+    "cau_hoi_khong_duoc_sau_khi_sua": 0
+  },
+  "tests": {
+    "tong_test": 624,
+    "test_moi_phase_8": 84,
+    "breakdown": {
+      "test_llm_client": 20,
+      "test_re_model": 32,
+      "test_merge_triples": 24,
+      "test_entity_linker": 7,
+      "test_kaggle_llm_notebook": 8
+    },
+    "all_pass": true
+  },
+  "kaggle_audit_16_11_2026": {
+    "kernels_running": 0,
+    "kernels_queued": 0,
+    "kernels_complete": 3,
+    "kernels_deleted": 3,
+    "gpu_base_model_verified": true,
+    "gpu_base_micro_f1": 0.937529,
+    "cpu_kernel_discard_reason": "COMPLETE nhung khong sinh metrics.json (dung epoch 1, subsample 6000)"
+  },
+  "llm_bulk_kaggle_D091_D092": {
+    "tai_khoan": "dathungdao2004",
+    "kernel": "dathungdao2004/vhgr-phase-8-llm-extract-qwen3-8b-4bit",
+    "model": "Qwen/Qwen3-8B (4-bit, bitsandbytes)",
+    "trang_thai": "COMPLETE",
+    "quota_gpu_con_lai_luc_do_phut": 18.7,
+    "n_requests": 8,
+    "chunk_size": 15,
+    "elapsed_s": 724.5,
+    "time_budget_s": 700,
+    "stop_reason": "het-ngan-sach-thoi-gian",
+    "n_sentences_tai": 600,
+    "throughput_sentences_per_s": 0.828,
+    "counters": {
+      "total": 11,
+      "kept": 8,
+      "rejected_evidence": 0,
+      "rejected_relation": 3,
+      "rejected_sentence": 0
+    },
+    "evidence_substring_ratio": 1.0,
+    "n_triples_sau_bo_loc_quality": 0,
+    "ly_do_lo": [
+      "khong co bang chung (4)",
+      "khong co tu kich hoat (4)"
+    ],
+    "kg_khong_doi": {
+      "n_triples_truoc": 13379,
+      "n_triples_sau": 13379,
+      "sha1_identical": true,
+      "sha1": "776209ce45ce996d"
+    },
+    "ke_hoach_lai": "chay lai khi quota reset 21/11/2026 voi --limit 5000 --time-budget-s 28800"
+  },
+  "qa_birth_death_year_fallback_D087_D088": {
+    "why": "thuoc_tinh birth_year/death_year chi co o 721/11021 node Person (co infobox); quan he sinh_nam/mat_nam phu 1126/1059 canh",
+    "fix_prompt": "OPTIONAL MATCH (p)-[:sinh_nam]->(y:Year) + coalesce(p.birth_year, y.value)",
+    "fix_graph_node": "backend/app/services/text_to_cypher.py::_enrich_graph_from_db() doc them sinh_nam/mat_nam -> Year.value vao node khi thuoc_tinh con trong",
+    "answers": {
+      "Lý Thường Kiệt sinh năm nào?": "1019",
+      "Lý Thường Kiệt mất năm nào?": "1105",
+      "Trần Hưng Đạo sinh năm nào?": "1230",
+      "Lê Lợi sinh năm nào?": "1385",
+      "Nhà Trần có bao nhiêu vua?": "19"
+    },
+    "graph_nodes_after": {
+      "Lý Thường Kiệt": {
+        "birth_year": 1019,
+        "death_year": 1105
+      },
+      "Trần Hưng Đạo": {
+        "birth_year": 1230,
+        "death_year": 1300
+      },
+      "Lê Thái Tổ": {
+        "birth_year": 1385,
+        "death_year": 1433
+      }
+    },
+    "graph_shape": {
+      "Lý Thường Kiệt": "12 node / 12 canh",
+      "Trần Hưng Đạo": "16 node / 15 canh",
+      "Nhà Trần": "46 node / 45 canh",
+      "Lê Lợi": "26 node / 29 canh"
+    }
+  },
+  "_tests_total": 625,
+  "_tests_all_pass": true,
+  "_kg_final": {
+    "nodes": 19548,
+    "edges": 13379,
+    "validate": "13/13 PASS",
+    "fields_per_triple": 13
+  },
+  "alt_evidence_preserved_D093": {
+    "why": "REQUIRED_FIELDS thieu 'alt_evidence' => 13294 bang chung thay the sau dedupe bi mat im lang; 0/13379 edge Neo4j co alt_evidence",
+    "fix": "them 'alt_evidence' vao REQUIRED_FIELDS (12 -> 13 truong), khop JSON mau docs/09 §Phase 8 dong 595",
+    "fields_per_record": 13,
+    "triples_with_alt_evidence": 3308,
+    "total_alt_evidence_sentences": 13294,
+    "neo4j_edges_with_alt_evidence": 3308,
+    "kg_nodes": 19548,
+    "kg_edges": 13379,
+    "validate": "13/13 PASS",
+    "reload_delta": "+0 node / +0 edge",
+    "regression_test": "tests/test_merge_triples.py::test_write_merged_preserves_alt_evidence"
+  },
+  "llm_cache_idempotent_D094": {
+    "why": "cache SQLite bi thay the giua lan ghi artifact (15/11 20:15) va lan kiem tra (16/11) => 89 request that ton",
+    "evidence_run1_artifact": {
+      "ts": "2026-11-15 20:15",
+      "elapsed_s": 0.0,
+      "cache_hit": "100%"
+    },
+    "evidence_run2_recheck": {
+      "ts": "2026-11-16 06:47",
+      "elapsed_s": 0.0,
+      "requests": 0,
+      "cache_hit": "100/100"
+    },
+    "evidence_failed_run": {
+      "ts": "2026-11-16 06:40",
+      "elapsed_s": 386.9,
+      "requests": 100,
+      "cache_rows": "104 -> 193"
+    },
+    "gate": "PASS - chay lai = 0 request (do bang 2 lan doc lap)",
+    "note": "artifact giu nguyen: LLM o temperature=0 van nondeterministic (268 cau/353 triple vs 249 cau/348 triple)"
+  }
+}

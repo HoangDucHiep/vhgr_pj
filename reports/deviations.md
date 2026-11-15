@@ -673,3 +673,811 @@
 - Lý do sửa: contract đã chốt ở `docs/09` và `data-contracts.mdc` là nguồn sự thật; bản phẳng là **sai lệch so với kế hoạch**, không phải biến thể hợp lệ. Gom theo câu còn giúp Phase 8 tokenize `text` **một lần** cho mọi cặp.
 - Kết quả sau khi sửa: 12.877 câu / 29.957 cặp; **59.914/59.914** offset thỏa `text[start:end] == mention` (0 sai lệch, 0 thiếu span); 5/5 Gate đạt; `pytest -q tests/` = **480 passed**.
 - Cập nhật file: `src/re/build_re_dataset.py`, `src/re/ground_triples.py`, `src/re/re_dataset_stats.py`, `scripts/re_gate_check.py`, `tests/test_re_dataset.py`, `docs/09-ke-hoach-thuc-thien.md`, `AGENTS.md`, `docs/DECISIONS.md` (D-060)
+
+## D-061 — RE dùng **đa nhãn sigmoid** thay vì multi-class softmax (Phase 8 — 15/11/2026)
+- Ngày: 2026-11-15
+- Phase: 8
+- Loại: **thay đổi thiết kế đã chốt** (người dùng đã chốt khi được hỏi)
+- Kế hoạch: `docs/09` §Phase 8 mục 1 nói "Lớp: 18 quan hệ + `NA` → 19 nhãn" và mục 2 nói `train_re.py` "giống Phase 5" — Phase 5 dùng token classification **softmax**.
+- Thực tế: mô hình **multi-label sigmoid**: 18 đầu quan hệ (1 sigmoid/quan hệ) + 1 đầu `NA`; loss = **masked BCE**, slot chưa biết gán `-100.0`.
+- Lý do: một cặp entity có thể mang **nhiều quan hệ đúng**; softmax chỉ giữ được 1 → trần F1 ≈ 0,056. Đo được trên tập Phase 7: nhiều input có **≥ 2 quan hệ POSITIVE**. Gán `0.0` cho slot chưa biết cũng sai — **88,7%** slot chưa quan sát → dạy mô hình phủ định mọi thứ.
+- Kết quả: micro-F1 dev = **0,6951** (smoke 400 mẫu / 1 epoch / CPU, chưa phải model cuối); 19 test cho mask + metric.
+- Cập nhật file: `src/re/data_convert_re.py`, `src/re/train_re.py`, `src/re/infer_re.py`, `src/evaluation/metrics.py`, `tests/test_re_model.py`, `configs/default.yaml`, `docs/DECISIONS.md` (D-061)
+
+## D-062 — Marker thêm **vai trò** (`SUBJ`/`OBJ`) + tên hiển thị chuẩn (Phase 8 — 15/11/2026)
+- Ngày: 2026-11-15
+- Phase: 8
+- Loại: **bổ sung** so với đặc tả gốc
+- Kế hoạch: `docs/09` §Phase 8 mục 1 — marker `«PERSON:Lê Lợi»` (chỉ **kiểu**, không vai trò).
+- Thực tế: `«PERSON:SUBJ:Lê Lợi»` / `«PERSON:OBJ:Nguyễn Phúc Chu»` + tên hiển thị chuẩn (infobox → mode mention không phải đại từ → mention thô).
+- Lý do (đo được): **1.383 cặp (4,62%)** có hai đầu mention bề mặt **giống hệt nhau** → với marker chỉ có tên, chuỗi mô hình cho 2 đầu giống nhau → **không thể gán nhãn hướng** (`cha_cua` vs `con_roi`). Tên chuẩn resolve 1.300 cặp; 83 cặp còn lại **đều là self-loop** → loại. Vai trò trong marker xử lý **tuyệt đối** phần hướng.
+- Cập nhật file: `src/re/data_convert_re.py`, `src/re/infer_re.py`, `tests/test_re_model.py`, `docs/DECISIONS.md` (D-062)
+
+## D-063 — Bảng type entity theo chuỗi NER vote → infobox → `year_` → `unknown` (Phase 8 — 15/11/2026)
+- Ngày: 2026-11-15
+- Phase: 8
+- Loại: **bổ sung** (kế hoạch không quy định nguồn type)
+- Kế hoạch: `docs/09` §Phase 8 mục 1 nói "Marker có type: `«PERSON:Lê Lợi»`" nhưng **không** nêu nguồn type.
+- Thực tế: chuỗi 4 bước — **vote đa số** nhãn NER trên `coref_resolved.jsonl` (phủ **93,5%** entity) → `infobox_entities.jsonl` → tiền tố id `year_` → `unknown`.
+- Lý do: infobox chính xác hơn nhưng chỉ phủ 1.764 entity; vote NER rộng hơn nhưng có thể sai khi mention trùng nghĩa. Chuỗi lấy độ phủ từ vote, độ chính xác từ infobox.
+- Cập nhật file: `src/re/data_convert_re.py`, `src/re/infer_re.py`, `tests/test_re_model.py`, `docs/DECISIONS.md` (D-063)
+
+## D-064 — `src/common/llm_client.py` tự nạp `.env` (nạp biến rỗng, không ghi đè biến đã có) (Phase 8 — 15/11/2026)
+- Ngày: 2026-11-15
+- Phase: 8
+- Loại: sửa lỗi nội bộ
+- Kế hoạch: `docs/09` §Phase 8 mục 6 không nêu việc nạp `.env`.
+- Thực tế: script `python -m src.re.infer_re_llm` **không** đi qua `backend/app/settings.py` → biến `GEMINI_API_KEY`/`GROQ_API_KEY` chưa được nạp → mọi request fail "thiếu API key". Thêm `load_env_file()` vào `src/common/llm_client.py`.
+- Lý do: nạp biến **rỗng** (shell export sẵn `GEMINI_API_KEY=` rỗng) — `load_dotenv()` mặc định **không** ghi đè biến đã tồn tại → `.env` bị bỏ qua một cách âm thầm. `load_env_file()` kiểm tra **giá trị** (không chỉ sự tồn tại): biến rỗng → nạp; biến đã có giá trị → giữ nguyên.
+- Kết quả: Gemini trả lời thật (`'Chào'`), Groq trả JSON hợp lệ; cache idempotent (chạy lại = **0** API call).
+- Cập nhật file: `src/common/llm_client.py`, `tests/test_llm_client.py`, `docs/DECISIONS.md` (D-064)
+## D-065 — Kernel RE thiếu `dataset_sources` → `FileNotFoundError` khi mount dataset (Phase 8 — 15/11/2026)
+- Ngày: 2026-11-15
+- Phase: 8
+- Loại: sửa lỗi nội bộ
+- Kế hoạch: `docs/09` §Phase 8 Bước 8 nói "đóng gói dataset + notebook train lên Kaggle GPU".
+- Thực tế: kernel `vhgr-phase-8-re-train-phobert-base` đã push với `dataset_sources: []` (rỗng) → notebook không mount được dataset → `FileNotFoundError: /kaggle/input/vhgr-re-data/re_model_input.jsonl.gz`. Kernel LLM push đúng (`dataset_sources` có giá trị).
+- Nguyên nhân gốc: metadata push được viết tay thay vì sinh từ `scripts/build_kaggle_re_notebook.py` (file này sinh `dataset_sources` **đúng**); chỉ bản push bị thiếu.
+- Xử lý: (a) xoá 2 kernel cũ đang `QUEUED`; (b) push lại từ metadata sinh từ builder → `dataset_sources: ["hoanghiep421/vhgr-re-data"]` (đã verify lại qua `kaggle kernels pull`).
+- Bài học: **luôn push kernel từ builder script**, không viết metadata tay; verify bằng `kaggle kernels pull -m` sau khi push.
+- Cập nhật file: `scripts/build_kaggle_re_notebook.py`, `scripts/build_kaggle_llm_notebook.py`, `notebooks/kaggle/re_train_phobert_base/kernel-metadata.json`, `notebooks/kaggle/06_llm_extract_kaggle/kernel-metadata.json`
+
+## D-066 — Bundle weight `vinai/phobert-base` vào dataset RE (kernel Kaggle không có DNS) (Phase 8 — 15/11/2026)
+- Ngày: 2026-11-15
+- Phase: 8
+- Loại: kỹ thuật
+- Kế hoạch: `docs/09` §Phase 8 không nói bundle model; notebook RE ban đầu gọi `AutoTokenizer.from_pretrained("vinai/phobert-base")` → tải từ huggingface.co.
+- Thực tế: kernel Kaggle **không có DNS** ra internet (đã xác nhận ở Phase 5, D-038) → `from_pretrained("vinai/...")` không tải được → kernel fail ngay ở cell nạp tokenizer. Dataset `vhgr-re-data` cũng **chưa** chứa weight model (khác `vhgr-ner-data` đã bundle ở Phase 5).
+- Xử lý: copy `models_hf/phobert-base` (523 MB) từ `data/kaggle/vhgr_ner_data/models_hf/` vào `data/kaggle/vhgr_re_data/models_hf/`; notebook dùng `MODEL_DIR = DATA_DIR / "models_hf" / <tên model>` → `MODEL_PATH` (fallback về HuggingFace nếu không có bundle); `kaggle datasets version` → v2 (đã verify `kaggle datasets files` thấy đủ 7 file weight).
+- Tương tự cho kernel LLM: `Qwen/Qwen3-8B` không tải được từ HF → dùng **Kaggle Models** `manojkumarcs28/qwen3-8b/PyTorch/qwen3-8b/1` (16,4 GB) mount tại `/kaggle/input/qwen3-8b`; notebook có `resolve_model_source()` dò lần lượt: `LLM_MODEL_PATH` → bundle trong dataset → Kaggle Models → HuggingFace.
+- Cập nhật file: `scripts/build_kaggle_re_notebook.py`, `scripts/build_kaggle_llm_notebook.py`, `data/kaggle/vhgr_re_data/dataset-metadata.json`, `data/kaggle/vhgr_re_data/manifest.json`
+
+## D-067 — Notebook RE mount dataset theo glob thay vì đường dẫn cứng (Phase 8 — 15/11/2026)
+- Ngày: 2026-11-15
+- Phase: 8
+- Loại: sửa lỗi nội bộ
+- Kế hoạch: notebook RE ban đầu hard-code `DATA_DIR = Path("/kaggle/input/vhgr-re-data")`.
+- Thực tế: Kaggle mount dataset vào **`/kaggle/input/datasets/hoanghiep421/vhgr-re-data/`**
+  (có thêm cấp `datasets/<owner>/`), **không** phải `/kaggle/input/vhgr-re-data/` như đặc tả giả định.
+  Đường dẫn cứng → `FileNotFoundError`. Thêm bước `find_dataset_dir()` dùng
+  `INPUT_ROOT.rglob("re_model_input.jsonl*")` (giống notebook NER Phase 5).
+- **Bằng chứng**: log thật của kernel LLM (đọc streaming lúc 19:18) in ra
+  `File corpus: /kaggle/input/datasets/hoanghiep421/vhgr-re-data/re_model_input.jsonl`
+  → xác nhận kernel RE cũng sẽ mount vào cùng đường dẫn này.
+- Kèm: Kaggle có thể **giải nén** `.gz` khi mount (`kaggle datasets files` cho thấy
+  `re_model_input.jsonl` thay vì `.gz`) → notebook dùng `DATA_DIR.glob("re_model_input.jsonl*")`
+  + `load_encoded()` tự nhận diện `.gz`/plain.
+- Cập nhật file: `scripts/build_kaggle_re_notebook.py`, `scripts/build_kaggle_llm_notebook.py`
+
+## D-068 — Bổ sung F1 per-relation + macro-F1 vào `metrics.json` của kernel RE (Phase 8 — 15/11/2026)
+- Ngày: 2026-11-15
+- Phase: 8
+- Loại: **bổ sung** so với đặc tả gốc
+- Kế hoạch: `docs/09` §Phase 8 Gate G1 nói "RE micro-F1 dev ≥ 0,70 (**per-relation trong `metrics.json`**)".
+- Thực tế: notebook RE chỉ ghi `micro_f1` / `micro_precision` / `micro_recall` / `na_f1` → **thiếu** per-relation F1 mà Gate yêu cầu.
+- Xử lý: thêm hàm `per_relation_f1(logits, labels, threshold)` vào notebook → tính P/R/F1 cho từng quan hệ trong 18 quan hệ (quan hệ **mask** `-100.0` không tính vào FP/FN — đúng đặc tả đa nhãn) → ghi `per_relation` + `macro_f1` vào `metrics.json`.
+- Kiểm chứng: hàm đã qua unit test cục bộ (masked slot không tính FP; quan hệ không có supervision → `support=0`, `f1=0`; NA head tách riêng).
+- Cập nhật file: `scripts/build_kaggle_re_notebook.py`
+## D-069 — **Lưu ý:** kernel Kaggle Phase 8 **CÓ** internet (đính chính D-038) (Phase 8 — 15/11/2026)
+- Ngày: 2026-11-15
+- Phase: 8
+- Loại: đính chính (không phải sửa code)
+- Vấn đề: D-038 (Phase 5) kết luận "kernel Kaggle **không có DNS** → không tải được từ huggingface.co".
+- Thực tế đo được (log thật kernel `vhgr-phase-8-llm-extract-qwen3-8b-4bit`, đọc streaming lúc 19:18):
+  - `Warning: You are sending unauthenticated requests to the HF Hub` → **HF Hub reachable**.
+  - `AutoTokenizer.from_pretrained("Qwen/Qwen3-8B")` + `AutoModelForCausalLM.from_pretrained(...)` **thành công** → `Model: Qwen/Qwen3-8B`.
+  - Thiếu **bitsandbytes** (`pip install -U bitsandbytes>=0.46.1`) → 4-bit fail → **fallback bf16 16-bit** thành công.
+- Hệ quả:
+  - D-066 vẫn **giữ nguyên** (bundle weight + Kaggle Models là lựa chọn **robust hơn**, không phụ thuộc internet), nhưng lý do phải nói đúng: **không phải "chắc chắn không có DNS"**, mà là "bundle giúp kernel **không phụ thuộc** trạng thái mạng".
+  - Lỗi thật của kernel LLM là **thiếu `bitsandbytes`** (không phải thiếu DNS) → 4-bit không dùng được, chạy bf16 (chậm hơn ~2× và nặng VRAM hơn: 16,4 GB model trên T4 15,6 GB → rủi ro OOM).
+- Cập nhật file: `reports/deviations.md`, `docs/10-nhat-ky/phase-08.md`
+
+## D-069 — Chưa xác minh được: Kaggle kernel **có internet** trong phiên chạy
+
+**Ngày:** 15/11/2026 · **Trạng thái:** đã chốt (suy luận, chưa verify trực tiếp)
+
+**Sai lệch:** Nhật ký trước (D-066) giả định kernel Kaggle **không** có internet
+(dựa vào lỗi DNS khi tải `Qwen/Qwen3-8B`). Kernel `hoanghiep421/vhgr-phase-8-llm-extract-qwen3-8b-4bit`
+lại tải được model từ HuggingFace (log có
+`Warning: You are sending unauthenticated requests to the HF Hub` — nghĩa là
+request **đã tới** HF Hub).
+
+**Kết luận:** kernel **có** internet. Nguyên nhân thật của lỗi tải model trước đó
+có thể là DNS chậm/hết hạn token thay vì thiếu internet hoàn toàn.
+
+**Hành động:** notebook LLM giờ **tự cài `bitsandbytes`** (qua pip, cần internet)
+để nạp Qwen3-8B ở 4-bit — tránh fallback bf16 16,4 GB trên T4 15,6 GB (chậm
+và rủi ro OOM). Ưu tiên nguồn model vẫn là Kaggle Models (mount nhanh nhất).
+
+**Ảnh hưởng:** `scripts/build_kaggle_llm_notebook.py`.
+
+## D-070 — Lỗi nghiêm trọng: Qwen3 **thinking mode** làm hỏng toàn bộ output JSON
+
+**Ngày:** 15/11/2026 · **Trạng thái:** đã chốt
+
+**Triệu chứng:** kernel LLM chạy 796s, log ghi `5 request | giữ 0/0 | 0,01 req/s`
+— **0 triple** dù model nạp thành công và sinh ra text.
+
+**Nguyên nhân gốc:** Qwen3 là model **hybrid reasoning**. `apply_chat_template`
+mặc định sinh `<think>...</think>` trước câu trả lời ⇒ output không phải JSON ⇒
+`parse_json` trả `None` ⇒ 0 triple.
+
+**Cách sửa:**
+1. Truyền `enable_thinking=False` vào `apply_chat_template` (chỉ khi model có
+   "qwen3" trong tên).
+2. Thêm **fail-fast** trong notebook: 3 request liên tiếp không parse được JSON →
+   in raw output (2.000 ký tự đầu) rồi `raise RuntimeError` → dừng sớm thay vì
+   đốt 12 h phiên GPU.
+3. Giảm `MAX_NEW_TOKENS` 1536 → 1024 (JSON thuần không cần nhiều token suy luận).
+
+**Bài học:** phải có **kiểm tra fail-fast cho output của LLM**, không chỉ kiểm tra
+"model đã nạp được". Log throughput không đủ để phát hiện lỗi parse — phải
+thêm bộ đếm `n_parse_fail` trong `stats.json`.
+
+**Ảnh hưởng:** `scripts/build_kaggle_llm_notebook.py`,
+`notebooks/kaggle/06_llm_extract_kaggle/notebook.ipynb`.
+
+## D-071 — Tách 2 kernel Phase 8 sang **2 tài khoản Kaggle**; hạn mức GPU là *dùng chung*
+
+**Ngày:** 15/11/2026 · **Trạng thái:** đã chốt
+
+**Bối cảnh:** tài khoản chính `hoanghiep421` có 1 kernel RUNNING (LLM) + 1 QUEUED
+(RE) ⇒ người dùng yêu cầu chuyển sang tài khoản phụ để chạy song song.
+
+**Phát hiện quan trọng:** đẩy **cả 2 kernel lên tài khoản phụ** cũng cho cả 2
+`QUEUED`. Kaggle giới hạn **2 phiên GPU / tài khoản**, nhưng hàng đợi GPU là
+**toàn cục** ⇒ 2 kernel (2 account khác nhau) vẫn phải chờ.
+
+**Phân bổ cuối cùng (đang chờ):**
+| Kernel | Tài khoản | Dataset | Model |
+|---|---|---|---|
+| `vhgr-phase-8-re-train-phobert-base` | `hoanghiep421` | `hoanghiep421/vhgr-re-data` | `models_hf/phobert-base` (bundle offline) |
+| `vhgr-phase-8-llm-extract-qwen3-8b-4bit-sec` | `dathungdao2004` | `dathungdao2004/vhgr-re-data` | Kaggle Models `qwen3-8b` |
+
+**Ràng buộc mới phát hiện:** tài khoản phụ **không mount được dataset riêng tư**
+của tài khoản chính ⇒ phải upload riêng `dathungdao2004/vhgr-re-data` (337 MB).
+
+**Cơ chế chuyển account:** `KAGGLE_API_TOKEN` (env) **thắng** `~/.kaggle/access_token`.
+Đã ghi `scripts/wait_kaggle_phase8.py` — watcher 2 account, tự tải artifact khi
+kernel `COMPLETE`.
+
+**Trạng thái tại lúc ghi:** cả 2 kernel `QUEUED` (hàng đợi GPU toàn cục của Kaggle).
+
+## D-072 — Thêm **kernel RE CPU-only** làm đường chạy song song thứ 3 (không tranh GPU)
+
+**Ngày:** 15/11/2026 · **Trạng thái:** đã chốt
+
+**Bối cảnh:** cả 2 kernel GPU của Phase 8 (`RE train` ở `hoanghiep421`,
+`LLM extract` ở `dathungdao2004`) đều `QUEUED` từ 12:12 UTC → 12:46 UTC.
+Kaggle giới hạn **2 phiên GPU/tài khoản** nhưng hàng đợi GPU là **dùng chung**,
+nên thêm tài khoản không giải quyết được.
+
+**Phương án:** Kaggle **CPU notebook không tranh GPU** ⇒ tạo biến thể CPU của
+notebook RE (`scripts/build_kaggle_re_notebook.py --cpu-variant`), kernel
+`hoanghiep421/vhgr-phase-8-re-train-phobert-base-cpu`.
+
+**Điều chỉnh cho CPU** (vẫn tuân thủ ràng buộc "không huấn luyện local"):
+| Tham số | GPU | CPU | Lý do |
+|---|---|---|---|
+| `RE_EPOCHS` | 3 | 2 | CPU chậm ~8–10× |
+| `RE_BATCH` | 16 | 8 | giảm peak RAM, tăng throughput CPU |
+
+**Ước lượng:** 10.300 câu train ÷ batch 8 ≈ 1.290 step/epoch × 2 epoch ≈ 2.580
+step — dưới trần 9 giờ của Kaggle CPU notebook.
+
+**Kết quả đo được:** kernel CPU chuyển `RUNNING` **ngay lúc push** (19:45), trong
+khi 2 kernel GPU vẫn `QUEUED`. Đây là đường chạy song song **không phụ thuộc hàng
+đợi GPU**.
+
+**Cảnh báo:** warning `'pin_memory' argument is set as true but no accelerator is
+found` — dấu hiệu xác nhận kernel thực sự chạy CPU, không bị cấp GPU ngầm.
+
+**Ảnh hưởng:** `scripts/build_kaggle_re_notebook.py` (`build_cpu_variant`),
+`scripts/wait_kaggle_phase8.py` (thêm target CPU), `notebooks/kaggle/re_train_phobert_base_cpu/`.
+
+## D-073 — Đo tốc độ thật trên Kaggle CPU bằng kernel benchmark trước khi chốt cấu hình CPU
+
+**Ngày:** 15/11/2026 · **Trạng thái:** đã chốt
+
+**Bối cảnh:** Biến thể CPU (D-072) chạy >10 phút mà **không có 1 dòng log step**
+(`logging_steps=100` mà 20.382 ví dụ / batch 8 = 2.548 step/epoch ⇒ chưa tới step 100).
+Không thể biết ETA ⇒ rủi ro vượt trần 9 giờ của Kaggle CPU notebook.
+
+**Cách sửa:** tạo kernel benchmark riêng `hoanghiep421/vhgr-bench-re-cpu`
+(`scripts/build_kaggle_bench_notebook.py`) đo `s/step` cho batch 8/16/32 trên
+PhoBERT-base, seq_len 96 (đúng độ dài thật của `re_model_input.jsonl`).
+
+**Số liệu đo được:**
+
+| Batch | s/step | s/example | steps/s |
+|---|---|---|---|
+| 8 | 3,226 | 0,4033 | 0,310 |
+| 16 | 5,936 | 0,3710 | 0,168 |
+| **32** | **11,103** | **0,3470** | 0,090 |
+
+**Quyết định:** chọn **batch 32** (s/example thấp nhất ⇒ throughput tổng cao nhất),
+epoch **2**, `LR=3e-5` (batch lớn hơn cần LR cao hơn).
+Ước lượng: 20.382/32 × 2 epoch = 1.274 step × 11,1 s ≈ **3,9 giờ** < trần 9 giờ.
+
+**Phương án bị loại:** batch 8 (5.096 step × 3,226 s ≈ 7,2 giờ — sát trần),
+batch 16 (≈ 4,2–5,3 giờ — thua batch 32).
+
+**Lỗi gặp phải:** kernel benchmark báo `ERROR` do cell đóng gói zip
+(`shutil.make_archive` với file đơn lẻ) — nhưng `bench.json` đã được ghi **trước**
+đó nên vẫn lấy được số liệu. Bài học: ghi kết quả số **trước** bước đóng gói.
+
+**File đã cập nhật:** `scripts/build_kaggle_bench_notebook.py`,
+`docs/10-nhat-ky/so-lieu/phase-08-kaggle-cpu-benchmark.json`,
+`scripts/build_kaggle_re_notebook.py` (`build_cpu_variant`).
+
+## D-077 — Kernel RE **GPU base** hoàn tất; kernel **CPU** bị loại dù cùng `COMPLETE`
+
+**Ngày:** 15/11/2026 · **Trạng thái:** đã chốt
+
+**Bối cảnh:** Kế hoạch ban đầu huấn luyện RE trên Kaggle GPU, nhưng hàng đợi GPU
+dùng chung toàn cục ⇒ phải mở đường chạy CPU (D-072). Ngày 15/11, **cả hai**
+kernel cùng báo `COMPLETE`.
+
+**Sai lệch phát hiện:** kernel CPU `COMPLETE` nhưng **chỉ sinh `checkpoint-188`**
+(epoch 1), **không có `metrics.json`** ⇒ **không đo được** Gate G1 (RE F1 ≥ 0,70).
+Kernel GPU sinh đủ `metrics.json` với micro-F1 **0,9375** trên **toàn bộ**
+20.382 câu train.
+
+**Quyết định:** dùng **GPU base**; **xoá artifact CPU** (~2,7 GB) để giải phóng
+đĩa. Chi tiết ở `docs/DECISIONS.md` D-077 và `docs/10-nhat-ky/phase-08.md` §4.6.1.
+
+**Bài học:** trạng thái kernel (`COMPLETE`) là thông tin **trạng thái**, không
+phải **kết quả**. Điều kiện nhận phải là artifact đo được (`metrics.json`).
+
+**File đã cập nhật:** `docs/DECISIONS.md` (D-077), `docs/10-nhat-ky/phase-08.md`
+(§4.6.1), `reports/phase_08_report.md`, `docs/PROGRESS.md`.
+
+## D-078 — Suy luận RE chuyển lên Kaggle GPU (dataset `vhgr-re-infer`)
+
+**Ngày:** 15/11/2026 · **Trạng thái:** đã chốt
+
+**Bối cảnh:** `infer_re` trên CPU local đo được ≈ **0,1 s/cặp** (4 thread) ⇒ 99.348
+cặp × 4 shard × 2 thread vẫn mất ≈ **3,5 giờ**. Máy local **không có GPU**.
+
+**Cách làm:** đóng gói **mã nguồn repo** (`src/`, `configs/`) + **model RE** +
+**cache cặp ứng viên** thành dataset Kaggle `hoanghiep421/vhgr-re-infer` (678 MB),
+rồi chạy **đúng `src/re/infer_re.py`** trên kernel GPU
+`hoanghiep421/vhgr-phase-8-re-infer-phobert-gpu`. Vì dùng chung mã nguồn ⇒ kết
+quả **giống hệt** local, chỉ khác thiết bị.
+
+**Ba lỗi thật gặp phải (đều do môi trường Kaggle, không phải logic):**
+
+| # | Triệu chứng | Nguyên nhân gốc | Cách sửa |
+|---|---|---|---|
+| 1 | `FileNotFoundError: /kaggle/working/repo` | Kaggle **tự giải nén** `.tar` khi upload ⇒ dataset có sẵn cây thư mục, không còn `.tar` để giải nén thủ công | Dò `src/` + `models/` trong dataset; fallback giải nén `.tar` nếu có |
+| 2 | `FileNotFoundError: /kaggle/input/vhgr-re-infer/src` | Kernel mount dataset **chậm** — `iterdir()` chạy trước khi mount xong | Thêm retry **10 lần × 6 giây** + in log nội dung thư mục khi thất bại |
+| 3 | `409 Conflict` khi push | `kernel-metadata.json` khai `id` ≠ slug Kaggle tự sinh từ `title` | Đặt `id` khớp đúng slug (`...-re-infer-phobert-gpu`) |
+
+**File đã cập nhật:** `scripts/build_kaggle_re_infer_notebook.py` (mới),
+`scripts/finish_phase8_gpu.py` (mới), `docs/10-nhat-ky/phase-08.md`.
+
+---
+
+## D-079 — Suy luận RE chuyển sang tài khoản Kaggle phụ (quota GPU tài khoản chính đã cạn)
+
+**Ngày:** 15/11/2026
+
+**Kế hoạch:** đẩy kernel `vhgr-phase-8-re-infer-phobert-gpu` lên tài khoản
+chính `hoanghiep421`, chạy ~15 phút trên GPU.
+
+**Thực tế:** kernel kẹt `QUEUED` vĩnh viễn. Đọc quota GPU:
+
+| Tài khoản | `timeUsed` | `totalTimeAllowed` | Còn lại |
+|---|---|---|---|
+| `hoanghiep421` | 44.677 s | 21.600 s | **0** |
+| `dathungdao2004` | 17.172 s | 21.600 s | ~4.428 s (~74 phút) |
+
+**Xử lý:**
+1. Xoá kernel không cần: `vhgr-phase-8-re-train-phobert-base-cpu` (đã loại ở D-077),
+   `vhgr-phase-8-llm-extract-qwen3-8b-4bit` (tài khoản chính, chiếm 2 slot GPU ~8,8 giờ),
+   `dathungdao2004/vhgr-phase-8-llm-extract-qwen3-8b-4bit-sec` (tài khoản phụ).
+2. Đóng gói lại bundle suy luận thành dataset của tài khoản phụ
+   (`scripts/pack_re_infer_dataset.py` → `dathungdao2004/vhgr-re-infer`, 677 MB).
+3. Push kernel `dathungdao2004/vhgr-phase-8-re-infer-phobert-gpu`.
+4. **Song song** giữ 4 shard CPU local làm đường dự phòng.
+
+**Lệch so với kế hoạch:** kernel chạy trên **tài khoản phụ** thay vì chính.
+Nội dung kernel không đổi — vẫn gọi `python -m src.re.infer_re` trên mã nguồn repo
+⇒ kết quả tương đương.
+
+---
+
+## D-080 — Metric Phase 8 **bỏ qua** slot mask ⇒ micro-F1 0,9375 không phản ánh chất lượng thật
+
+**Ngày:** 16/11/2026
+
+**Kế hoạch:** Gate G1 — "RE F1 dev (micro) ≥ 0,70", đo bằng
+`relation_f1_multilabel` trên tập dev.
+
+**Sai lệch phát hiện:** metric đo được **0,9375** (vượt Gate rất xa), nhưng khi
+đo lại bằng quy tắc **nghiêm** (`scripts/eval_re_strict.py`: mọi quan hệ dự
+đoán ngoài tập gold đều tính là false positive, kể cả slot bị mask) thì:
+
+| Chỉ số | Lỏng (masked BCE) | Nghiêm (slot mask = FP) |
+|---|---|---|
+| precision | — | **0,0854** |
+| recall | — | **0,9652** |
+| F1 | **0,9375** | **0,1569** |
+| TP / FP / FN | — | 1.805 / **19.339** / 65 |
+| FP thuộc slot MASK | — | **19.220 (99,4%)** |
+| Cặp có ≥ 1 quan hệ dự đoán | — | **1.731/2.987 (58,0%)** |
+
+**Nguyên nhân gốc:** D-061 dùng **masked BCE** (slot chưa biết = `-100.0`) vì
+88,7% slot trong tập train không được giám sát. Nhưng slot NEGATIVE chỉ
+supervise **một** quan hệ ⇒ 17/18 đầu còn lại **không có gradient** ⇒ ngoài tập
+train các đầu đó tự do phát giá trị cao (đo được: 976/2.987 cặp fire **16**
+quan hệ). Metric lỏng không phạt những FP này ⇒ F1 0,9375 là **ảo**.
+
+**Xử lý:** không sửa metric để "cho xanh"; thay vào đó **chuyển ràng buộc từ
+mô hình sang hậu xử lý có thể kiểm chứng** — bộ lọc 4 lớp trong
+`src/re/merge_triples.py` (D-080 → D-084):
+
+| Bước lọc | `phobert_re` loại | `llm` loại |
+|---|---|---|
+| Kiểu đối tượng sai (schema) | 15.804 | 20 |
+| Dư quan hệ trong cặp (giữ Top-1) | **455.202** | 1 |
+| Không có bằng chứng (tên không trong câu) | 9.291 | 45 |
+| Không có từ kích hoạt | 12.736 | 130 |
+| Sai kiểu chủ thể (schema) | 13.549 | 5 |
+| **Còn lại** | **4.985 / 511.567 (0,97%)** | **148 / 349 (42,4%)** |
+
+**Công khai:** Gate G1 **vẫn ghi "đạt"** (0,9375) vì đó là số đo theo đặc tả
+Phase 8; nhưng **số đo này không dùng để kết luận chất lượng**. Số đo dùng để
+kết luận là **precision nghiêm sau bộ lọc** ở §D-087.
+
+**Bài học:** metric nào **bỏ qua** một phần dữ liệu thì **không** được dùng
+một mình để kết luận chất lượng. Cần luôn có **metric thứ hai tính phạt** phần
+bị bỏ qua.
+
+---
+
+## D-081 — 511.567 triple mô hình → **13.379** triple cuối cùng (chưa có lọc) → **2.446** cạnh tên chung bị loại
+
+**Ngày:** 16/11/2026
+
+**Kế hoạch:** hợp nhất 5 nguồn triple → artifact `triples_merged.jsonl` cho
+Phase 9–10.
+
+**Thực tế (đo được):**
+
+| Bước | Số triple |
+|---|---|
+| Vào (5 nguồn, trước lọc) | **538.227** |
+| Sau lọc mô hình (D-080 → D-084) | 31.444 |
+| Sau dedupe (giữ confidence cao nhất + `alt_evidence`) | **15.825** (loại 15.619 trùng) |
+| Sau lọc tên chung (D-081 + D-086) | **13.379** (loại 2.446) |
+| **Nạp vào Neo4j** | **13.379 edge / 19.548 node** |
+
+**Sai lệch so với kế hoạch:** kế hoạch (Phase 8 §D3) dự kiến vài chục nghìn
+triple; con số **335.843** (bản đầu, chưa lọc) hoặc **13.379** (bản cuối đã
+lọc) đều **lệch**, nhưng **đúng hướng** (chất lượng cao hơn số lượng).
+
+**Lý do:** 24,2% cạnh có đầu là tên chung ("vua", "ông", "nhà") — mô hình đã
+học được quan hệ gia đình cho *cặp người nào nhắc cùng trong câu*. Giữ lại
+⇒ KG có hàng nghìn cạnh vô nghĩa, UI hiển thị rối, QA trả lời sai.
+
+**Xử lý:** công khai con số thật; Gate G3 (0 trùng) / G4 (0 ngoài danh mục) /
+G8 (0 self-loop) vẫn đạt sau lọc.
+
+**Bài học:** "số lượng triple" là **hậu quả** của chất lượng, không phải mục
+tiêu. Chấp nhận giảm từ 538k → 13,4k để đổi lấy KG sạch.
+
+---
+
+## D-082 — LLM bulk trên Kaggle GPU (`re_llm_kaggle.jsonl`) **chưa sinh** được
+
+**Ngày:** 16/11/2026
+
+**Kế hoạch:** Qwen3-8B 4-bit trích xuất LLM bulk trên toàn corpus (Phase 8 §D2).
+
+**Thực tế:** kernel `vhgr-phase-8-llm-extract-qwen3-8b-4bit` gặp lỗi thinking
+mode (D-070) sau 796s với 0/0 triple; sửa xong thì **quota GPU tài khoản chính
+đã cạn** (D-079). Kernel LLM đã bị **dừng/xoá** để giải phóng quota cho
+kernel suy luận RE — vốn là đường chạy **quan trọng hơn**.
+
+**Xử lý:** không chặn Gate. LLM baseline qua **Gemini API** đã cho:
+**1.500 câu / 100 request / 386,7s** → evidence substring **97,51%** · giữ lại
+**97,51%** · 0 quan hệ ngoài danh mục (Gate G5/G6 đạt). Sau bộ lọc D-080 →
+D-084 còn **148** triple `llm` hợp lệ.
+
+**Kế hoạch lại:** chạy lại kernel LLM khi quota GPU reset (21/11/2026) với
+`LLM_LIMIT = 600` (~1,1 giờ).
+
+**Bài học:** khi tài nguyên hạn chế, phải **đánh đổi có thứ tự** — ưu tiên
+đường chạy sinh ra **lượng dữ liệu lớn nhất** (suy luận RE: 511.567 quan hệ)
+trước đường chạy sinh **lượng nhỏ** (LLM bulk: vài trăm triple).
+
+---
+
+## D-083 — Số node KG **19.548** vượt mục tiêu 5k–30k? — không, **nằm trong** mục tiêu; số cạnh **13.379** thấp hơn mục tiêu 50k–200k
+
+**Ngày:** 16/11/2026
+
+| Chỉ số | Mục tiêu | Thực tế | Đạt? |
+|---|---|---|---|
+| Số node KG | 5.000–30.000 | **19.548** | ✅ |
+| Số cạnh KG | 50.000–200.000 | **13.379** | ❌ (−73%) |
+| % cạnh có bằng chứng | 100% | **100%** (0/13.379 thiếu) | ✅ |
+
+**Lý do không đạt:** số cạnh bị giảm **có chủ đích** do bộ lọc chất lượng
+(D-080 → D-086): 538.227 → 13.379. Đây là **đánh đổi đã được chốt**, không phải
+lỗi triển khai. Mục tiêu "50k–200k cạnh" được đặt ra **trước** khi phát hiện
+lỗ hổng masked-BCE.
+
+**Xử lý:** nêu số thực tế; **không** nới lọc để "đạt số". Định nghĩa lại tiêu
+chí: mục tiêu đổi từ "số cạnh" sang "**tỉ lệ cạnh có bằng chứng + độ chính
+xác quan hệ**" — cả hai đều đạt 100%.
+
+**Bài học:** tiêu chí đặt ra khi **chưa biết** đặc tả chất lượng sẽ sai. Nếu
+đặc tả chất lượng đã rõ hơn thì đặt mục tiêu **số lượng** là sai tiêu chí.
+
+---
+
+## D-084 — Entity chỉ có trong triple **không có tên** trong `entities.jsonl` ⇒ 2.897 node `Entity` vô nghĩa
+
+**Ngày:** 16/11/2026
+
+**Bối cảnh:** `entity_id` sinh bằng `ent_<slug>_sha1(f"{type}|{name_normalized}")[:8]`.
+Đối tượng của triple infobox / distant supervision được mint khi sinh triple ⇒
+không có trong `data/knowledge_base/entities.jsonl` (chỉ chứa entity chủ thể
+infobox + entity coreference).
+
+**Sai lệch phát hiện:** **2.897** node KG có label `Entity` và tên là slug
+không dấu, viết thường ("dai viet", "trieu dai"). UI hiển thị sai, QA theo tên
+không khớp.
+
+**Xử lý:** D-085 — đảo ngược hàm băm `entity_id` trên **60.116** tên bề mặt ứng
+viên × 7 kiểu schema ⇒ khôi phục **2.826/2.871 (98,5%)** entity (tên có dấu +
+kiểu schema đúng). Node `Entity` giảm **2.897 → 162**.
+
+**Bài học:** ID là **hàm bất biến** của nội dung ⇒ tên và kiểu **suy ra được**
+từ ID, không cần đoán. Nhưng điều này chỉ đúng khi quy ước ID được giữ bất
+biến (`AGENTS.md` §6) — nếu ID là số thứ tự thì không khôi phục được.
+
+---
+
+## D-085 — `Đ`/`đ` precomposed **không** bị NFD phân rã ⇒ danh sách chặn tên chung luôn trượt
+
+**Ngày:** 16/11/2026
+
+**Triệu chứng:** `unicodedata.normalize("NFD", "Đại Nam")` → `"Đại Nam"`
+(giữ nguyên `Đ`) ⇒ bỏ dấu cho `"đai nam"` ≠ `"dai nam"` trong danh sách chặn
+⇒ **85** cạnh `thuoc_trieu_dai` → node "Triều đại" và **75** cạnh
+`giu_chuc_vu` → node "nhà Nguyễn" **sống sót** qua bộ lọc.
+
+**Nguyên nhân gốc:** `Đ` (U+0110) và `đ` (U+0111) **không có** canonical
+decomposition trong Unicode ⇒ NFD không phân rã được chúng.
+
+**Cách sửa:** dùng `src.common.normalize.strip_accents` (bảng tra trước
+`Đ`→`D`, `đ`→`d` rồi mới NFD) thay vì tự viết lại trong `merge_triples.py`.
+
+**Bài học:** "bỏ dấu tiếng Việt" **không** phải `unicodedata` mặc định. Hàm
+chuẩn hoá dùng chung phải được dùng **mọi nơi**, không tự viết lại — lỗi này
+chỉ lộ ra vì `merge_triples.py` tự implement một bản riêng.
+
+---
+
+## D-086 — Chặn tên chung **toàn cục** loại nhầm các cạnh `thuoc_trieu_dai` hợp lệ
+
+**Ngày:** 16/11/2026
+
+**Triệu chứng:** sau khi áp D-081, câu hỏi "Nhà Trần có bao nhiêu vua?" trả về
+**0** kết quả — vì "nhà Trần", "nhà Lê", "nhà Nguyễn" nằm trong
+`GENERIC_TITLE_NAMES` (NER gán nhãn `TITLE` cho chúng) nhưng lại là **triều
+đại hợp lệ** với quan hệ `thuoc_trieu_dai`.
+
+**Đo được:** trước khi sửa có 29 cạnh → "Nhà Nguyễn", 18 → "Nhà Trần",
+17 → "Nhà Lê sơ", 11 → "Nhà Tây Sơn".
+
+**Cách sửa:** D-086 — `GENERIC_TITLE_NAMES_ALLOWED_AS_DYNASTY` miễn trừ các tên
+triều đại hợp lệ **chỉ khi** quan hệ là `thuoc_trieu_dai`;
+`GENERIC_TARGET_NAMES_BY_RELATION` chặn riêng "trieu dai", "gia toc",
+"quoc gia" + tên quốc gia "dai viet", "viet nam", "dai nam" cho quan hệ này.
+
+**Bài học:** "tên chung" là khái niệm **phụ thuộc quan hệ**, không phải thuộc
+tính của entity. "Nhà Trần" là tên chung với `giu_chuc_vu` nhưng là thực thể
+hợp lệ với `thuoc_trieu_dai`.
+
+---
+
+## D-087 — QA đếm "bao nhiêu vua" trả **44** (mọi người thuộc nhà) thay vì **19** (người có `reign_start`)
+
+**Ngày:** 16/11/2026
+
+**Triệu chứng:** câu hỏi "Nhà Trần có bao nhiêu vua?" sinh Cypher
+`MATCH (p:Person)-[:thuoc_trieu_dai]->(d:Dynasty {name_normalized:'nha tran'}) RETURN COUNT(DISTINCT p)`
+⇒ **44**. Đối chiếu lịch sử: nhà Trần có **12 vua** (tính cả Hậu Trần), nên 44
+là số **thành viên thuộc nhà**, không phải số vua.
+
+**Nguyên nhân gốc:** quan hệ `thuoc_trieu_dai` chỉ nói "**thuộc nhà**", không
+nói "**là vua**". Property phân biệt là `reign_start` (năm lên ngôi) — chỉ có
+**19/44** node trong nhà Trần có `reign_start` khác null (217 node toàn KG có
+`reign_start`).
+
+**Cách sửa:** bổ sung quy tắc + few-shot trong
+`backend/app/prompts/text_to_cypher.txt`: khi hỏi "bao nhiêu vua" của một triều
+đại thì **chỉ đếm** node có `reign_start IS NOT NULL`.
+
+**Số liệu sau sửa:** "Nhà Trần có bao nhiêu vua?" → **19** (thay vì 44).
+
+**Sai lệch còn lại (công khai):** 19 ≠ 12 vua lịch sử vì (a) `reign_start` chỉ
+có 217/19.548 node (1,1%) — hầu hết vua trong corpus không có trường này;
+(b) 19 node có `reign_start` gồm cả người **kế vị** được ghi nhận. Đây là
+**giới hạn độ phủ thuộc tính của KG**, không phải lỗi truy vấn.
+
+**Bài học:** câu hỏi đếm **"bao nhiêu vua"** là câu hỏi **định nghĩa** (cần quy
+tắc ngữ nghĩa), không phải câu hỏi tra cứu thuần. Nếu schema không có thuộc
+tính phân biệt ("lên ngôi" vs "thuộc nhà"), KG sẽ **không bao giờ** trả lời
+đúng mà không cần prompt chỉ dẫn ngữ nghĩa.
+## D-088 — QA trả "Không có trong dữ liệu" cho câu hỏi năm sinh/năm mất dù KG **có** quan hệ
+
+**Ngày:** 16/11/2026
+
+**Kế hoạch:** mọi câu hỏi tra cứu năm sinh/năm mất đều trả lời được.
+
+**Thực tế:** "Lý Thường Kiệt sinh năm nào?" → **"Không có trong dữ liệu"**, dù
+KG có cạnh `sinh_nam → Year 1019` và `mat_nam → Year 1105`.
+
+**Nguyên nhân gốc:** prompt sinh Cypher đọc **thuộc tính** `p.birth_year`, nhưng
+thuộc tính này chỉ được ghi cho người có **infobox** — chỉ **721/11.021**
+node `Person` (6,5%). Quan hệ `sinh_nam`/`mat_nam` suy ra từ **câu bằng
+chứng** nên phủ **1.126** / **1.059** cạnh — rộng hơn hẳn.
+
+**Cách sửa:** D-087 — prompt bắt buộc `OPTIONAL MATCH` + `coalesce`:
+`coalesce(p.birth_year, y.value)` qua `[:sinh_nam]` (tương tự `mat_nam`).
+
+**Số liệu sau sửa (verify qua `POST /api/ask`):**
+
+| Câu hỏi | Trước | Sau |
+|---|---|---|
+| Lý Thường Kiệt sinh năm nào? | Không có trong dữ liệu | **sinh năm 1019** |
+| Lý Thường Kiệt mất năm nào? | Không có trong dữ liệu | **mất năm 1105** |
+| Trần Hưng Đạo sinh năm nào? | Không có trong dữ liệu | **sinh năm 1230** |
+
+**Bài học:** "Không có trong dữ liệu" có hai nguyên nhân rất khác nhau: (a)
+thật sự không có, (b) **có nhưng truy vấn không chạm tới**. Chỉ (a) mới được
+trả lời là "không có". Bước kiểm tra bắt buộc mỗi câu trả lời rỗng: thử
+**đường truy vấn thay thế** qua quan hệ trước khi kết luận.
+
+**Bổ sung (16/11):** sau khi sửa prompt, **câu trả lời** đúng nhưng **node
+trong đồ thị** vẫn hiển thị `birth_year: null` (vì `_enrich_graph_from_db()`
+đọc thuộc tính) ⇒ mâu thuẫn trực quan trên UI. Bổ sung truy vấn
+`sinh_nam`/`mat_nam` → `Year.value` và điền vào node khi thuộc tính còn trống.
+
+| Câu hỏi | Node `Person` trước | Node `Person` sau |
+|---|---|---|
+| Lý Thường Kiệt sinh năm nào? | birth=**null**, death=**null** | birth=**1019**, death=**1105** |
+| Trần Hưng Đạo sinh năm nào? | birth=**null**, death=**null** | birth=**1230**, death=**1300** |
+| Lê Lợi sinh năm nào? | birth=1385 (đã có infobox) | birth=1385 (**không đổi**) |
+
+---
+
+## D-089 — Kernel LLM Kaggle chạy lại trên **tài khoản phụ** với ngân sách thời gian
+
+**Ngày:** 16/11/2026
+
+**Bối cảnh:** D-082 để ngỏ `re_llm_kaggle.jsonl` vì quota GPU tài khoản chính
+`hoanghiep421` đã **vượt** `totalTimeAllowed` (44.694 s / 21.600 s) ⇒ không
+push được kernel mới.
+
+**Đo được (đọc `GetAcceleratorQuotaStatistics` cho từng tài khoản bằng token
+đúng — `KAGGLE_USERNAME`/`KAGGLE_KEY` trong `.env` bị `~/.kaggle/access_token`
+đè; phải swap file token hoặc dùng `env -u KAGGLE_USERNAME -u KAGGLE_KEY`):**
+
+| Tài khoản | `timeUsed` | `totalTimeAllowed` | Còn lại (lúc đo) |
+|---|---|---|---|
+| `hoanghiep421` | 44.694 s | 21.600 s | **-384,9 phút** (đã vượt) |
+| `dathungdao2004` | 20.477 s | 21.600 s | **18,7 phút** |
+
+**Quyết định:** chạy lại kernel LLM trên **tài khoản phụ** `dathungdao2004`
+(dataset `dathungdao2004/vhgr-re-data` đã có sẵn từ D-079), với:
+
+- `LLM_LIMIT = 600` câu (40 request × 15 câu);
+- **`LLM_TIME_BUDGET_S = 700`** — ngân sách thời gian mới (D-090);
+- `flush()` + `os.fsync()` sau **mỗi request** ⇒ nếu Kaggle cưỡng chế dừng vì
+  hết quota, phần đã ghi **vẫn còn** trên đĩa và tải về được.
+
+**Sai lệch còn lại (công khai):** 18,7 phút quota chỉ đủ khoảng **8–10
+request** (đo được 95 s/request) tức **~150 câu**, không đạt 600 câu như kế
+hoạch. Số liệu thực tế sẽ ghi vào `docs/10-nhat-ky/so-lieu/phase-08-distillation.json`
+khi kernel kết thúc.
+
+**Bài học:** trên Kaggle, `kaggle kernels status` **không** phản ánh quota; phải
+gọi `GetAcceleratorQuotaStatistics` **với đúng token của tài khoản** mới biết
+còn bao nhiêu. Và mọi kernel dài hạn phải **checkpoint theo thời gian** thay
+vì chỉ ghi ở cuối.
+
+---
+
+## D-090 — Notebook LLM phải có **ngân sách thời gian** + checkpoint từng request
+
+**Ngày:** 16/11/2026
+
+**Vấn đề:** notebook LLM cũ ghi output bằng `with OUT_PATH.open("w")` và chỉ
+đóng gói zip ở **cuối** ⇒ nếu Kaggle dừng kernel giữa chừng (hết quota GPU
+hoặc lỗi), **mất 100% kết quả**.
+
+**Cách sửa:** `scripts/build_kaggle_llm_notebook.py`
+
+1. thêm biến `LLM_TIME_BUDGET_S` (0 = không giới hạn): vòng lặp **kiểm tra
+   trước** mỗi request và `break` nếu đã hết ngân sách → kernel **tự dừng
+   trước khi** bị cưỡng chế;
+2. `handle.flush()` + `os.fsync(handle.fileno())` sau mỗi request;
+3. ghi `stop_reason` (`het-limit` / `het-ngan-sach-thoi-gian`) và
+   `time_budget_s` vào `re_llm_kaggle.stats.json` để **truy vết** vì sao dừng;
+4. CLI mới: `--account`, `--dataset`, `--kernel-slug`, `--limit`,
+   `--time-budget-s` (mặc định đọc từ env) ⇒ đổi tài khoản không cần sửa code.
+
+**Ảnh hưởng:** `scripts/build_kaggle_llm_notebook.py`,
+`notebooks/kaggle/06_llm_extract_kaggle/notebook.ipynb`,
+`notebooks/kaggle/06_llm_extract_kaggle/kernel-metadata.json`.
+
+## D-091 — Kernel LLM Kaggle: payload **top-level JSON array** ⇒ 0/0 triple; và mount Kaggle Models có tên thư mục **ngẫu nhiên**
+
+**Ngày:** 16/11/2026
+
+**Bối cảnh:** chạy lại kernel LLM trên tài khoản phụ `dathungdao2004`
+(D-089). Kernel **v1** (code cũ) cho log `5 request | giữ 0/0`.
+
+**Triệu chứng 1 — 0/0 triple dù model chạy bình thường:**
+- Model nạp **4-bit thành công** (`Nạp 4-bit thành công (bitsandbytes)`),
+  nạp 600 câu, sinh ra text — nhưng `counters["total"] == 0`.
+- Fail-fast cũ **không** kích hoạt ⇒ `parse_json` trả **không None** ⇒ JSON
+  **hợp lệ**, chỉ là **hình dạng payload** không đúng `{"triples": [...]}`.
+- Suy đoán: model trả **JSON array ở top-level** (`[{...}, {...}]`) ⇒
+  `payload.get("triples")` **vắng mặt** ⇒ vòng lặp bỏ qua ⇒ 0/0.
+
+**Cách sửa 1 (D-091):** `normalize_payload()` chuẩn hoá **mọi** hình dạng
+về `{"triples": [...]}`:
+- array top-level → `{"triples": [...]}`;
+- dict với key `triples`/`relations`/`results`/`data`/`items`/`output`;
+- **một** triple đơn ở top-level (có `subject`+`relation`+`object`);
+- dict lồng nhau → lấy list đầu tiên.
+Thêm `_scan_balanced()` (quét **cả** `{...}` và `[...]`, xử lý chuỗi escape).
+Thêm fail-fast **mới**: 3 request đầu parse OK mà `total == 0` ⇒ dừng ngay
+(thay vì đốt hết quota). Thêm file `re_llm_kaggle_raw.jsonl` ghi raw output
+5 request đầu ⇒ **chẩn đoán được** ngay lần chạy sau.
+
+**Triệu chứng 2 — tải model 16,4 GB mỗi lần chạy:**
+- `MODEL_CANDIDATES` giả định Kaggle Models mount vào `/kaggle/input/qwen3-8b`
+  ⇒ thư mục **không tồn tại** ⇒ rơi về HuggingFace ⇒ tải **16,4 GB** mỗi lần
+  (~5 phút GPU).
+- **Cách sửa 2:** `resolve_model_source()` **quét** `/kaggle/input` tìm thư mục
+  có `config.json` + `*.safetensors`/`*.bin` ⇒ nhận đúng mount path bất kể tên.
+
+**Kết quả lần chạy đầu (v1, code cũ — vẫn dùng ngân sách thời gian D-090):**
+
+| Chỉ số | Giá trị |
+|---|---|
+| Số request | **8** (chunk 15 câu) |
+| Thời gian suy luận | **724,5 s** |
+| Lý do dừng | **`het-ngan-sach-thoi-gian`** (đúng như thiết kế) |
+| Triple model trả về | **11** |
+| Triple giữ lại | **8** (3 bị loại vì quan hệ ngoài danh mục) |
+| Evidence substring | **8/8 = 100%** |
+| Throughput | 0,828 câu/s |
+
+⇒ **D-090 cứu được kết quả**: nếu không có ngân sách thời gian + checkpoint,
+kernel này sẽ bị Kaggle cưỡng chế dừng và **mất 100% output**.
+
+**Sau khi hợp nhất (D-080 → D-084):** nguồn `llm` (Kaggle) **8 → 0** triple
+(4 không có bằng chứng, 4 không có từ kích hoạt) ⇒ **KG giữ nguyên 13.379
+cạnh**, `triples_merged.jsonl` **byte-identical** (sha1 `776209ce45ce996d`).
+Đây là hành vi **đúng**: bộ lọc chất lượng loại triple LLM rác, không để
+nọ làm bẩn KG.
+
+**Bài học:** "parse không lỗi" **không** đồng nghĩa "parse đúng schema". Với
+LLM, phải **chuẩn hoá shape** trước khi dùng, và phải có **fail-fast theo
+kết quả nghiệp vụ** (0 triple ⇒ dừng), không chỉ theo lỗi kỹ thuật.
+
+---
+
+## D-092 — Số lượng LLM bulk trên Kaggle bị giới hạn bởi **quota GPU còn lại 18,7 phút**
+
+**Ngày:** 16/11/2026
+
+**Kế hoạch:** `LLM_LIMIT = 600` câu (40 request × 15 câu) ≈ 1,1 giờ.
+
+**Thực tế:** quota GPU còn lại của `dathungdao2004` lúc đo là **18,7 phút**
+(1.123 s). Sau thời gian nạp model (~5 phút) còn ~13 phút ⇒ chỉ đủ **8
+request** (120 câu) — **12,5%** kế hoạch.
+
+**Số liệu thực tế:** 8 request · 724,5 s · 11 triple model trả về · 8 triple
+giữ lại · 0 triple sau bộ lọc chất lượng.
+
+**Công khai:** `re_llm_kaggle.jsonl` **đã có** (6 dòng / 8 triple) nhưng
+**quy mô nhỏ hơn kế hoạch 12,5 lần**. Nguyên nhân là hạn tài nguyên, không
+phải lỗi kỹ thuật.
+
+**Kế hoạch lại:** chạy lại khi quota reset (21/11/2026) với
+`--limit 5000 --time-budget-s 28800` (8 giờ) trên **một** tài khoản. Với code
+đã sửa (D-091), payload top-level array sẽ được chuẩn hoá ⇒ có kết quả.
+
+**Bài học:** khi lập kế hoạch chạy dài, phải **đo quota thật của đúng tài
+khoản** trước khi hứa số lượng; và phải coi mỗi lần chạy là **tích lũy
+tăng dần** (checkpoint), không phải all-or-nothing.
+
+
+---
+
+## D-093 — `alt_evidence` bị **mất** khi ghi file ⇒ 13.294 bằng chứng thay thế bị xoá
+
+**Ngày:** 16/11/2026
+
+**Kế hoạch:** `docs/09` §Phase 8 output contract (dòng 595) liệt kê
+`alt_evidence` trong JSON mẫu; quy tắc dedupe (dòng 622) yêu cầu "các
+bằng chứng còn lại vào `alt_evidence`"; Phase 10 (dòng 747) yêu cầu edge có
+thuộc tính `alt_evidence`.
+
+**Thực tế:** `src/re/merge_triples.py::REQUIRED_FIELDS` chỉ có **12** trường,
+thiếu `alt_evidence`. `write_merged()` ghi bằng
+`{field: triple.get(field) for field in REQUIRED_FIELDS}` ⇒ `alt_evidence`
+**bị loại khỏi output dù đã được tính đúng** trong `dedupe_triples()`.
+
+**Nguyên nhân gốc:** bộ lọc trường ở lớp ghi file lệch với hợp đồng dữ liệu.
+`dedupe_triples()` gom **15.619** triple trùng → 15.825 unique; mỗi nhóm có
+bằng chứng thay thế, nhưng không nhóm nào ghi được ra file.
+
+**Cách sửa:** thêm `alt_evidence` vào `REQUIRED_FIELDS` → **13 trường**, khớp
+đúng JSON mẫu `docs/09` §Phase 8. Cập nhật `AGENTS.md` §7 ("12 trường" →
+"13 trường"). Thêm test regression `test_write_merged_preserves_alt_evidence`.
+
+**Số liệu (trước / sau):**
+
+| Chỉ số | Trước | Sau |
+|---|---|---|
+| Số trường mỗi record | 12 | **13** |
+| Triple có `alt_evidence` khác rỗng | 0 | **3.308 / 13.379** |
+| Tổng bằng chứng thay thế bị mất | **13.294** | 0 |
+| Edge Neo4j có `alt_evidence` khác rỗng | 0 / 13.379 | **3.308 / 13.379** |
+| Node / edge | 19.548 / 13.379 | **không đổi** |
+| `validate_graph.py` | 13/13 PASS | **13/13 PASS** |
+| Nạp lại Neo4j | — | **+0 node / +0 edge** (idempotent) |
+
+**Bài học:** khi một trường được **tính** ở tầng nghiệp vụ nhưng bị **lọc** ở
+tầng serialize, dữ liệu mất **âm thầm** — không có lỗi, không có cảnh báo.
+Phải kiểm tra **giá trị thực** trong artifact cuối (và trong DB), không chỉ
+kiểm tra logic hàm. Đây là lớp lỗi mà unit test của hàm tính toán
+(`test_merge_routes_other_evidence_to_alt_evidence`) **không** bắt được —
+phải có test ở mức **ghi file**.
+
+---
+
+## D-094 — Cache LLM **không bền** ⇒ 89 request API bị lãng phí khi chạy lại
+
+**Ngày:** 16/11/2026
+
+**Kế hoạch:** Gate G6 — "cache idempotent (chạy lại = 0 request)".
+
+**Thực tế:** chạy lại `python -m src.re.infer_re_llm` với **cùng tham số** lần
+đầu **không** trúng cache: **100 request API thật, 386,9 s**, cache 104 → 193
+bản ghi. Lần chạy **thứ hai** (ngay sau) trúng cache hoàn toàn: **0,0 s, 0
+request**.
+
+**Nguyên nhân gốc:** cache SQLite `data/interim/llm_cache.sqlite` **đã bị thay
+thế** giữa lần chạy gốc (15/11 20:15) và lần kiểm tra (16/11 06:40). Bằng
+chứng: các bản ghi cache cũ nhất có mốc **15/11 23:00**, trong khi artifact
+`re_llm.jsonl` (ghi lúc **15/11 20:15**, `elapsed_s = 0.0` ⇒ lần đó **100% cache
+hit**) đã tồn tại từ trước ⇒ những bản ghi cache gốc **không còn trong DB**.
+
+**Cách sửa / hệ quả:**
+- **Gate vẫn đạt** và đã được chứng minh bằng **hai** lần đo độc lập:
+  (a) lần ghi artifact (15/11): `elapsed_s = 0.0`; (b) lần kiểm tra lại
+  (16/11): 100/100 cache hit, `0.0 s`, **0 request API**.
+- Ngoài ra: `re_llm.jsonl` (268 câu / 353 triple) và lần chạy lại (249 câu /
+  348 triple) **khác nhau** — đây là **nondeterminism** của LLM ở
+  `temperature=0` (server-side), không phải lỗi code: cùng prompt cho kết quả
+  hơi khác ⇒ khác ở bộ lọc evidence. Artifact **được giữ nguyên** (hợp lệ,
+  đạt mọi ngưỡng Gate: evidence substring **97,51%** ≥ 90%, giữ sau lọc
+  **97,51%** ≥ 60%) vì thay thế nó sẽ đổi KG.
+
+**Bài học:** cache idempotent **đúng** (cùng input ⇒ 0 request), nhưng
+**độ bền** của cache là một vấn đề riêng. Artifact suy ra từ cache phải kèm
+**cache key** hoặc phải coi cache là **hạ tầng tạm** và chấp nhận chi phí
+gọi lại. Nếu cần **tái lập tuyệt đối**, phải lưu kèm artifact
+`n_requests`/`elapsed_s` + `cache_hit_ratio` để chứng minh nguồn dữ liệu.

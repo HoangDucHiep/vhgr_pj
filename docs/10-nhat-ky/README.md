@@ -36,11 +36,15 @@ docs/10-nhat-ky/
 | [`phase-02.md`](phase-02.md) | 2 — Làm sạch wikitext, tách câu/đoạn, trích hyperlink | 14/11/2026 | 3 lỗi lớn (offset lệch 502 bài · vỡ câu do soft-wrap · `<ref>` nuốt text) · chốt mẫu số link & cách đo "câu hợp lệ" |
 | [`phase-03.md`](phase-03.md) | 3 — Parse infobox + chuẩn hóa ngày (A4) | 14/11/2026 | 10.078 triple confidence ≥ 0,95 · **audit đóng phase**: 4 lỗi thật (347 triple trùng · 4 self-loop · 81 trùng giữa artifact · template mơ hồ) · ablation đo từng fix |
 | [`phase-04.md`](phase-04.md) | 4 — Nhãn bạc NER từ hyperlink (B2.1) | 14/11/2026 | 186.960 câu · 138.860 mention · độ phủ **100%** · **audit đóng phase**: 4 lỗi thật (thiếu ranh giới từ · "Quan lại nhà X" · siêu dữ liệu sinh tử · số đo lượng) · ablation 5 bước |
+| [`phase-07.md`](phase-07.md) | 7 — Wikidata DS + tập train RE (D1.1) | 15/11/2026 | Vì sao Wikidata thuần không đủ · đường grounding có giá trị nhất (+152%) · ablation đo từng nguồn nhãn |
+| [`phase-08.md`](phase-08.md) | 8 — Mô hình RE đa nhãn + LLM + hợp nhất triple (D1/D2/D3) | 15/11/2026 | Vì sao **đa nhãn sigmoid** không phải softmax · vì sao marker cần **vai trò** (4,62% cặp mơ hồ) · số liệu LLM baseline (evidence substring 97,51%) · 7 lỗi & cách sửa |
 | [`so-lieu/phase-00-mo-truong.json`](so-lieu/phase-00-mo-truong.json) | 0 | — | Phiên bản thư viện, cấu hình hạ tầng, so sánh phương án bảo vệ DB |
 | [`so-lieu/phase-01-bang-do-sanh.json`](so-lieu/phase-01-bang-do-sanh.json) | 1 | — | Thống kê corpus trước/sau T5 theo mọi chiều |
 | [`so-lieu/phase-02-text-stats.json`](so-lieu/phase-02-text-stats.json) | 2 | — | Số liệu văn bản Phase 2: trước/sau theo từng lỗi · so sánh 3 phương án xử lý wikilink |
 | [`so-lieu/phase-03-infobox-stats.json`](so-lieu/phase-03-infobox-stats.json) | 3 | — | Số liệu infobox Phase 3: 8 Gate (5 gốc + 3 bất biến) · **thang ablation** đo từng fix riêng lẻ |
 | [`so-lieu/phase-04-ner-stats.json`](so-lieu/phase-04-ner-stats.json) | 4 | — | Số liệu nhãn bạc NER Phase 4: 5 Gate · phân bố nguồn nhãn (7 nguồn) · **thang ablation 5 bước** · F1 theo loại của 2 baseline |
+| [`so-lieu/phase-07-re-stats.json`](so-lieu/phase-07-re-stats.json) | 7 | — | Số liệu tập train RE Phase 7: 5 Gate · phân bố nguồn nhãn POSITIVE (3 nguồn) · **thang ablation** đường grounding |
+| [`so-lieu/phase-08-re-llm-merge.json`](so-lieu/phase-08-re-llm-merge.json) | 8 | — | Số liệu Phase 8: **thang so sánh marker** (1.383 cặp mơ hồ → 0) · **thang so sánh đơn vị đo khoảng cách** (khớp 113.917) · số liệu LLM baseline · số liệu hợp nhất 5 nguồn |
 
 ## Cách dùng cho báo cáo / slide
 
@@ -53,6 +57,10 @@ docs/10-nhat-ky/
 | Slide "bài học kinh nghiệm" | `phase-01.md` § *Bài học* |
 | Slide "sai lệch so với kế hoạch" | `reports/deviations.md` (D-004 → D-030) |
 | Slide "audit: 5 Gate xanh mà dữ liệu vẫn sai" | `phase-03.md` § *Ý tưởng cho slide* + `so-lieu/phase-03-infobox-stats.json` § `thang_so_sanh_ablation` |
+| Slide "vì sao chọn đa nhãn cho RE" | `phase-08.md` § *Thang số liệu so sánh* (3.2) + `so-lieu/phase-08-re-llm-merge.json` § `quyet_dinh` |
+| Slide "vì sao marker có vai trò" | `phase-08.md` § *Thang số liệu so sánh* (4.1) + `so-lieu/phase-08-re-llm-merge.json` § `thang_so_sanh_marker` |
+| Slide "chất lượng LLM baseline" | `phase-08.md` § *Thang số liệu so sánh* (4.4) + `data/interim/re_llm.stats.json` |
+| Slide "hợp nhất 5 nguồn triple" | `phase-08.md` § *Số liệu đo được* + `data/interim/triples_merged.stats.json` |
 | Slide "sinh nhãn bạc NER" | `phase-04.md` § *Ý tưởng cho slide* + `so-lieu/phase-04-ner-stats.json` § `thang_so_sanh_ablation` |
 | Slide "chất lượng nhãn NER" | `phase-04.md` § *Số liệu đo được* + `reports/silver_quality.md` |
 | Số liệu tổng quan toàn dự án | `docs/PROGRESS.md` § *Chỉ số đo được* |

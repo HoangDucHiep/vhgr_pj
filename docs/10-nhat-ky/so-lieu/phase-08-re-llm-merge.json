@@ -1,0 +1,133 @@
+{
+  "_meta": {
+    "phase": 8,
+    "ngay": "2026-11-15",
+    "muc_tieu": "Mo hinh RE da nhan 19 lop + LLM baseline + hop nhat triple 5 nguon",
+    "nguon_so_lieu": [
+      "data/interim/re_model_input.jsonl",
+      "data/interim/re_llm.stats.json",
+      "data/interim/triples_merged.stats.json",
+      "models/re/metrics.json"
+    ],
+    "seed": 42,
+    "dau_ra_chinh": [
+      "models/re/",
+      "data/interim/re_phobert.jsonl",
+      "data/interim/re_llm.jsonl",
+      "data/interim/triples_merged.jsonl"
+    ]
+  },
+  "quyet_dinh": {
+    "D-061": "RE dua nhan sigmoid: 18 nhip han + 1 NA, loss BCE co mask (-100.0)",
+    "D-062": "Marker co kieu + vai tro: <<TYPE:SUBJ:name>> / <<TYPE:OBJ:name>>",
+    "D-063": "Bang type entity: NER vote -> infobox -> tien to year_ -> unknown"
+  },
+  "thang_so_sanh_marker": {
+    "_meta": {
+      "nguon": "do tren data/interim/coref_resolved.jsonl (186.960 cau, 137.584 mention co canonical_id)",
+      "phuong_an_A": "Marker chi chua ten (dac ta goc: <<PERSON:Le Loi>>)",
+      "phuong_an_B": "Marker co kieu + vai tro + ten hien thi chuan (D-062)"
+    },
+    "cap_do_mo_ho": {
+      "hai_dau_mention_be_mat_giong_het": 1383,
+      "ty_le_mo_ho_cheo_phuong_an_A": 0.0462,
+      "sau_khi_dung_ten_hien_thi_chuan_con_lai": 83,
+      "trong_so_83_co_la_self_loop": 83,
+      "ty_le_mo_ho_cheo_phuong_an_B": 0.0028
+    },
+    "span_chong_lan": {
+      "so_cap": 1552,
+      "ty_le": 0.052
+    },
+    "giai_quyet_1300_cap_bi_ten_giai_quyet": 1300,
+    "giai_quyet_bang_vai_tro": 83
+  },
+  "thang_so_sanh_so_cau_ung_vien": {
+    "_meta": {
+      "nguon": "do tren data/interim/coref_resolved.jsonl",
+      "phuong_an_A": "Token hoa bang regex (build_silver.tokenize)",
+      "phuong_an_B": "Token hoa bang khoang trang (text.split())"
+    },
+    "phuong_an_A": 112355,
+    "phuong_an_B": 113917,
+    "con_so_trong_ke_hoach": 113917,
+    "ghi_chu": "Ke hoach dung phep do token khoang trang -> phuong_an B khop 100%"
+  },
+  "phan_bo_cau_ung_vien": {
+    "_meta": {
+      "nguon": "do tren data/interim/coref_resolved.jsonl, khoang cach <= 60 token khoang trang"
+    },
+    "tong_cap_ung_vien": 113917,
+    "cung_canonical_id_self_pair": 14569,
+    "khac_canonical_id_dung_de_suy_luan": 99348
+  },
+  "ma_hoa_input": {
+    "_meta": {
+      "nguon": "data/interim/re_model_input.jsonl",
+      "lenh": "python -m src.re.data_convert_re"
+    },
+    "so_cau": 12877,
+    "so_input": 26030,
+    "so_example": 25947,
+    "split": {
+      "train": 20382,
+      "dev": 2987,
+      "test": 2578
+    },
+    "max_subwords": 256,
+    "mean_subwords": 80.3,
+    "ty_le_slot_bi_mask": 0.887
+  },
+  "llm_baseline_api": {
+    "_meta": {
+      "nguon": "data/interim/re_llm.stats.json",
+      "lenh": "python -m src.re.infer_re_llm --limit 1500 --chunk-size 15",
+      "model": "gemini-3.5-flash-lite",
+      "fallback_model": "openai/gpt-oss-20b",
+      "split": "test"
+    },
+    "so_cau": 1500,
+    "so_request": 100,
+    "chunk_size": 15,
+    "thoi_gian_s": 386.7,
+    "tong_triple": 362,
+    "giu_triple": 353,
+    "ty_le_evidence_substring_truoc_loc": 0.9751,
+    "ty_le_giu_sau_loc": 0.9751,
+    "loai_evidence": 9,
+    "loai_relation_ngoai_danh_muc": 0,
+    "loai_sentence_index_sai": 0,
+    "clamp_confidence": 0
+  },
+  "hop_nhat_triple": {
+    "_meta": {
+      "nguon": "data/interim/triples_merged.stats.json",
+      "lenh": "python -m src.re.merge_triples"
+    },
+    "theo_nguon": {
+      "infobox": 10078,
+      "rule": 736,
+      "distant_supervision": 15497,
+      "phobert_re": 0,
+      "llm": 349
+    },
+    "tong_input": 26660,
+    "sau_merge": 12313,
+    "loai_trung": 14347,
+    "loai_duoi_nguong": 0,
+    "llm_resolve_entity_id": {
+      "so_triple_llm_gop": 349,
+      "so_triple_llm_vao_merge": 329,
+      "hai_dau_la_ent_id": 329,
+      "ty_le_resolve": 1.0
+    },
+    "kiem_tra_gate": {
+      "missing_required_fields": 0,
+      "invalid_confidence": 0,
+      "invalid_relation": 0,
+      "self_loops": 0,
+      "empty_evidence": 0,
+      "duplicate_keys": 0
+    }
+  }
+}

@@ -13,7 +13,7 @@ from typing import Any, AsyncIterator
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from backend.app.api import health, stats
+from backend.app.api import ask, health, lookup, stats
 from backend.app.settings import get_settings
 
 
@@ -60,6 +60,8 @@ def create_app() -> FastAPI:
 
     app.include_router(health.router)
     app.include_router(stats.router)
+    app.include_router(ask.router)
+    app.include_router(lookup.router)
 
     @app.get("/")
     def root() -> dict[str, Any]:
@@ -72,7 +74,14 @@ def create_app() -> FastAPI:
             "name": "Knowledge Graph Lịch sử Việt Nam",
             "version": settings["version"],
             "docs": "/docs",
-            "endpoints": ["/api/health", "/api/stats"],
+            "endpoints": [
+                "/api/health",
+                "/api/stats",
+                "/api/ask",
+                "/api/search",
+                "/api/graph/{entity_id}",
+                "/api/entity/{entity_id}",
+            ],
         }
 
     return app

@@ -598,10 +598,12 @@ PY
 **Việc phải làm**
 1. `src/re/data_convert_re.py`: format đầu vào mô hình (entity marker):
    `<s> subj_mention [SEP] câu có «subject» và «object» [SEP] obj_mention`
-   - Marker có type: `«PERSON:Lê Lợi»`. Nhãn ở vị trí `[CLS]`.
-   - Lớp: 18 quan hệ + `NA` → 19 nhãn.
-2. `src/re/train_re.py`: giống Phase 5, `metric_for_best_model="f1"`, lưu `metrics.json` per-relation.
-3. `src/re/infer_re.py`: dự đoán trên toàn corpus, sinh cặp ứng viên từ mention trong câu (cặp có cùng câu, cách nhau ≤ 60 token), lọc `NA`, ghi confidence = softmax.
+   - Marker có **type + vai trò**: `«PERSON:SUBJ:Lê Lợi»` / `«PERSON:OBJ:Nguyễn Phúc Chu»` (D-062 — bắt buộc: 4,62% cặp có hai đầu mention giống hệt nhau, marker chỉ có tên không phân biệt được hướng).
+   - **Nhãn ở vị trí `[CLS]`**.
+   - Lớp: 18 quan hệ + `NA` → **19 đầu sigmoid** (D-061 — đa nhãn, không phải softmax).
+   - Slot quan hệ **chưa biết** gán `-100.0` và bị **mask** trong loss (88,7% slot).
+2. `src/re/train_re.py`: `Trainer` đa nhãn với **masked BCE** (D-061), `metric_for_best_model="f1"`, lưu `metrics.json` per-relation + ngưỡng hiệu chỉnh trên dev.
+3. `src/re/infer_re.py`: dự đoán trên toàn corpus, sinh cặp ứng viên từ mention trong câu (cặp có cùng câu, cách nhau ≤ 60 token — đo bằng **token khoảng trắng**, khớp **113.917** cặp trong kế hoạch), lọc `NA`, ghi confidence = sigmoid.
 4. **LLM bulk** `[KAGGLE-GPU]`: `notebooks/kaggle/06_llm_extract_kaggle.ipynb`
    - Model: `Qwen/Qwen3-8B` (hoặc `openai/gpt-oss-20b`) nạp bằng `transformers` + bitsandbytes 4-bit, hoặc `vllm` nếu thời gian cho phép.
    - Chunk 15 câu/request, prompt ép JSON: `{"triples":[{"subject","relation","object","evidence","confidence"}]}`.
@@ -615,7 +617,7 @@ PY
    - Cache `data/interim/llm_cache.sqlite` (key = sha256(model+prompt+params)).
    - **Không log giá trị key**.
 7. `src/re/merge_triples.py`:
-   - Gộp `infobox` + `phobert_re` + `llm` + `distant_supervision`.
+   - Gộp `infobox` + `rule` (lead) + `distant_supervision` + `phobert_re` + `llm` (**5 nguồn**).
    - Chuẩn hóa subject/object về `entity_id` (nếu chưa có → dùng `make_entity_id`).
    - Loại trùng (subject, relation, object): giữ bản `confidence` cao nhất; các bằng chứng còn lại vào `alt_evidence`.
    - Chuẩn hóa quan hệ đối xứng (`anh_em_cua`, `tham_gia_tran`) về orientation chuẩn (subject_id < object_id) → tránh trùng.
@@ -626,7 +628,7 @@ PY
 python -m src.re.train_re --config configs/default.yaml
 python -m src.re.infer_re --model models/re --out data/interim/re_phobert.jsonl
 python -m src.re.merge_triples --out data/interim/triples_merged.jsonl
-pytest -q tests/test_relations.py tests/test_llm_client.py
+pytest -q tests/test_re_model.py tests/test_merge_triples.py tests/test_llm_client.py
 python - <<'PY'
 import json
 rows=[json.loads(l) for l in open('data/interim/triples_merged.jsonl')]

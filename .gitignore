@@ -58,3 +58,7 @@ Thumbs.db
 
 # ---- Kaggle ----
 .kaggle/
+# Bundle dataset Kaggle (mã nguồn + weight + artifact) — tái tạo được bằng
+# `scripts/build_kaggle_*.py`, dung lượng hàng GB.
+data/kaggle/
+dataset-metadata.json

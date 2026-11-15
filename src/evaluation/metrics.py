@@ -329,6 +329,7 @@ def relation_f1_multilabel(
         for key in all_keys:
             relation_set |= gold_by_key.get(key, set())
             relation_set |= pred_by_key.get(key, set())
+            relation_set |= masked_by_key.get(key, set())
         relation_list = sorted(relation_set)
     else:
         relation_list = list(relations)

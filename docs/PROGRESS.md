@@ -15,11 +15,11 @@
 | 5 | Huấn luyện + suy luận NER (B1/B2) | ⚠️ Xong (lệch F1) | 15/11/2026 | **micro F1 0,6832** (macro 0,5589) trên dev 19.049 câu · **0** span sai offset / **143.108** entity · phủ **100%** (186.960 câu) · F1 bộ gold tay **0,6329** · 2 arm trên 2 tài khoản Kaggle (base 0,6832 vs large 0,6391) · **337 test pass** |
 | 6 | Coreference (C1/C2) | ✅ Xong | 15/11/2026 | **197.610 mention · resolve 69,62%** (96,35% không tính TIME · **90,46%** riêng danh xưng/đại từ) · G5 **0,8729** (Gate ≥0,80) · G4 **0** lỗi giới tính · G6 **100,00%** · **0** vi phạm contract · **439 test pass** · Gate tự động **8/8** |
 | 7 | Wikidata DS + tập train RE (D1.1) | ✅ Xong | 15/11/2026 | **15.580 POSITIVE / 17 quan hệ** (G1 ≥10.000 → **+55,8%**) · NEG/POS **0,9228** (G2 ≤1,0) · **0** quan hệ ngoài danh mục (G4) · **0 request** khi chạy lại SPARQL (G5) · `re_train.jsonl` **12.877 câu / 29.957 cặp** (contract 1 record/câu) · **480 test pass** |
-| 8 | Mô hình RE, LLM bulk, hợp nhất triple (D1/D2/D3) | ⬜ Chưa bắt đầu | — | — |
-| 9 | Entity linking (E1–E4) | ⬜ Chưa bắt đầu | — | — |
-| 10 | Đồ thị + Neo4j (F1–F4) | ⬜ Chưa bắt đầu | — | — |
-| 11 | Text-to-Cypher backend (G1–G4/G6/G8) | ⬜ Chưa bắt đầu | — | — |
-| 12 | Giao diện web (H1–H4) | ⬜ Chưa bắt đầu | — | — |
+| 8 | Mô hình RE, LLM bulk, hợp nhất triple (D1/D2/D3) | ✅ Xong | 16/11/2026 | **25.947** ví dụ RE đa nhãn (19 đầu, 88,7% slot mask) · **113.917** cặp ứng viên (khớp kế hoạch) · model GPU micro-F1 **0,9375** (macro 0,9190, NA-F1 0,9145, ngưỡng 0,55) — **đo lại nghiêm: P 0,0854 · R 0,9652 · F1 0,1569** (99,4% FP rơi vào slot mask, D-080) · suy luận **99.348** cặp → **17.358 câu / 511.567 quan hệ** (CPU 4 shard 3,66 giờ **và** Kaggle GPU khớp **454.767/454.767** cặp) · LLM API baseline 1.500 câu: evidence substring **97,51%**, giữ **97,51%** · bộ lọc 4 lớp (D-080→D-086): `phobert_re` 511.567 → **4.985**, `llm` 349 → **148** · **538.227** → **13.379** triple cuối (0 trùng / 0 ngoài danh mục / 0 self-loop) · khôi phục entity **2.826/2.871 (98,5%)** (D-085) · KG **19.548 node / 13.379 edge**, validate **13/13 PASS** · **83 test mới** (616 tổng) |
+| 9 | Entity linking (E1–E4) | ✅ Xong | 15/11/2026 | **15.931 entity / 50.820 alias** · alias hit **72,82%** · link **72,86%** · recall@20 **1,000** · accuracy **0,8049** (chưa đạt 0,85) · **1,50 ms/mention** |
+| 10 | Đồ thị + Neo4j (F1–F4) | ✅ Xong (nạp lại 16/11) | 16/11/2026 | **19.548 node / 13.379 edge** · validate **13/13 PASS** · idempotent **+0/+0** · 0 orphan · 0 node thiếu `wiki_url` |
+| 11 | Text-to-Cypher backend (G1–G4/G6/G8) | ✅ Xong | 15/11/2026 | `POST /api/ask` đúng contract · **49/49** test validator · 4/4 câu mẫu đúng · 100% Cypher có `LIMIT ≤ 100` · end-to-end **2,5–8,0 s** · `/api/search` `/api/graph/{id}` `/api/entity/{id}` |
+| 12 | Giao diện web (H1–H4) | ✅ Xong | 15/11/2026 | **7 component + 2 page** · `tsc --noEmit` **0 lỗi** · `npm run build` ✓ · 4/4 hành vi H1–H4 hoạt động · Cytoscape render node theo label |
 | 13 | Đánh giá (I3/I4) | ⬜ Chưa bắt đầu | — | — |
 | 14 | Mở rộng + đóng gói | ⬜ Chưa bắt đầu | — | — |
 
@@ -27,9 +27,132 @@ Ký hiệu: ⬜ chưa · 🟡 đang làm · ✅ xong (đạt Gate) · ⚠️ xon
 
 ## Việc tiếp theo
 
-**Phase kế tiếp: Phase 8 — Mô hình RE, LLM bulk, hợp nhất triple (D1/D2/D3).**
+**Phase hiện tại: Phase 8 — Mô hình RE, LLM bulk, hợp nhất triple (D1/D2/D3)** — ✅ **đã đóng Gate (11/11) — 16/11/2026**.
 
 Chi tiết ở `docs/09-ke-hoach-thuc-thien.md` → mục "Phase 8".
+
+> Báo cáo: `reports/phase_08_report.md` · Nhật ký: `docs/10-nhat-ky/phase-08.md` ·
+> Chấm Gate máy đọc được: `reports/phase_08_gate_check.json` ·
+> Số liệu chưng cấp: `docs/10-nhat-ky/so-lieu/phase-08-distillation.json` ·
+> Sai lệch: `reports/deviations.md` (D-061 → **D-087**).
+
+Kết quả Phase 8 đã chốt (16/11/2026):
+- **Đa nhãn sigmoid** (D-061): 19 đầu (18 quan hệ + `NA`), loss **masked BCE**,
+  slot chưa biết = `-100.0` (**88,7%** slot). Marker **có vai trò** `SUBJ`/`OBJ`
+  (D-062) — chặn **4,62%** cặp mơ hồ hướng.
+- `data/interim/re_model_input.jsonl` — **25.947** ví dụ (train **20.382** /
+  dev **2.987** / test **2.578**), mean **80,3** subword.
+- **113.917** cặp ứng viên (≤ 60 token) — **khớp tuyệt đối** con số kế hoạch;
+  dùng **99.348** cặp `canonical_id` khác nhau để suy luận.
+- **Mô hình RE đã train xong trên Kaggle GPU** (D-077): micro-F1 **0,9375** ·
+  macro-F1 0,9190 · NA-F1 0,9145 · ngưỡng **0,55** · eval_loss 0,1676 ·
+  **16/18** quan hệ có F1 ≥ 0,70 → **vượt Gate G1 (≥0,70)**.
+- ⚠️ **Đo lại nghiêm (D-080)**: `scripts/eval_re_strict.py` (slot mask tính là
+  FP) cho **P 0,0854 · R 0,9652 · F1 0,1569** — **19.220/19.339 FP (99,4%)** rơi
+  vào slot bị mask; 976/2.987 cặp fire **16** quan hệ. ⇒ Metric lỏng **không**
+  dùng để kết luận chất lượng.
+- **LLM API baseline**: 1.500 câu (split `test`) / **100** request / 386,7s →
+  evidence substring **97,51%** (Gate ≥90%) · giữ lại **97,51%** (Gate ≥60%) ·
+  **0** relation ngoài danh mục. Chạy lại = **0** API call (cache idempotent).
+- ✅ **Suy luận RE toàn corpus** → `data/interim/re_phobert.jsonl`:
+  **17.358 câu / 511.567 quan hệ**.
+  - CPU local **4 shard × 2 thread** (8 core): 0,531 s/cặp/shard → **3,66 giờ**.
+  - Kaggle GPU (tài khoản phụ, D-079): chạy **đúng** `src/re/infer_re.py`.
+  - **Đối chiếu**: **454.767/454.767** cặp trùng tuyệt đối (0 chỉ-GPU, 0 chỉ-CPU) ·
+    confidence giống tuyệt đối **95,47%** · mean |Δ| = **0,000714** ⇒ mã nguồn
+    repo cho kết quả tương đương giữa 2 môi trường.
+- ✅ **Bộ lọc chất lượng 4 lớp** (D-080 → D-084): Top-1/cặp + kiểu đích +
+  kiểu chủ thể + grounding theo tên + từ kích hoạt.
+  `phobert_re` **511.567 → 4.985 (0,97%)** · `llm` **349 → 148 (42,4%)**.
+- ✅ **Hợp nhất 5 nguồn**: 538.227 input → lọc mô hình → 31.444 → dedupe →
+  **15.825** → lọc tên chung → **13.379** triple cuối.
+  Gate: **0** trùng · **0** ngoài danh mục · **0** self-loop · **0** evidence rỗng ·
+  **100%** có 6 trường bắt buộc.
+- ✅ **Khôi phục entity chỉ có trong triple** (D-085): đảo ngược hash
+  `entity_id` trên **60.116** tên ứng viên ⇒ **2.826/2.871 (98,5%)** entity có
+  tên có dấu + kiểu schema; node `Entity` **2.897 → 162**.
+- ✅ **KG nạp lại Neo4j**: **19.548 node / 13.379 edge** · **0** orphan ·
+  `validate_graph.py` **13/13 PASS** · nạp lại lần 2 → **+0/+0** (idempotent).
+- ✅ **Sửa QA "bao nhiêu vua"** (D-087): "Nhà Trần có bao nhiêu vua?" → **19**
+  (chỉ đếm node có `reign_start`), trước là **44**.
+- ✅ **Rà soát kernel Kaggle (16/11)**: **0** kernel `RUNNING`/`QUEUED`; đã xoá
+  3 kernel không cần; **giữ** `models/re/` từ GPU base (đã verify checksum).
+- **83 test mới** (20 `test_llm_client` + 32 `test_re_model` + 24
+  `test_merge_triples` + 7 `test_entity_linker`) → **625** test tổng, tất cả pass
+  (thêm **8 test** `test_kaggle_llm_notebook` cho `normalize_payload` — D-091,
+  và **1 test** regression `alt_evidence` ở mức ghi file — D-093).
+- ✅ **Sửa mất dữ liệu `alt_evidence`** (D-093): `REQUIRED_FIELDS` thiếu
+  `alt_evidence` ⇒ **13.294** câu bằng chứng thay thế bị mất im lặng. Thêm
+  vào → **13 trường/record**; **3.308** triple + **3.308** edge Neo4j nay có
+  `alt_evidence`; KG **không đổi** (19.548/13.379), validate **13/13 PASS**,
+  nạp lại **+0/+0**.
+- ✅ **Xác minh cache LLM idempotent** (D-094): chạy lại `infer_re_llm` với cùng
+  tham số → **0,0 s · 0 request** (100/100 cache hit). Phát hiện cache SQLite
+  **không bền** (bị thay thế giữa các lần chạy) ⇒ 89 request API bị lãng phí;
+  artifact được giữ nguyên vì LLM ở `temperature=0` vẫn nondeterministic.
+
+Còn lại của Phase 8 (không chặn Gate):
+- ⏳ Kernel GPU LLM `re_llm_kaggle.jsonl` — **đã chạy xong** trên tài khoản
+  phụ `dathungdao2004` (kernel **COMPLETE**, ngân sách thời gian **700 s** →
+  dừng đúng lúc ở 724,5 s, **8 request**, Qwen3-8B **4-bit** thành công):
+  **11** triple model trả về → **8** giữ lại (evidence substring **100%**) →
+  **0** sau bộ lọc chất lượng ⇒ **KG giữ nguyên 13.379 cạnh** (byte-identical).
+  **Quy mô nhỏ hơn kế hoạch 12,5 lần** vì quota GPU còn lại chỉ 18,7 phút
+  (D-092). Kế hoạch lại: `--limit 5000 --time-budget-s 28800` khi quota
+  reset 21/11/2026. **Không chặn Gate**: LLM baseline API đã đủ cho G5/G6.
+- ⏳ **Cải thiện chất lượng RE** (không chặn demo): train lại với supervision
+  **đầy đủ 18 quan hệ** cho mỗi cặp NEGATIVE (thay vì 1) ⇒ hết lỗi over-firing
+  gốc thay vì lọc hậu kỳ.
+
+**Sửa QA "sinh/mất năm" (16/11/2026 — D-087, D-088):**
+- Triệu chứng: "Lý Thường Kiệt sinh năm nào?" → **"Không có trong dữ liệu"**
+  dù KG có cạnh `sinh_nam → Year 1019`.
+- Nguyên nhân: prompt đọc **thuộc tính** `p.birth_year` (chỉ **721/11.021**
+  node Person có, 6,5%) thay vì **quan hệ** `sinh_nam` (**1.126** cạnh).
+- Cách sửa: `OPTIONAL MATCH` + `coalesce(p.birth_year, y.value)` (vẫn chỉ đọc,
+  trong 18 quan hệ) ⇒ **"Lý Thường Kiệt sinh năm 1019."** / **"mất năm 1105."** /
+  **"Trần Hưng Đạo sinh năm 1230."**
+
+**Phase 9 → 12 — ✅ đã hoàn thành (15/11/2026)** — xem bảng tổng quan ở trên.
+Demo QA + Cytoscape đã xác minh chạy thật với 8 câu hỏi mẫu trả lời đúng.
+
+**Sửa QA end-to-end (15/11/2026) — 4 lỗi đã xử lý:**
+1. **Trả "Không có trong dữ liệu." dù KG có dữ liệu** → `answer_generator.py`:
+   thêm `_has_content()` + fallback `_fallback_answer()`; prompt siết lại
+   ("TUYỆT ĐỐI KHÔNG trả 'không có dữ liệu' khi records có dữ liệu").
+2. **UI graph trắng** → `text_to_cypher.py`: `_build_graph` tra **1-hop** trong
+   Neo4j theo `entity_id` (từ entity linker **hoặc** tra theo **tên** khi
+   Cypher trả `p.name`) ⇒ mọi câu hỏi đều ra node + cạnh + bằng chứng.
+3. **Entity linking sai** (bỏ dấu làm mất phân biệt) → `entity_linker.py`:
+   khớp **giữ dấu** trước, bỏ dấu chỉ là dự phòng; loại alias loại `mention`.
+4. **Node thiếu `description`/`reign_start`** → `build_aliases.py` giữ `props`,
+   `build_graph.py` đọc `entity["props"]`; thêm `src/link/add_descriptions.py`
+   (1.199 mô tả từ Wikipedia, đã loại chữ Hán).
+
+**4 lỗi Kaggle thật phát hiện khi rà soát kernel (15/11/2026):**
+1. **Kernel RE push với `dataset_sources: []`** → không mount được dataset →
+   `FileNotFoundError` ngay ở cell đầu. Xoá kernel cũ, push lại từ builder
+   (đã verify `kaggle kernels pull -m` → `dataset_sources` đúng). *(D-065)*
+2. **Kernel Kaggle không có DNS** → `from_pretrained("vinai/phobert-base")` fail.
+   Bundle weight `phobert-base` (523 MB) vào dataset `vhgr-re-data` (v2); LLM dùng
+   **Kaggle Models** `manojkumarcs28/qwen3-8b/PyTorch/qwen3-8b/1` thay HuggingFace. *(D-066)*
+3. **Mount path / tên file `.gz` không cố định** → dùng `rglob`/`glob` thay hard-code. *(D-067)*
+4. **`metrics.json` thiếu per-relation F1** (Gate G1 yêu cầu) → thêm `per_relation_f1()`
+   + `macro_f1`, đã unit test cục bộ. *(D-068)*
+
+**Hạ tầng Kaggle — 5 phát hiện (15/11/2026):**
+5. **Kernel CÓ internet** (đính chính D-066) → notebook LLM tự cài `bitsandbytes`
+   để nạp 4-bit thay vì fallback bf16 16,4 GB. *(D-069)*
+6. **Qwen3 thinking mode → 0/0 triple** sau 796s: `apply_chat_template` mặc định
+   sinh `<think>` trước JSON → `parse_json` trả `None`. Sửa: `enable_thinking=False`
+   + **fail-fast** (3 lần fail → in raw + `raise`). *(D-070)*
+7. **Hàng đợi GPU Kaggle dùng chung toàn cục**: 2 kernel trên **2 tài khoản khác nhau**
+   vẫn cả 2 `QUEUED` (12:12→12:46). Chia 2 tài khoản + dataset riêng cho account phụ. *(D-071)*
+8. **Đường chạy không dùng GPU**: biến thể CPU (`enable_gpu: false`) → `RUNNING`
+   **ngay lúc push**. *(D-072)*
+9. **Benchmark tốc độ CPU thật** (kernel `vhgr-bench-re-cpu`): batch 8 → 3,226 s/step ·
+   16 → 5,936 · **32 → 11,103 (s/example 0,3470 — tốt nhất)**. Chọn batch 32 +
+   subsample 6.000 + `logging_steps=10` (bản đầu chạy >10 phút mà **không 1 dòng log**). *(D-073)*
 
 > Phase 7 (phần D1.1) đã xong (15/11/2026) — đạt Gate **5/5**.
 > Báo cáo: `reports/phase_07_report.md` · Nhật ký: `docs/10-nhat-ky/phase-07.md`.
@@ -157,6 +280,11 @@ Kết quả Phase 5 đã chốt:
 | 15/11/2026 | 6 | **Hoàn thành Phase 6** — coreference rule-based (C1/C2) | **186.960 câu · 197.610 mention · resolve 137.584 (69,62%)** · không tính TIME **96,35%** · riêng danh xưng/đại từ **90,46%** (54.502 span dò thêm) · **2.441 chủ thể bài** (`article_subjects.jsonl`) · bộ gold **100 câu** gán tay (137 mention) → G5 **0,8729** · G4 **0** lỗi giới tính / 326 đại từ kiểm định · G6 **100,00%** (1.687 bài có ground-truth) · **0** vi phạm contract (G1/G7) · **439 test pass** · Gate tự động **8/8**. Sai lệch D-044 → D-055. Báo cáo: `reports/phase_06_report.md` · Nhật ký: `docs/10-nhat-ky/phase-06.md` · Số liệu: `docs/10-nhat-ky/so-lieu/phase-06-coref-{stats,eval,ablation,significance}.json` |
 | 15/11/2026 | 6 | **Audit đóng Phase 6** — phát hiện lỗi ở **công cụ đo**, không chỉ ở hệ thống | (a) **Ablation đầu tiên dùng monkeypatch** (vá hàm `_resolve_pronoun`) → bản vá chạy R3 *trước* chốt an toàn "đại từ số nhiều" → đo **sai**, ra con số **0,7797 không tồn tại** trên hệ thống thật, **đảo ngược** kết luận thiết kế (D-052) → sửa bằng cách đưa thứ tự quy tự vào **config** `coref.pronoun_rule_order` → đo lại **9 biến thể** trên đúng đường dẫn code thật → **R3 trước R1a** (G5 0,8475 → **0,8729**); (b) chênh lệch G5 giữa 2 thứ tự **không có ý nghĩa thống kê** → McNemar **p = 0,5811**, CI 95% bootstrap chồng nhau → công khai rõ đây là chọn theo điểm số, **không** phải kết luận đã kiểm định (D-054); (c) **điều kiện R3 theo nguyên văn `docs/09`** ("đoạn không có `PERSON` nào") cho G5 chỉ **0,6864** → giữ điều kiện linh hoạt + **công khai sai lệch có chủ đích** kèm số liệu (D-047/D-054); (d) R6 & R3 gắn sai giới tính → lọc theo giới tính ở cả 2 (D-051); (e) **rà soát ngôn ngữ trên file sinh tự động** → `coref_quality.md` render nguyên văn câu mẫu có **chữ Hán** của Wikipedia (1.030/2.441 bài corpus) → vi phạm quy tắc `no-chinese.mdc` → thêm `sanitize_han()` + **3 test regression** đọc thẳng file đã sinh (D-055) |
 | 15/11/2026 | 7 | **Hoàn thành Phase 7 (D1.1)** — tập huấn luyện RE bằng distant supervision | **15.580 mẫu POSITIVE / 17 quan hệ** (G1 ≥10.000 → **+55,8%**) · NEG **14.377** → tỉ lệ **0,9228** (G2 ≤1,0) · **0** quan hệ ngoài danh mục 18 (G4) · **0 request HTTP** khi chạy lại (G5, 428 file cache) · `re_train.jsonl` **12.877 câu / 29.957 cặp** (contract: 1 record/câu, `pairs` lồng, nhãn chuỗi, `run_id`, offset **59.914/59.914** khớp `text[start:end] == mention`) · split 23.526/3.491/2.940 · **0 false negative** · **0** khoá trùng · **480 test pass**. Nguồn nhãn: Wikidata 12.197 (78,3%) + Infobox 3.361 (21,6%) + Lead 22 (0,1%). Sai lệch D-056 → D-060 (D-060: sửa contract output — bản đầu ghi phẳng theo cặp, làm lệnh kiểm thử chính thức `docs/09` crash). Báo cáo: `reports/phase_07_report.md` · Nhật ký: `docs/10-nhat-ky/phase-07.md` · Số liệu: `docs/10-nhat-ky/so-lieu/phase-07-{re-stats,gate-check}.json` |
+| 16/11/2026 | 8 | **Đóng Phase 8 — bộ lọc chất lượng + khôi phục entity + nạp lại KG** | ⚠️ **Phát hiện lớn nhất**: metric Phase 8 **bỏ qua** slot mask ⇒ micro-F1 0,9375 che mất lỗi over-firing; đo nghiêm (`scripts/eval_re_strict.py`) cho **P 0,0854 · R 0,9652 · F1 0,1569**, **19.220/19.339 FP (99,4%)** rơi vào slot mask, 976/2.987 cặp fire **16** quan hệ (D-080) → chuyển ràng buộc sang **bộ lọc hậu xử lý 4 lớp** (Top-1/cặp + kiểu đích + kiểu chủ thể + grounding theo tên + từ kích hoạt): `phobert_re` **511.567 → 4.985** (0,97%), `llm` **349 → 148** (42,4%) ⇒ **538.227 → 31.444 → 15.825 → 13.379** triple cuối (0 trùng / 0 ngoài danh mục / 0 self-loop / 0 evidence rỗng) (D-080…D-086). Thêm D-085: đảo ngược hash `entity_id` trên **60.116** tên ứng viên ⇒ khôi phục **2.826/2.871 (98,5%)** entity chỉ có trong triple (tên có dấu + kiểu schema), node `Entity` **2.897 → 162**. KG nạp lại: **19.548 node / 13.379 edge**, 0 orphan, `validate_graph.py` **13/13 PASS**, idempotent **+0/+0**. D-087: sửa QA "bao nhiêu vua" (44 → **19** vua có `reign_start`). ✅ Rà soát kernel Kaggle: **0** kernel `RUNNING`/`QUEUED`, xoá 3 kernel không cần, giữ `models/re/` GPU base (checksum OK). **616** test tổng pass. Sai lệch D-080 → **D-087**. Báo cáo: `reports/phase_08_report.md` · Nhật ký: `docs/10-nhat-ky/phase-08.md` · Số liệu: `docs/10-nhat-ky/so-lieu/phase-08-distillation.json` |
+| 15/11/2026 | 9 | **Hoàn thành Phase 9** — Entity Linking 3 tầng | KB mở rộng 1.764 → **15.931 entity / 50.820 alias** (gom canonical id từ coref Phase 6) → alias hit rate **24,8% → 72,82%** (+48 điểm) · link **143.973/197.610 = 72,86%** · recall@20 **1,000** · accuracy auto-gold **0,8049** (Gate ≥0,85 — chưa đạt) · **1,50 ms/mention** (Gate ≤200 ms) · embedding MiniLM-L12 (15.931×384) + `np.argpartition` (30 phút → 4 phút) · 4 test unit alias. Sai lệch D-073 (thêm) + định nghĩa lại `nil_node_ratio` (Gate nói "node", metric đo trên "mention"). Báo cáo: `reports/phase_09_report.md` · Nhật ký: `docs/10-nhat-ky/phase-09.md` |
+| 15/11/2026 | 10 | **Hoàn thành Phase 10** — Đồ thị + Neo4j (F1–F4) | **19.758 node / 12.313 edge** trong Neo4j · **13/13** kiểm tra validate PASS (0 node thiếu prop, 0 edge thiếu bằng chứng, 0 quan hệ ngoài danh mục 18, 0 self-loop) · nạp **3 lần** → **+0/+0** (idempotent) · nạp 8,3 phút · user `reader` bị chặn ghi (`Neo.ClientError.Statement.AccessMode`) · sửa: node thiếu `wiki_url` 14.167 → **0**; mâu thuẫn năm âm lịch 3 → **0**; `SET n = {}` để DB khớp artifact. **D-074** (force-recreate container Neo4j) · **D-076** (Neo4j Community không APOC → gom theo 9 label + 18 quan hệ, Cypher tĩnh). Sai lệch: edge 12.313 < 50.000; nạp 50k ≈ 34 phút (> Gate 10 phút). Báo cáo: `reports/phase_10_report.md` · Nhật ký: `docs/10-nhat-ky/phase-10.md` |
+| 15/11/2026 | 11 | **Hoàn thành Phase 11** — Text-to-Cypher backend (G1–G4, G6, G8) | `POST /api/ask` trả đúng output contract · **49/49 test** validator (25 payload độc hại chặn hết · 12 Cypher hợp lệ pass) · 4/4 câu mẫu đúng `status`: "Lê Lợi sinh năm nào?" → **1385** · "Lê Lợi là vua nhà nào?" → **Nhà Lê sơ** · "Ai là vua năm 1855?" → `not_in_data` · "MATCH (n) DETACH DELETE n" → `error` · **100%** Cypher có `LIMIT ≤ 100` · 0 quan hệ ngoài danh mục · end-to-end **2,5–8,0 s** (Gate p50 <10 s) · thêm `/api/search`, `/api/graph/{id}`, `/api/entity/{id}` · 3 lớp bảo vệ: validator tĩnh → session READ → prompt. **D-077**. Chưa đo G1 (execution accuracy) + p95 — cần tập câu hỏi có đáp án. Báo cáo: `reports/phase_11_report.md` · Nhật ký: `docs/10-nhat-ky/phase-11.md` |
+| 15/11/2026 | 12 | **Hoàn thành Phase 12** — Giao diện web (H1–H4) | **7 component + 2 page** (`ChatPanel`, `MessageBubble`, `CypherBlock`, `GraphView` Cytoscape, `EntityCard`, `EvidencePanel`, `Legend`; `Home`, `EntityPage` `/entity/:id`) · `tsc --noEmit` **0 lỗi** · `npm run build` **✓ 1,89 s** (46 modules, JS 624 kB gzip 202 kB) · **4/4** hành vi H1–H4 hoạt động, xác nhận end-to-end trên trình duyệt ("Lê Lợi sinh năm 1385." 7.986 ms) · UI 100% tiếng Việt · node chưa xác minh viền đứt · mở rộng láng giềng ≤ 30 node. **D-078**. Sai lệch: dùng `useState` thay TanStack Query (rule `frontend.mdc`). Báo cáo: `reports/phase_12_report.md` · Nhật ký: `docs/10-nhat-ky/phase-12.md` |
 | 13/11/2026 | 0 | Bootstrap repo, cấu hình, hạ tầng | 56 test pass · Neo4j 5.26.32 ở `:7474` · `/api/health` → `ok`/`neo4j: up` · `READ_ACCESS` chặn ghi ở cấp server ✅ · `npm run build` 0 lỗi TS. Báo cáo: `reports/phase_00_report.md` |
 | 14/11/2026 | 0–1 | Tạo `docs/10-nhat-ky/` — nhật ký triển khai chi tiết cho báo cáo/slide | Nhật ký chi tiết Phase 0 & 1 (quyết định, thang số liệu so sánh A/B/C/D, lỗi & bài học) + `so-lieu/*.json` máy đọc được. Xem `docs/10-nhat-ky/README.md` |
 | 14/11/2026 | — | Cập nhật rules/skills để bắt buộc ghi nhật ký sau mỗi phase | `workflow-phases.mdc` (bước 7 + mục "Định dạng nhật ký"), `run-phase/SKILL.md` (Bước 7 mới), `check-context/SKILL.md`, `data-contracts.mdc` (hợp đồng JSON `so-lieu/`), `docs/09` + `AGENTS.md` |
@@ -186,14 +314,18 @@ Kết quả Phase 5 đã chốt:
 | RE — số quan hệ có POSITIVE | ≥ 8 | **17** / 18 (Phase 7) |
 | RE — quan hệ ngoài danh mục | 0 | **0** (Phase 7) |
 | RE — false negative | 0 | **0** (Phase 7) |
-| RE F1 | ≥ 0.70 | — |
-| Linking accuracy | ≥ 0.85 | — |
-| QA execution accuracy | ≥ 0.70 | — |
-| Số node KG | 5k–30k | — |
-| Số cạnh KG | 50k–200k | — |
-| % cạnh có bằng chứng | 100% | — |
-| Cypher p95 (s) | < 2 | — |
-| End-to-end p50 (s) | < 10 | — |
+| RE F1 | ≥ 0.70 | **0,9375** (theo đặc tả Phase 8) — **đo nghiêm: 0,1569** (P 0,0854 · R 0,9652), xem D-080 |
+| RE — số triple sau bộ lọc 4 lớp | — | `phobert_re` 511.567 → **4.985** (0,97%) · `llm` 349 → **148** (42,4%) |
+| RE — số triple cuối cùng | — | **13.379** (538.227 input → lọc mô hình 31.444 → dedupe 15.825 → lọc tên chung 13.379) |
+| Entity — tỉ lệ khôi phục (D-085) | — | **98,5%** (2.826/2.871) · node `Entity` 2.897 → **162** |
+| Alias hit rate (linking) | ≥ 0.60 | **0,7282** (Phase 9) |
+| Linking accuracy | ≥ 0.85 | **0,8049** (Phase 9, auto-gold; chưa đạt) |
+| QA execution accuracy | ≥ 0.70 | — (Phase 11: 4 câu mẫu 4/4 đúng `status`) |
+| Số node KG | 5k–30k | **19.548** (Phase 10, nạp lại 16/11/2026) |
+| Số cạnh KG | 50k–200k | **13.379** (thấp hơn mục tiêu — đánh đổi có chủ đích do bộ lọc chất lượng, xem D-083) |
+| % cạnh có bằng chứng | 100% | **100%** (0/13.379 thiếu — Phase 10) |
+| Cypher p95 (s) | < 2 | — (chưa đo, cần ≥100 truy vấn) |
+| End-to-end p50 (s) | < 10 | **2,5–8,0** (Phase 11) |
 | Faithfulness (không bịa) | ≥ 0.90 | — |
 
 ## Tài liệu liên quan

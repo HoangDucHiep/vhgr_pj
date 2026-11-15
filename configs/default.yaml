@@ -91,6 +91,60 @@ re:
   max_len: 256
   batch_size: 32
 
+  # --- Phase 8 (D1.2): mã hoá đầu vào mô hình RE ---
+  # Mã hoá typed-marker: <s> subj </s> câu có «TYPE:SUBJ:name» ... «TYPE:OBJ:name» </s> obj </s>
+  convert:
+    max_len: 256
+    # Số word ngữ cảnh giữ mỗi bên của hai mention (thu hẹp dần nếu vượt ngân sách).
+    context_words: 48
+  # Artifact đầu vào/đầu ra của Phase 8.
+  encoded_path: data/interim/re_model_input.jsonl
+  predictions_path: data/interim/re_phobert.jsonl
+  llm_predictions_path: data/interim/re_llm.jsonl
+  merged_path: data/interim/triples_merged.jsonl
+
+  # --- Phase 8 (D1.2): huấn luyện mô hình RE đa nhãn ---
+  train:
+    model_name: vinai/phobert-base
+    model_dir: models/re
+    learning_rate: 3.0e-5
+    epochs: 5
+    batch_size: 32
+    eval_batch_size: 64
+    max_len: 256
+    weight_decay: 0.01
+    warmup_ratio: 0.1
+    max_grad_norm: 1.0
+    early_stopping_patience: 2
+    logging_steps: 100
+    save_total_limit: 2
+    seed: 42
+    checkpoint_dir: models/_checkpoints
+
+  # --- Phase 8: suy luận toàn corpus ---
+  infer:
+    model_dir: models/re
+    batch_size: 64
+    max_len: 256
+    # Ngưỡng kích hoạt quan hệ (hiệu chỉnh trên dev trong train_re).
+    threshold: 0.5
+    # Ngưỡng đầu NA — dưới ngưỡng này mới coi là "có quan hệ".
+    na_threshold: 0.5
+    # Khoảng cách tối đa (token) giữa hai mention để sinh cặp ứng viên.
+    max_pair_distance_tokens: 60
+
+  # Hợp nhất triple (Phase 8 — D3).
+  merge:
+    # Ngưỡng confidence tối thiểu để giữ triple (0 = giữ tất cả).
+    min_confidence: 0.0
+    documents_path: data/interim/documents_clean.jsonl
+    infobox_path: data/interim/infobox_triples.jsonl
+    lead_path: data/interim/lead_triples.jsonl
+    ds_path: data/interim/re_positive.jsonl
+    phobert_path: data/interim/re_phobert.jsonl
+    llm_path: data/interim/re_llm.jsonl
+    llm_kaggle_path: data/interim/re_llm_kaggle.jsonl
+
   # --- Phase 7 (D1 phần 1): distant supervision ---
   # Bảng mapping property Wikidata → quan hệ KG (nguồn sự thật cho mapping).
   relations_config: configs/wikidata_relations.yaml

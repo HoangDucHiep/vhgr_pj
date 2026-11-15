@@ -118,7 +118,13 @@ reports/      # kết quả đánh giá, phase reports
 | `data/interim/re_train.jsonl` | 7 | tập huấn luyện RE — **1 record/câu** (`run_id`/`sentence_id`/`doc_id`/`page_id`/`split`/`text` + mảng `pairs` lồng), POSITIVE (Wikidata + Infobox + Lead, 15.580) + NEGATIVE an toàn (14.377), label chuỗi `POSITIVE`/`NEGATIVE` |
 | `data/interim/wikidata_pairs.jsonl` | 7 | cặp quan hệ thô từ Wikidata (13 property lõi × lô 200 QID), có cache đĩa dùng chung Phase 1 |
 | `data/interim/re_positive.jsonl` | 7 | mẫu POSITIVE đã grounding vào câu corpus (15.580, 17 quan hệ, trường `source` truy vết nguồn nhãn) |
-| `data/interim/triples_merged.jsonl` | 8 | triple hợp nhất |
+| `data/interim/re_model_input.jsonl` | 8 | input mô hình RE đã mã hoá: `input_ids`/`attention_mask` + **vector nhãn 19 chiều** (18 quan hệ + `NA`), slot chưa biết = `-100.0` |
+| `data/interim/re_phobert.jsonl` | 8 | dự đoán RE của mô hình PhoBERT (`method="phobert_re"`), 1 record/câu + mảng `pairs` |
+| `data/interim/re_llm.jsonl` | 8 | baseline LLM API trên tập con ~1.500 câu (`method="llm"`), `evidence` đã kiểm substring |
+| `data/interim/re_llm_kaggle.jsonl` | 8 | trích xuất LLM mở (Qwen3-8B 4-bit) trên Kaggle GPU, cùng format với `re_llm.jsonl` |
+| `data/interim/llm_cache.sqlite` | 8 | cache idempotent LLM (key = sha256 của model + prompt + params) |
+| `data/interim/triples_merged.jsonl` | 8 | triple hợp nhất từ 5 nguồn (infobox/rule/distant_supervision/phobert_re/llm) — **13 trường** (`docs/09` §Phase 8), dedupe theo `(subject, relation, object)` giữ confidence cao nhất + `alt_evidence` (bằng chứng thay thế) |
+| `models/re/` | 8 | mô hình RE đa nhãn (19 đầu) + `metrics.json` (F1 per-relation, ngưỡng hiệu chỉnh) + `trainer_state.json` |
 | `data/knowledge_base/entities.jsonl` | 9 | entity + alias + QID |
 | `data/knowledge_base/graph.jsonl` | 10 | nodes + edges cho Neo4j |
 

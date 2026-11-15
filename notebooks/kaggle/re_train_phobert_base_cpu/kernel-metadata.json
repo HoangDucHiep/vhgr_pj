@@ -1,0 +1,21 @@
+{
+ "id": "hoanghiep421/vhgr-phase-8-re-train-phobert-base-cpu",
+ "title": "VHGR Phase 8 - RE train PhoBERT base CPU",
+ "code_file": "notebook.ipynb",
+ "language": "python",
+ "kernel_type": "notebook",
+ "is_private": true,
+ "enable_gpu": false,
+ "enable_tpu": false,
+ "enable_internet": true,
+ "dataset_sources": [
+  "hoanghiep421/vhgr-re-data"
+ ],
+ "keywords": [
+  "vietnamese",
+  "wikipedia",
+  "relation-extraction"
+ ],
+ "competition_sources": [],
+ "model_sources": []
+}

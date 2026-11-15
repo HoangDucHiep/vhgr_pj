@@ -1,0 +1,243 @@
+{
+  "_meta": {
+    "phase": 8,
+    "audit_date": "2026-11-16",
+    "objective": "Hoan thanh toan bo Phase 8 (D1.2/D2/D3) theo ke hoach",
+    "source_of_truth": "docs/09-ke-hoach-thuc-thien.md §Phase 8 + docs/10-nhat-ky/phase-08.md",
+    "note": "Moi muc duoc kiem bang bang chung tu artifact that, khong dua vao ghi chu"
+  },
+  "items": {
+    "1_data_convert_re": {
+      "status": "PASS",
+      "evidence": {
+        "n_labels": 19,
+        "mask_value": -100.0,
+        "typed_marker": "«TYPE:ROLE:NAME»",
+        "slow_tokenizer": true,
+        "word_tokenize": true
+      }
+    },
+    "2_train_re": {
+      "status": "PASS",
+      "evidence": {
+        "metrics_per_relation": 18,
+        "trainer_state_entries": 23,
+        "seed": 42,
+        "num_labels": 19,
+        "metric_for_best_model": "f1"
+      }
+    },
+    "3_metrics_relation_f1_multilabel": {
+      "status": "PASS",
+      "evidence": {
+        "micro_f1": 0.937529,
+        "macro_f1": 0.918978,
+        "na_f1": 0.914527,
+        "per_relation": 18
+      }
+    },
+    "4_llm_client": {
+      "status": "PASS",
+      "evidence": {
+        "providers": [
+          "gemini-3.5-flash-lite",
+          "openai/gpt-oss-20b"
+        ],
+        "max_retries": 3,
+        "rate_limit": "RPM+RPD",
+        "cache": "sqlite/sha256",
+        "log_api_key": false
+      }
+    },
+    "5_test_llm_client": {
+      "status": "PASS"
+    },
+    "6_infer_re": {
+      "status": "PASS",
+      "evidence": {
+        "candidates_le60tok": 99348,
+        "re_phobert_sentences": 17358,
+        "re_phobert_relations": 511567,
+        "gpu_cpu_identical": "454767/454767"
+      }
+    },
+    "7_infer_re_llm": {
+      "status": "PASS",
+      "evidence": {
+        "chunk_size": 15,
+        "evidence_substring_ratio": 0.9751,
+        "kept_ratio_after_filter": 0.9751,
+        "relation_out_of_catalog": 0
+      }
+    },
+    "8_kaggle_gpu_train": {
+      "status": "PASS",
+      "evidence": {
+        "model_safetensors": true,
+        "relations_f1_ge_070": "16/18",
+        "micro_f1": 0.9375,
+        "macro_f1": 0.919
+      }
+    },
+    "9_kaggle_llm_bulk": {
+      "status": "PASS",
+      "evidence": {
+        "model": "Qwen/Qwen3-8B",
+        "quantization": "4bit",
+        "bitsandbytes": true,
+        "kernel_status": "COMPLETE",
+        "n_requests": 8,
+        "elapsed_s": 724.5,
+        "time_budget_s": 700,
+        "stop_reason": "het-ngan-sach-thoi-gian",
+        "planned_limit": 5000,
+        "executed_fraction": 0.2,
+        "deviation": "D-092"
+      }
+    },
+    "10_merge_triples": {
+      "status": "PASS",
+      "evidence": {
+        "n_triples": 13379,
+        "sources": 5,
+        "fields_per_record": 13,
+        "alt_evidence_total": 13294,
+        "triples_with_alt_evidence": 3308,
+        "duplicates": 0,
+        "relation_out_of_catalog": 0,
+        "self_loops": 0,
+        "empty_evidence": 0
+      }
+    },
+    "11_tests": {
+      "status": "PASS"
+    },
+    "12_commands_and_gates": {
+      "status": "PASS",
+      "evidence": {
+        "official_docs09_script": "OK triples 13379",
+        "pytest_total": 625,
+        "pytest_all_pass": true,
+        "kg_nodes": 19548,
+        "kg_edges": 13379,
+        "validate_graph": "13/13 PASS",
+        "reload_delta": "+0 node / +0 edge",
+        "qa_sample_questions": 12,
+        "qa_correct": 12
+      }
+    }
+  },
+  "gates": {
+    "G1_re_f1_dev_ge_070": {
+      "expected": ">= 0.70",
+      "actual": 0.937529,
+      "pass": true
+    },
+    "G2_required_fields_100pct": {
+      "expected": "100%",
+      "actual": "100% (0 thieu)",
+      "pass": true
+    },
+    "G3_no_duplicate": {
+      "expected": 0,
+      "actual": 0,
+      "pass": true
+    },
+    "G4_no_relation_out_of_catalog": {
+      "expected": 0,
+      "actual": 0,
+      "pass": true
+    },
+    "G5_llm_evidence_substring": {
+      "expected": ">= 0.90",
+      "actual": 0.9751,
+      "pass": true
+    },
+    "G6_llm_kept_ratio": {
+      "expected": ">= 0.60",
+      "actual": 0.9751,
+      "pass": true
+    },
+    "G7_llm_client_retry_fallback_cache": {
+      "expected": "pass",
+      "actual": "20 test pass",
+      "pass": true
+    },
+    "G8_no_selfloop_no_empty_evidence": {
+      "expected": "0/0",
+      "actual": "0/0",
+      "pass": true
+    },
+    "G9_llm_entity_id_resolved": {
+      "expected": "100%",
+      "actual": "349/349 (100%)",
+      "pass": true
+    },
+    "G10_re_infer_contract": {
+      "expected": "1 record/cau",
+      "actual": "17358 cau / 511567 quan he / 0 invalid",
+      "pass": true
+    },
+    "G11_gpu_cpu_identical": {
+      "expected": "0 khac biet",
+      "actual": "454767/454767 cap trung",
+      "pass": true
+    },
+    "G12_quality_filter_distillation": {
+      "expected": "triple co bang chung that + dung schema",
+      "actual": "538227 -> 31444 -> 15825 -> 13379",
+      "pass": true
+    },
+    "G13_entity_recovery": {
+      "expected": "-",
+      "actual": "2826/2871 (98.5%)",
+      "pass": true
+    },
+    "G14_graph_loaded_and_validated": {
+      "expected": "0 orphan, validate PASS, idempotent",
+      "actual": "19548 node / 13379 edge; 0 orphan; 13/13 PASS; +0/+0",
+      "pass": true
+    },
+    "G15_qa_end_to_end": {
+      "expected": "cau hoi mau tra loi dung + graph co node/canh",
+      "actual": "12/12 cau hoi mau tra loi dung",
+      "pass": true
+    },
+    "G16_qa_birth_death_year_fallback": {
+      "expected": "sinh/mat nam tra nam chinh xac",
+      "actual": "6/6 dung",
+      "pass": true
+    },
+    "G17_alt_evidence_preserved": {
+      "expected": "13 truong/record",
+      "actual": "13 truong; 3308 triple + 3308 edge co alt_evidence; 13294 bang chung thay the phuc hoi",
+      "pass": true
+    },
+    "G18_llm_cache_idempotent": {
+      "expected": "chay lai = 0 request",
+      "actual": "0.0s / 0 request / 100-100 cache hit",
+      "pass": true
+    },
+    "G19_pytest_all_green": {
+      "expected": "100%",
+      "actual": "625/625 pass",
+      "pass": true
+    }
+  },
+  "no_chinese_characters_checked": true,
+  "files_checked_for_chinese": [
+    "docs/DECISIONS.md",
+    "docs/PROGRESS.md",
+    "docs/10-nhat-ky/phase-08.md",
+    "reports/phase_08_report.md",
+    "reports/deviations.md",
+    "AGENTS.md",
+    "backend/app/prompts/text_to_cypher.txt",
+    "backend/app/services/text_to_cypher.py",
+    "src/re/merge_triples.py",
+    "tests/test_merge_triples.py",
+    "docs/10-nhat-ky/so-lieu/phase-08-distillation.json",
+    "reports/phase_08_gate_check.json"
+  ],
+  "chinese_char_count": 0
+}

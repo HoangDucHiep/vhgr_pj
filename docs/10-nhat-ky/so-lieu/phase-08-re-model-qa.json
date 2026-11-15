@@ -1,0 +1,135 @@
+{
+  "_meta": {
+    "phase": 8,
+    "title": "Kết quả mô hình RE + QA end-to-end (15/11/2026)",
+    "description": "Số liệu đo được sau khi kernel Kaggle GPU base train xong và sửa 4 lỗi QA end-to-end.",
+    "sources": {
+      "re_metrics": "models/re/metrics.json",
+      "re_kernel": "hoanghiep421/vhgr-phase-8-re-train-phobert-base",
+      "inference_kernel": "hoanghiep421/vhgr-phase-8-re-infer-phobert-gpu",
+      "llm_kernel": "hoanghiep421/vhgr-phase-8-llm-extract-qwen3-8b-4bit",
+      "qa_api": "POST http://127.0.0.1:8000/api/ask"
+    },
+    "decision": "D-077 (ưu tiên GPU base, loại CPU), D-078 (suy luận lên Kaggle GPU)"
+  },
+  "re_model": {
+    "model": "vinai/phobert-base",
+    "device": "Kaggle GPU (T4)",
+    "epochs": 3,
+    "seed": 42,
+    "n_train": 20382,
+    "n_dev": 2987,
+    "n_test": 2578,
+    "num_labels": 19,
+    "threshold": 0.55,
+    "na_threshold": 0.5,
+    "eval_loss": 0.167561,
+    "micro_f1": 0.937529,
+    "micro_precision": 0.937578,
+    "micro_recall": 0.936705,
+    "macro_f1": 0.918978,
+    "na_f1": 0.914527,
+    "gate_g1_target": 0.70,
+    "gate_g1_pass": true,
+    "relations_f1_ge_070": 16,
+    "relations_total": 18,
+    "per_relation_f1": {
+      "sinh_tai": 0.991,
+      "giu_chuc_vu": 0.993,
+      "mat_nam": 0.995,
+      "dien_ra_tai": 1.0,
+      "dong_doi_tai": 1.0,
+      "vo_cua": 0.989796,
+      "me_cua": 0.962199,
+      "chong_cua": 0.941176,
+      "cha_cua": 0.932642,
+      "chi_huy_tran": 0.889,
+      "ke_vi": 0.867,
+      "anh_em_cua": 0.865,
+      "lap_ra": 0.333,
+      "danh_bai": 0.0
+    },
+    "weak_relations": {
+      "danh_bai": {"f1": 0.0, "support": 0, "reason": "dev khong co mau duong"},
+      "lap_ra": {"f1": 0.333, "support": 5, "reason": "support qua nho"}
+    }
+  },
+  "kernel_comparison": {
+    "gpu_base": {
+      "kernel": "hoanghiep421/vhgr-phase-8-re-train-phobert-base",
+      "status": "COMPLETE",
+      "epochs": 3,
+      "train_examples": 20382,
+      "has_metrics_json": true,
+      "micro_f1": 0.937529,
+      "selected": true
+    },
+    "cpu": {
+      "kernel": "hoanghiep421/vhgr-phase-8-re-train-phobert-base-cpu",
+      "status": "COMPLETE",
+      "epochs": 1,
+      "train_examples": 6000,
+      "has_metrics_json": false,
+      "micro_f1": null,
+      "selected": false,
+      "reason": "COMPLETE nhung khong sinh metrics.json => khong do duoc Gate G1"
+    },
+    "lesson": "COMPLETE la thong tin trang thai, khong phai ket qua. Dieu kien nhan phai la artifact do duoc."
+  },
+  "qa_e2e_fixes": [
+    {
+      "id": 1,
+      "symptom": "Tra 'Khong co trong du lieu.' du KG co du lieu",
+      "root_cause": "Gemini qua chat: records co field null => khong du du lieu",
+      "fix": "answer_generator.py: _has_content() + _fallback_answer(); prompt siet lai",
+      "before": "Tran Bach Dang dien ra nam nao -> 'Khong co trong du lieu.'",
+      "after": "-> '...nam 1288'"
+    },
+    {
+      "id": 2,
+      "symptom": "UI graph trang (0 node, 0 canh)",
+      "root_cause": "Cypher tra p.name (string) => khong co entity_id de dung node",
+      "fix": "text_to_cypher.py: _build_graph tra 1-hop trong Neo4j theo entity_id; fallback tra theo ten",
+      "before": "Vua nao sinh nam 1385? -> graph 0 node",
+      "after": "-> graph 27 node / 27 canh"
+    },
+    {
+      "id": 3,
+      "symptom": "Entity linking sai: 'Nguyen Hue chi' -> 'Nguyen Hue Chi'",
+      "root_cause": "Khop tren text da bo dau => mat phan biet",
+      "fix": "entity_linker.py: khop giu dau truoc; lop bo dau bat buoc kiem chu hoa; loai alias type 'other'",
+      "before": "14 cau hoi mau -> nhieu cau link sai",
+      "after": "14/14 link dung"
+    },
+    {
+      "id": 4,
+      "symptom": "Node thieu description / reign_start",
+      "root_cause": "build_aliases.py vut 'props' khi ghi entities.jsonl",
+      "fix": "Giu props; build_graph.py doc entity['props']; them src/link/add_descriptions.py",
+      "before": "0 node co description",
+      "after": "1199 node co description, 217 co reign_start"
+    }
+  ],
+  "qa_samples": [
+    {"question": "Le Loi sinh nam nao?", "nodes": 27, "edges": 27, "answer": "Le Loi sinh nam 1385."},
+    {"question": "Nguyen Hue la ai?", "nodes": 25, "edges": 29, "answer": "Nguyen Hue (ten khai sinh la Ho Thom...) la mot nha chinh tri va quan su..."},
+    {"question": "Ai la cha cua Le Loi", "nodes": 27, "edges": 27, "answer": "Cha cua Le Loi la Le Thai Tong."},
+    {"question": "Le Loi la vua nha nao", "nodes": 27, "edges": 27, "answer": "Le Loi la vua nha Le so."},
+    {"question": "Nha Tran co bao nhieu doi vua", "nodes": 42, "edges": 41, "answer": "Nha Tran co tong cong 37 doi vua theo du lieu duoc cung cap."},
+    {"question": "Ngo Quyen lap ra nha nao", "nodes": 24, "edges": 25, "answer": "Ngo Quyen lap ra nha Ngo."},
+    {"question": "Ly Thuong Kiet la ai", "nodes": 10, "edges": 10, "answer": "Ly Thuong Kiet la mot nha quan su, nha chinh tri Dai Viet thoi Ly..."},
+    {"question": "Tran Bach Dang dien ra nam nao", "nodes": 14, "edges": 13, "answer": "Du lieu chi ghi nhan su kien Tran Bach Dang (1288)..."},
+    {"question": "Ai chi huy tran Bach Dang", "nodes": 14, "edges": 13, "answer": "...4 nguoi la Tran Nhan Tong, Tran Thanh Tong, Tran Hung Dao va Nguyen Khoai."},
+    {"question": "Vua nao sinh nam 1385?", "nodes": 27, "edges": 27, "answer": "Vua sinh nam 1385 la Le Thai To."},
+    {"question": "Quang Trung mat nam nao", "nodes": 25, "edges": 29, "answer": "Quang Trung mat nam 1792."},
+    {"question": "Nguyen Hue chi huy tran nao", "nodes": 25, "edges": 29, "answer": "Nguyen Hue chi huy Tran Ngoc Hoi - Dong Da."},
+    {"question": "Nguyen Trai la ai", "nodes": 12, "edges": 11, "answer": "Nguyen Trai, hieu la Uc Trai, la mot nha chinh tri, nha van..."},
+    {"question": "Ha Noi la thu do cua nuoc nao", "nodes": 107, "edges": 120, "answer": "Ha Noi co trong du lieu nhung thong tin ve quoc gia ma Ha Noi la thu do khong co trong du lieu."}
+  ],
+  "tests": {
+    "total": 616,
+    "phase_8_new": 76,
+    "entity_linker_new": 7,
+    "all_pass": true
+  }
+}

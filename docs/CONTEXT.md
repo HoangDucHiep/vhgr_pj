@@ -8,7 +8,7 @@
 | Hạng mục | Trạng thái |
 |---|---|
 | Giai đoạn | **Đang triển khai** — Phase 1–7 xong (15/11/2026) |
-| Phase hiện tại | **Phase 8 — Mô hình RE, LLM bulk, hợp nhất triple (D1/D2/D3)** (chưa bắt đầu) |
+| Phase hiện tại | **Phase 8 — Mô hình RE, LLM bulk, hợp nhất triple (D1/D2/D3)** — 🟡 đang làm (7/8 Gate đạt, model đang train trên Kaggle GPU) |
 | Phase đã xong | 0 Bootstrap · 1 Lọc bài · 2 Làm sạch+tách câu · 3 Infobox · 4 Nhãn bạc NER · 5 Huấn luyện+suy luận NER · **6 Coreference (C1/C2)** · **7 Wikidata DS + tập train RE (D1.1)** |
 | Tài liệu | `docs/00` … `docs/09` đã hoàn thành · `docs/10-nhat-ky/` nhật ký triển khai chi tiết theo phase |
 | Môi trường | Python 3.12.3, Docker 29.9.2, Node 24.15, RAM 23GB, đĩa 2.5TB, **không GPU local** |
@@ -17,8 +17,8 @@
 | Frontend | Vite + React 18 + TS — `npm run build` 0 lỗi ✅ |
 | Kaggle | `KAGGLE_USERNAME=hoangduchiep` + `KAGGLE_KEY` trong `.env` ✅ (auth bằng `Authorization: Bearer`) |
 | API key | `GEMINI_API_KEY`, `GROQ_API_KEY` trong `.env` ✅ |
-| Test | `pytest -q tests/` → **480 passed** (Phase 7) |
-| Số liệu hiện tại | 2.441 bài · 186.960 câu · 10.078 triple infobox · 143.108 entity NER · **197.610 mention coref** (resolve 69,62%) · **15.580 mẫu POSITIVE RE** / 17 quan hệ |
+| Test | `pytest -q tests/` → **556 passed** (480 Phase 7 + 76 Phase 8) |
+| Số liệu hiện tại | 2.441 bài · 186.960 câu · 10.078 triple infobox · 143.108 entity NER · **197.610 mention coref** (resolve 69,62%) · **15.580 mẫu POSITIVE RE** / 17 quan hệ · **25.947** ví dụ train RE (19 đầu) · **12.313** triple hợp nhất |
 
 ## 2. Quyết định đã chốt (KHÔNG đổi nếu không có lý do ghi vào DECISIONS.md)
 
@@ -38,7 +38,7 @@
 | Hạng mục | Quyết định | Ghi chú |
 |---|---|---|
 | NER | `vinai/phobert-base` token classification, BIOES | 13 lớp = 6 nhãn × BIOES + O |
-| RE | `vinai/phobert-base` + entity marker, 19 lớp (18 quan hệ + NA) | |
+| RE | `vinai/phobert-base` + entity marker, 19 lớp (18 quan hệ + NA) | **đa nhãn sigmoid**, không phải softmax — D-061 |
 | Embedding | `BAAI/bge-m3`, dim 1024, float16 | sinh trên Kaggle, máy local chỉ load |
 | LLM bulk | model mở lượng tử hóa trên Kaggle GPU (`Qwen/Qwen3-8B` 4-bit) | **không tốn quota** |
 | LLM API chính | Gemini `gemini-3.5-flash-lite` | 15 RPM / 500 RPD |
@@ -80,6 +80,27 @@ Trích xuất LLM trên toàn corpus → **Kaggle GPU**.
 | Contract output RE | **1 record/câu** (`run_id`/`text` + mảng `pairs` lồng), nhãn **chuỗi** `POSITIVE`/`NEGATIVE`, mỗi cặp có offset `start`/`end` thỏa `text[start:end] == mention` | D-060 |
 | Artifact | `data/interim/re_train.jsonl` — **12.877 câu / 29.957 cặp** (POS 15.580 / NEG 14.377), split theo `page_id`; contract: 1 record/câu, `pairs` lồng, nhãn chuỗi `POSITIVE`/`NEGATIVE`, có `run_id` | D-060 |
 | Số quan hệ còn thiếu POSITIVE | `danh_bai` (0) — cần nguồn nhãn khác (Wikidata P166, LLM) | — |
+
+**Mô hình RE (Phase 8) — các quyết định đã chốt:**
+
+| Quyết định | Giá trị | Mã |
+|---|---|---|
+| Hình thức đầu ra | **đa nhãn sigmoid**: 18 đầu quan hệ (1 sigmoid/quan hệ) + 1 đầu `NA` | D-061 |
+| Lỗi huấn luyện | **masked BCE** — slot chưa biết = `-100.0` (bị bỏ qua, **không** phải 0.0) | D-061 |
+| Đầu `NA` | luôn có supervision: `1.0` nếu input không có quan hệ POSITIVE nào, ngược lại `0.0` | D-061 |
+| Marker | có **kiểu + vai trò**: `«PERSON:SUBJ:Lê Lợi»` / `«PERSON:OBJ:Nguyễn Phúc Chu»` | D-062 |
+| Chuỗi mô hình | `<s> subj </s> câu có «…» và «…» </s> obj </s>` — nhãn ở `[CLS]` | D-062 |
+| Tên hiển thị | `infobox_entities` → mode mention không phải đại từ → mention thô | D-062 |
+| Bảng type entity | NER vote đa số (93,5%) → `infobox_entities` → tiền tố `year_` → `unknown` | D-063 |
+| Cặp ứng viên (suy luận) | 2 mention cùng câu, **≤ 60 token** khoảng cách (đo bằng token khoảng trắng), `canonical_id` khác nhau | — |
+| Số cặp ứng viên | **113.917** cặp (99.348 cặp `canonical_id` khác nhau — dùng để suy luận) | — |
+| Hợp nhất triple | dedupe `(subject, relation, object)` giữ **confidence cao nhất**, bằng chứng còn lại → `alt_evidence` | — |
+| Quan hệ đối xứng | `anh_em_cua`, `tham_gia_tran` → chuẩn hoá `subject_id < object_id` | — |
+| Số nguồn gộp | **5**: `infobox` · `rule` (lead) · `distant_supervision` · `phobert_re` · `llm` | — |
+| LLM bulk | Kaggle GPU, `Qwen/Qwen3-8B` 4-bit, chunk **15 câu/request** | — |
+| LLM API baseline | Gemini `gemini-3.5-flash-lite` → fallback Groq `openai/gpt-oss-20b`, tập con **1.500 câu** (tập `test`) | — |
+| Ràng buộc evidence | `evidence` phải là **substring** nguyên văn của câu → nếu không, **loại** và **đếm** số lượt loại | — |
+| Cache LLM | SQLite `data/interim/llm_cache.sqlite`, key = sha256(model + prompt + params) → **idempotent** | — |
 
 **Coreference (Phase 6) — các quyết định đã chốt:**
 

@@ -1,0 +1,55 @@
+{
+  "_meta": {
+    "phase": "08",
+    "name": "phase-08-kaggle-cpu-benchmark",
+    "description": "Đo tốc độ train PhoBERT-base (RE) trên Kaggle CPU notebook, dùng để quyết định batch size/epoch cho biến thể CPU",
+    "source": "Kaggle kernel hoanghiep421/vhgr-bench-re-cpu (version 2), output bench.json",
+    "date": "2026-11-15",
+    "device": "Kaggle CPU notebook (2 vCPU)",
+    "seq_len": 96,
+    "num_labels": 19,
+    "model": "vinai/phobert-base",
+    "notes": "Đo trên tensor ngẫu nhiên, warmup 2 step, đo 8 step. Có lỗi ở cell đóng gói zip nên kernel báo ERROR, nhưng bench.json đã ghi thành công."
+  },
+  "measurements": {
+    "batch_8": {
+      "sec_per_step": 3.226,
+      "sec_per_example": 0.4033,
+      "steps_per_sec": 0.31
+    },
+    "batch_16": {
+      "sec_per_step": 5.936,
+      "sec_per_example": 0.371,
+      "steps_per_sec": 0.168
+    },
+    "batch_32": {
+      "sec_per_step": 11.103,
+      "sec_per_example": 0.347,
+      "steps_per_sec": 0.09
+    }
+  },
+  "decision": {
+    "chosen_batch_size": 32,
+    "chosen_epochs": 2,
+    "chosen_learning_rate": 3e-05,
+    "reason": "batch 32 có s/example thấp nhất (0,347) nên throughput tổng tốt nhất; 20.382 ví dụ / 32 x 2 epoch x 11,1 s ≈ 3,9 giờ < trần 9 giờ Kaggle CPU",
+    "rejected": [
+      {
+        "batch_size": 8,
+        "estimated_hours": 7.2,
+        "reason": "5.096 step x 3,226 s ≈ 7,2 giờ — sát trần 9 giờ, rủi ro timeout"
+      },
+      {
+        "batch_size": 16,
+        "estimated_hours": 5.3,
+        "reason": "2.548 step x 5,936 s ≈ 4,2-5,3 giờ — tốt nhưng thua batch 32 về throughput tổng"
+      }
+    ]
+  },
+  "dataset": {
+    "re_model_input_total": 25947,
+    "train": 20382,
+    "dev": 2987,
+    "test": 2578
+  }
+}

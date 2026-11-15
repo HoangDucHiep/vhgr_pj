@@ -1,0 +1,20 @@
+{
+ "id": "dathungdao2004/vhgr-phase-8-re-infer-phobert-gpu",
+ "title": "VHGR Phase 8 - RE infer PhoBERT (GPU)",
+ "code_file": "notebook.ipynb",
+ "language": "python",
+ "kernel_type": "notebook",
+ "is_private": true,
+ "enable_gpu": true,
+ "enable_tpu": false,
+ "enable_internet": false,
+ "dataset_sources": [
+  "dathungdao2004/vhgr-re-infer"
+ ],
+ "keywords": [
+  "vietnamese",
+  "nlp"
+ ],
+ "competition_sources": [],
+ "model_sources": []
+}
