@@ -139,9 +139,38 @@ if [ "$LINES" -lt "$TARGET" ]; then
 fi
 
 echo "$(date '+%F %T') — chấm lại các arm bị judge bỏ sót"
-./.venv/bin/python scripts/rejudge_missing.py \
-    --checkpoint "$CHECKPOINT" \
-    >> logs/eval_rejudge.log 2>&1
+# Chạy **nhiều vòng**: mỗi vòng dùng lại context+answer đã sinh (không tốn
+# quota sinh) ⇒ chỉ tốn 1 request judge/arm. Judge đôi khi bị cắt token ⇒
+# cần nhiều vòng mới chấm hết. Dừng khi không còn arm thiếu điểm.
+for rejudge_round in 1 2 3 4 5; do
+    ./.venv/bin/python scripts/rejudge_missing.py \
+        --checkpoint "$CHECKPOINT" \
+        >> logs/eval_rejudge.log 2>&1
+    MISSING=$(./.venv/bin/python - "$CHECKPOINT" <<'PY'
+import json, sys
+missing = 0
+with open(sys.argv[1], encoding="utf-8") as handle:
+    for line in handle:
+        line = line.strip()
+        if not line:
+            continue
+        try:
+            record = json.loads(line)
+        except json.JSONDecodeError:
+            continue
+        for arm in ("A", "B", "B-"):
+            reason = str((record.get(arm) or {}).get("judge", {}).get("reason") or "")
+            if "không trả về điểm" in reason or reason == "missing":
+                missing += 1
+print(missing)
+PY
+)
+    echo "$(date '+%F %T') — rejudge vòng ${rejudge_round}: còn ${MISSING} arm thiếu điểm"
+    if [ "$MISSING" -eq 0 ]; then
+        break
+    fi
+    sleep 30
+done
 
 echo "$(date '+%F %T') — dựng lại báo cáo JSON từ checkpoint"
 ./.venv/bin/python scripts/rebuild_phase16_report.py \
