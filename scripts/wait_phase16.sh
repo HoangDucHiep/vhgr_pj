@@ -16,7 +16,11 @@ REPO="${PHASE16_REPO:-/media/hoanghiep/All1/Codes/NPL/vhgr_pj}"
 cd "$REPO" || exit 1
 
 TARGET=247
-MAX_ROUNDS="${PHASE16_MAX_ROUNDS:-40}"
+# 40 vòng là **không đủ**: quota Gemini reset 1 lần/ngày (~15:00 UTC+7),
+# Groq TPD là cửa sổ **trượt 24h** ⇒ cần đủ số vòng để sống sót qua các lần
+# reset. Mỗi vòng ngủ theo mốc quota hồi (tối đa 4h) nên 120 vòng ≈ 20 ngày
+# — trên mức cần thiết, nhưng rẻ (vòng chỉ tốn 60s nạp index).
+MAX_ROUNDS="${PHASE16_MAX_ROUNDS:-120}"
 CHECKPOINT=data/eval/eval_rag_checkpoint.jsonl
 # --- Phân bổ quota theo đặc tính hạn mức từng provider ------------------
 # **Groq**: hạn mức theo **token/ngày** (200.000 token/model) ⇒ dùng cho
