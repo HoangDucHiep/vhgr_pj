@@ -49,19 +49,22 @@ def main() -> int:
     )
     parser.add_argument("--qa-set", default="data/eval/qa_rag_250.jsonl")
     parser.add_argument("--stamp", default="phase16")
+    # **Phải khớp** pool thật đã dùng khi chạy benchmark
+    # (`scripts/wait_phase16.sh`) ⇒ metadata trong báo cáo không sai lệch.
     parser.add_argument(
         "--gen-pool",
         default=(
+            "groq:openai/gpt-oss-120b,qwen/qwen3.8-27b,openai/gpt-oss-20b;"
             "gemini:gemini-3.1-flash-lite,gemini-3.1-flash-lite-preview,"
-            "gemini-3-flash-preview;groq:openai/gpt-oss-120b,qwen/qwen3.8-27b,"
-            "openai/gpt-oss-20b"
+            "gemini-3-flash-preview"
         ),
     )
     parser.add_argument(
         "--judge-pool",
         default=(
             "gemini:gemini-3.1-flash-lite,gemini-3.1-flash-lite-preview,"
-            "gemini-3-flash-preview;groq:openai/gpt-oss-120b,qwen/qwen3.8-27b"
+            "gemini-3-flash-preview,gemini-3.5-flash-lite;"
+            "groq:openai/gpt-oss-120b,qwen/qwen3.8-27b,openai/gpt-oss-20b"
         ),
     )
     args = parser.parse_args()
@@ -145,6 +148,15 @@ def main() -> int:
             m.get("citation_precision"), m.get("n_infra_errors"),
             m.get("n_judge_missing"),
         )
+        # `judge_missing > 0` ⇒ còn arm chưa được chấm ⇒ **số liệu chưa
+        # hoàn chỉnh** (dù đã loại khỏi mẫu số). Cảnh báo rõ để không ai
+        # đọc báo cáo nhầm là đã chấm đủ.
+        if m.get("n_judge_missing"):
+            logger.warning(
+                "  ⚠ Arm %s còn %s arm chưa được judge chấm (đã loại khỏi mẫu số) "
+                "— chạy scripts/rejudge_missing.py để chấm lại",
+                arm, m.get("n_judge_missing"),
+            )
     return 0
 
 

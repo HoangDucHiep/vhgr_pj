@@ -1509,17 +1509,41 @@ def aggregate(records: list[dict[str, Any]]) -> dict[str, Any]:
             "n_total": len(records),
         }
 
-    correctness = [r["judge"]["correctness"] for r in valid]
-    faithfulness = [r["judge"]["faithfulness"] for r in valid]
-    citations = [r["judge"]["citation_precision"] for r in valid]
-    latencies = [r["arm"]["elapsed_ms"] for r in valid]
-    tokens = [estimate_tokens(r["arm"]["context"]) for r in valid]
+    # Arm mà judge **không** trả về điểm (JSON bị cắt) ⇒ điểm 0 **giả**.
+    # Vì sao phải loại khỏi mẫu số?
+    #   - Điểm 0 ấy **không** phản ánh chất lượng hệ thống (judge bị cắt
+    #     output, không phải hệ thống trả lời sai).
+    #   - Tính vào trung bình ⇒ **hạ** điểm của arm đó một cách không
+    #     công bằng ⇒ so sánh A/B/B- bị lệch (arm nào bị cắt nhiều hơn thì
+    #     điểm càng thấp).
+    # ⇒ Loại khỏi mẫu số của chỉ số điểm; đếm riêng ở `n_judge_missing`
+    #   (sau `scripts/rejudge_missing.py` phải = 0).
+    def _judge_missing(record: dict[str, Any]) -> bool:
+        """Kiểm tra arm có bị judge bỏ sót điểm hay không.
 
-    # Số arm mà judge **không** trả về điểm (JSON bị cắt) ⇒ điểm 0 giả.
-    # Đếm riêng để báo cáo minh bạch (sau `scripts/rejudge_missing.py` phải = 0).
-    n_judge_missing = sum(
-        1 for r in valid if "không trả về điểm" in str(r["judge"].get("reason", ""))
-    )
+        Args:
+            record: Bản ghi kết quả 1 arm.
+
+        Returns:
+            ``True`` nếu judge không trả về điểm.
+        """
+        return "không trả về điểm" in str(record["judge"].get("reason", ""))
+
+    n_judge_missing = sum(1 for r in valid if _judge_missing(r))
+    scored = [r for r in valid if not _judge_missing(r)]
+    if not scored:
+        return {
+            "n": 0,
+            "n_infra_errors": len(infra),
+            "n_judge_missing": len(valid),
+            "n_total": len(records),
+        }
+
+    correctness = [r["judge"]["correctness"] for r in scored]
+    faithfulness = [r["judge"]["faithfulness"] for r in scored]
+    citations = [r["judge"]["citation_precision"] for r in scored]
+    latencies = [r["arm"]["elapsed_ms"] for r in scored]
+    tokens = [estimate_tokens(r["arm"]["context"]) for r in scored]
 
     no_data_records = [r for r in valid if r["type"] == "no_data"]
     no_data_ok = sum(
@@ -1530,7 +1554,7 @@ def aggregate(records: list[dict[str, Any]]) -> dict[str, Any]:
     )
 
     by_type: dict[str, dict[str, float]] = {}
-    for record in valid:
+    for record in scored:
         bucket = by_type.setdefault(
             record["type"],
             {"n": 0, "correctness_sum": 0, "faithfulness_sum": 0},
@@ -1549,7 +1573,9 @@ def aggregate(records: list[dict[str, Any]]) -> dict[str, Any]:
         bucket.pop("faithfulness_sum")
 
     return {
-        "n": len(valid),
+        # `n` = số câu **có điểm thật** (đã loại arm lỗi hạ tầng và arm
+        # judge bỏ sót) ⇒ mẫu số của mọi chỉ số là mẫu số **công bằng**.
+        "n": len(scored),
         "n_total": len(records),
         "n_infra_errors": len(infra),
         "n_judge_missing": n_judge_missing,

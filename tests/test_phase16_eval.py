@@ -335,7 +335,24 @@ class TestAggregateJudgeMissing:
         record["judge"]["reason"] = "Judge không trả về điểm cho phương án này."
         metrics = aggregate([record, _record("q2", 1)])
         assert metrics["n_judge_missing"] == 1
-        assert metrics["n"] == 2
+        # Arm bị judge bỏ sót **không** được tính vào mẫu số (điểm 0 giả).
+        assert metrics["n"] == 1
+
+    def test_missing_arm_excluded_from_means(self) -> None:
+        """Arm bị judge bỏ sót không được kéo trung bình xuống.
+
+        Vì sao: điểm 0 giả do judge bị cắt output **không** phản ánh chất
+        lượng hệ thống. Tính vào trung bình ⇒ so sánh A/B/B− bị lệch theo
+        hướng bất lợi cho arm nào bị cắt nhiều hơn.
+        """
+        missing = _record("q1", 0)
+        missing["judge"]["reason"] = "Judge không trả về điểm cho phương án này."
+        good = _record("q2", 2)
+        metrics = aggregate([missing, good])
+        assert metrics["n_judge_missing"] == 1
+        assert metrics["n"] == 1
+        assert metrics["correctness_mean"] == 2
+        assert metrics["correctness_rate"] == 1.0
 
 
 class TestInfraErrorResume:
