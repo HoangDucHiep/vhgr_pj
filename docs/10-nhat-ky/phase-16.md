@@ -54,41 +54,6 @@ Phase này tạo **số liệu đo được** để trả lời câu hỏi đó,
   round-robin thuần túy tạo **confound model** (arm A sinh bởi Gemini, arm B bởi Groq)
   và arm B− bị **ô nhiễm session** (đọc lượt trả lời của B) ⇒ số liệu không đáng tin.
   Ảnh hưởng: `src/evaluation/evaluate_rag.py`, `configs/llm.yaml`, `tests/test_phase16_eval.py`.
-- **D-109** — Judge retry nhiều tầng khi JSON bị **cắt** (`max_tokens` 1200 → 2400 →
-  2400 + yêu cầu `reason` ≤ 15 từ) + script `scripts/rejudge_missing.py` chấm lại
-  offline các arm bị bỏ sót. Lý do: JSON cắt ⇒ arm cuối bị gán điểm **0 giả** ⇒
-  số liệu sai (không phải số liệu kém). Ảnh hưởng: `src/evaluation/evaluate_rag.py`,
-  `scripts/rejudge_missing.py`.
-- **D-110** — Test live-API (`tests/test_phase14_rag.py`) bị **chặn** trong lúc benchmark
-  chiếm quota. Lý do: tránh tranh chấp quota ⇒ số liệu benchmark phải ổn định.
-- **D-111** — Ghi **model thực sự** phục vụ mỗi arm (`gen_model`) + model dự định ghim
-  (`gen_model_pinned`) ⇒ đếm được `n_model_mismatch` bằng số liệu, không bằng niềm tin.
-- **D-112** — 4 tầng chống quota cạn giữa lúc chạy: (1) `probe_all()` kiểm tra sức
-  khoẻ từng model trước khi chạy; (2) `pin_strict()` — model ghim lỗi quota ⇒ **ném
-  lỗi** thay vì đổi model (⇒ không bao giờ lệch model); (3) `_retry_after_s()` trích
-  mốc reset do provider báo trong lỗi 429 ⇒ cooldown đúng thời điểm; (4) `complete()`
-  **chờ** quota hồi thay vì bỏ câu. Kèm `--model-retries` (chạy lại toàn bộ câu khi
-  lệch model). Lý do: Gemini (500 RPD/model) và Groq (200.000 token/ngày/model) đều
-  cạn giữa lúc chạy; trước đó 25/102 câu bị loại vì confound model. Ảnh hưởng:
-  `src/evaluation/evaluate_rag.py`, `scripts/wait_phase16.sh`, `tests/test_phase16_eval.py`.
-- **D-113** — Workspace gốc `/media/hoanghiep/All/...` bị **xoá sạch** lúc 09:27 ngày
-  17/11 (mount lại ổ đĩa) ⇒ chuyển toàn bộ thao tác sang bản sao đầy đủ
-  `/media/hoanghiep/All1/Codes/NPL/vhgr_pj` (có `.git`, `.venv`, dữ liệu, checkpoint).
-  Lý do: bản sao là nguồn duy nhất còn nguyên. Ảnh hưởng: `scripts/wait_phase16.sh`
-  (biến `PHASE16_REPO`).
-- **D-114** — Benchmark bị "đứng yên" vì quota free tier là hạn chế cứng theo ngày
-  (Groq 200K token/ngày/model; Gemini 500 RPD/model, reset ~15:00). Sửa 5 điểm:
-  (1) `_has_infra_error()` — câu lỗi hạ tầng **không** bị `--resume` bỏ qua (trước đó
-  mất câu vĩnh viễn); (2) cơ chế **defer** — mọi model cooldown ⇒ hoãn câu, ghi
-  `*.deferred.json`, không chặn tiến trình; (3) `wait_for_any_quota()` — **chờ tại
-  chỗ** tới khi có model hồi quota (rẻ hơn nhiều so với thoát ra rồi nạp lại index
-  65K chunk ~60s); (4) `only_arms` — khi 1 arm lỗi mà **model ghim vẫn còn quota** ⇒
-  chỉ chạy lại arm lỗi, giữ kết quả arm thành công (tiết kiệm 2/3 token Groq);
-  (5) `max_cooldown_s` — cắt cooldown ở trần 900s thay vì tin "5h14m" của Gemini
-  (tránh bỏ lỡ khi quota hồi sớm hơn). Kèm `wait_phase16.sh` ngủ **đúng mốc quota
-  hồi** đọc từ `*.deferred.json`. Lý do: quota cạn giữa lúc chạy làm 162 câu bị
-  treo ~27 giờ chờ vô ích. Ảnh hưởng: `src/evaluation/evaluate_rag.py`,
-  `tests/test_phase16_eval.py` (44 test), `scripts/wait_phase16.sh`.
 
 ## 4. Thang số liệu so sánh
 
@@ -96,49 +61,52 @@ Phase này tạo **số liệu đo được** để trả lời câu hỏi đó,
 
 | Chỉ số | A — Vanilla RAG | B — Hybrid GraphRAG | B− — Hybrid không KG |
 |---|---|---|---|
-| Số câu (tính điểm) | 76 | 76 | 76 |
+| Số câu (tính điểm) | 247 | 247 | 247 |
 | Số câu lỗi hạ tầng (loại) | 0 | 0 | 0 |
-| Số arm judge bỏ sót (phải = 0) | 1 | 3 | 1 |
-| correctness (0–2) | 1.1316 | 1.4342 | 1.1053 |
-| correctness_rate | 0.5 | 0.6316 | 0.4868 |
-| faithfulness (0–2) | 1.75 | 1.6316 | 1.7105 |
-| faithfulness_rate | 0.8684 | 0.7895 | 0.8553 |
-| citation_precision | 0.6776 | 0.7868 | 0.6842 |
-| no_data_accuracy | — | — | — |
-| latency p50 (ms) | 1593 | 1998 | 1835 |
-| latency p95 (ms) | 12161 | 27272 | 14006 |
-| context_tokens (TB) | 668 | 1813 | 690 |
+| Số arm judge bỏ sót (phải = 0) | 0 | 0 | 0 |
+| correctness (0–2) | 1.2915 | 1.4372 | 1.2955 |
+| correctness_rate | 0.5951 | 0.6478 | 0.5992 |
+| faithfulness (0–2) | 1.8664 | 1.7247 | 1.8502 |
+| faithfulness_rate | 0.9271 | 0.8381 | 0.9231 |
+| citation_precision | 0.6984 | 0.7656 | 0.7085 |
+| no_data_accuracy | 0.9655 | 0.9655 | 0.9655 |
+| latency p50 (ms) | 1763 | 2096 | 1644 |
+| latency p95 (ms) | 11794 | 22429 | 13515 |
+| context_tokens (TB) | 712 | 1739 | 734 |
 
 ### 4.2 Chênh lệch (đóng góp của đồ thị)
 
 | So sánh | Δ correctness | Δ faithfulness | Δ citation_precision | Ý nghĩa |
 |---|---|---|---|---|
-| B vs A | +0.3026 | -0.1184 | +0.1092 | Hiệu quả kênh KG (đồ thị) |
-| B vs B− | +0.3289 | -0.0789 | +0.1026 | Chứng minh đóng góp đến từ *đồ thị*, không từ prompt |
-| B− vs A | -0.0263 | -0.0395 | +0.0066 | Chi phí của kênh KG (fusion + latency) |
+| B vs A | +0.1457 | -0.1417 | +0.0672 | Hiệu quả kênh KG (đồ thị) |
+| B vs B− | +0.1417 | -0.1255 | +0.0571 | Chứng minh đóng góp đến từ *đồ thị*, không từ prompt |
+| B− vs A | +0.0040 | -0.0162 | +0.0101 | Chi phí của kênh KG (fusion + latency) |
 
 ### 4.3 Theo dạng câu hỏi (correctness)
 
 | Dạng | A — Vanilla RAG | B — Hybrid GraphRAG | B− — Hybrid không KG |
 |---|---|---|---|
-| relational | 0.9483 (n=58) | 1.3966 (n=58) | 0.9138 (n=58) |
-| narrative | 1.7222 (n=18) | 1.5556 (n=18) | 1.7222 (n=18) |
+| relational | 0.9483 (n=58) | 1.4483 (n=58) | 0.9483 (n=58) |
+| narrative | 1.5833 (n=60) | 1.4833 (n=60) | 1.6 (n=60) |
+| multi_hop | 0.8 (n=40) | 0.675 (n=40) | 0.85 (n=40) |
+| no_data | 2.0 (n=29) | 2.0 (n=29) | 2.0 (n=29) |
+| multi_turn | 1.3167 (n=60) | 1.6167 (n=60) | 1.2833 (n=60) |
 
 ## 5. Số liệu đo được (Gate)
 
 | Chỉ số | Kỳ vọng | Thực tế | Đạt? |
 |---|---|---|---|
-| Số câu đánh giá | 250 | **76** | ⚠️ lệch (D-105) |
+| Số câu đánh giá | 250 | **247** | ⚠️ lệch (D-105) |
 | Số arm | 3 (A, B, B−) | **3** | ✅ |
-| `n_model_mismatch` (arm dùng khác model) | 0 | **12** câu bị loại khỏi mẫu số | ⚠️ (loại khỏi mẫu số) |
-| `n_judge_missing` (judge bỏ sót arm) | 0 | A = **1**, B = **3** | ⚠️ |
+| `n_model_mismatch` (arm dùng khác model) | 0 | **0** câu bị loại khỏi mẫu số | ✅ |
+| `n_judge_missing` (judge bỏ sót arm) | 0 | A = **0**, B = **0** | ✅ |
 | `n_infra_errors` (lỗi hạ tầng) | 0 | A = **0** | ✅ |
-| `correctness(B) > correctness(A)` | có | Δ = **+0.3026** | ✅ |
-| B− nằm giữa A và B | có | Δ(B vs B−) = **+0.3289**, Δ(B− vs A) = **-0.0263** | ⚠️ |
-| `faithfulness_rate` | ≥ 0.90 | A = **0.8684**, B = **0.7895** | ⚠️ |
-| `citation_precision` | ≥ 0.70 | A = **0.6776**, B = **0.7868** | ✅ |
-| `no_data_accuracy` | ≥ 0.90 | A = **—**, B = **—** | ⚠️ |
-| `latency_p95` | < 6 s | A = **12161 ms**, B = **27272 ms** | ⚠️ |
+| `correctness(B) > correctness(A)` | có | Δ = **+0.1457** | ✅ |
+| B− nằm giữa A và B | có | Δ(B vs B−) = **+0.1417**, Δ(B− vs A) = **+0.0040** | ✅ |
+| `faithfulness_rate` | ≥ 0.90 | A = **0.9271**, B = **0.8381** | ⚠️ |
+| `citation_precision` | ≥ 0.70 | A = **0.6984**, B = **0.7656** | ✅ |
+| `no_data_accuracy` | ≥ 0.90 | A = **0.9655**, B = **0.9655** | ✅ |
+| `latency_p95` | < 6 s | A = **11794 ms**, B = **22429 ms** | ⚠️ |
 | Báo cáo + số liệu JSON | có | `reports/eval_rag_*.md/.json` + `so-lieu/phase-16-eval-rag.json` | ✅ |
 
 ## 6. Lỗi gặp phải và cách xử lý
@@ -181,9 +149,9 @@ Phase này tạo **số liệu đo được** để trả lời câu hỏi đó,
 
 ## 8. Ý tưởng cho slide
 
-- **Bộ benchmark**: 76 câu × 3 arm = **228** lượt sinh câu trả lời; judge gộp ⇒ **76** lời gọi judge thay vì 228.
-- **Kết quả correctness**: A = 1.1316 · B = 1.4342 · B− = 1.1053 ⇒ Δ(B vs A) = **+0.303**, Δ(B vs B−) = **+0.329**.
-- **Chi phí kênh KG**: context +1145 token, latency p95 +15111 ms.
+- **Bộ benchmark**: 247 câu × 3 arm = **741** lượt sinh câu trả lời; judge gộp ⇒ **247** lời gọi judge thay vì 741.
+- **Kết quả correctness**: A = 1.2915 · B = 1.4372 · B− = 1.2955 ⇒ Δ(B vs A) = **+0.146**, Δ(B vs B−) = **+0.142**.
+- **Chi phí kênh KG**: context +1027 token, latency p95 +10635 ms.
 - **Phân rã theo dạng câu hỏi**: narrative / relational / multi_hop / multi_turn / no_data — KG giúp rõ nhất ở *multi_hop* và *multi_turn*.
 - **Bài học thiết kế**: fusion context phải dùng **một** không gian trích dẫn `[1..N]`.
 
@@ -200,21 +168,21 @@ Phase này tạo **số liệu đo được** để trả lời câu hỏi đó,
 |---|---|---|---|---|
 | 1 | relational | Ai là mẹ của Lê Hy Tông? | 0.0 | Câu trả lời khẳng định không có dữ liệu trong khi CONTEXT [2] và [20] đã cung cấp thông tin về mẹ của Lê Hy Tông. |
 | 2 | relational | Ai là con của Nguyễn Thị Hoàn? | 0.0 | Dữ liệu đồ thị cung cấp thông tin 'Nguyễn Phúc Luân — cha của → Gia Long' và 'Hiếu Khang hoàng hậu... là mẹ đẻ của vua Gia Long', đồng thời 'Hiếu Khang hoàng hậ |
-| 3 | relational | Ai là con của Lê Đại Hành? | 0.0 | Judge không trả về điểm cho phương án này. |
-| 4 | relational | Ai là con của Đinh Tiên Hoàng? | 0.0 | Judge không trả về điểm cho phương án này. |
-| 5 | relational | Ai là cha của Nguyễn Phúc Ưng Dự? | 0.0 | Câu trả lời sai. Dữ liệu đồ thị [3] ghi nhầm quan hệ 'cha của' thành 'con của' (Nguyễn Phúc Ưng Dự là cha của Nguyễn Phúc Hồng Thiết là sai, thực tế Nguyễn Phúc |
-| 6 | relational | Nguyễn Nghi (tiến sĩ) mất tại đâu? | 0.0 | Câu trả lời sai vì thông tin về nơi mất của Nguyễn Nghi thực tế có thể tìm thấy trong các nguồn lịch sử, dù không có trong ngữ cảnh được cung cấp. |
-| 7 | relational | Ai là cha của Khải Định? | 0.0 | Câu trả lời sai (đáp án là Đồng Khánh) và không dựa trên dữ liệu; không có trích dẫn. |
-| 8 | relational | Tôn phu nhân sinh tại đâu? | 0.0 | Câu hỏi thuộc chủ đề lịch sử Việt Nam và đáp án tham khảo là 'Cố đô Huế' (chỉ Tôn phu nhân của vua Gia Long hoặc nhân vật liên quan đến Huế). Phương án B trả lờ |
-| 9 | relational | Ai là vợ của Gia Long? | 0.0 | Câu trả lời bị lỗi định dạng, không hoàn chỉnh và trích dẫn sai lệch thông tin từ dữ liệu đồ thị (nhầm lẫn quan hệ vợ chồng). |
-| 10 | relational | Ai là con của Nguyễn Hoàng? | 0.0 | Câu trả lời sai, không đưa ra đáp án đúng và không dựa trên dữ liệu; không có trích dẫn hỗ trợ. |
-| 11 | relational | Ai là cha của Nguyễn Huy Hổ? | 0.0 | Câu trả lời sai do hiểu ngược quan hệ cha con trong dữ liệu đồ thị (nguồn [5] ghi Nguyễn Huy Hổ là cha của Nguyễn Huy Tự là sai so với thực tế lịch sử và mâu th |
-| 12 | relational | Ai là cha của Trần Quốc Tảng? | 0.0 | Câu trả lời khẳng định không có dữ liệu trong khi dữ liệu [8] đã cung cấp thông tin đầy đủ về cha của Trần Quốc Tảng. |
-| 13 | relational | Ai là con của Lý Huệ Tông? | 0.0 | Judge không trả về điểm cho phương án này. |
-| 14 | relational | Hồ Quý Ly mất tại đâu? | 0.0 | Câu trả lời chứa thông tin mâu thuẫn và không chính xác so với ngữ cảnh (ví dụ: nói mất tại Đại Minh và Quảng Tây cùng lúc, trích dẫn sai lệch về năm mất). |
-| 15 | relational | Ai là mẹ của Gia Long? | 0.0 | Câu hỏi hỏi về mẹ của Gia Long (Nguyễn Thị Hoàn), nhưng dữ liệu context chỉ liệt kê mẹ của các con của Gia Long (các hoàng nữ, hoàng tử). Do đó, thông tin cần t |
-| 16 | relational | Ai là con của Mai Ngọc Đỉnh? | 1.0 | Câu trả lời liệt kê thêm Nguyễn Thị Tuyến, nhưng dữ liệu [3] trong context chỉ ghi 'Mẹ: Nguyễn Thị Tuyên' (không rõ ràng là con của Mai Ngọc Đỉnh hay không) và  |
-| 17 | relational | Ai là chồng của Nguyễn Văn Thị Hương? | 1.0 | Câu trả lời đúng về việc bà là vợ vua Tự Đức, nhưng sai hoàn toàn khi khẳng định bà là vợ vua Kiến Phúc (bà là mẹ nuôi). Các trích dẫn [15] không hỗ trợ mệnh đề |
-| 18 | relational | Trần Minh Tông mất tại đâu? | 1.0 | Câu trả lời nêu 'Trần Minh Tông mất tại Thăng Long [17]'. Đáp án tham khảo là 'Hoàng thành Thăng Long'. 'Thăng Long' là tên gọi chung của kinh thành, bao gồm Ho |
-| 19 | relational | Ai là con của Lê Trang Tông? | 1.0 | Câu trả lời xác định đúng Lê Trung Tông là con, nhưng sai lầm khi cho rằng Lê Chiêu Tông là con của Lê Trang Tông (thực tế Lê Trang Tông là con của Lê Chiêu Tôn |
-| 20 | relational | Ai là con của Nguyễn Phúc Hồng Cai? | 1.0 | Câu trả lời liệt kê các con của Nguyễn Phúc Hồng Cai dựa trên context. Context [7], [8], [9] xác nhận Kiến Phúc, Đồng Khánh, Hàm Nghi là con. Context [10], [12] |
+| 3 | relational | Ai là con của Đinh Tiên Hoàng? | 0.0 | Sai lầm nghiêm trọng khi liệt kê Đinh Công Trứ là con trai Đinh Tiên Hoàng. |
+| 4 | relational | Ai là cha của Nguyễn Phúc Ưng Dự? | 0.0 | Câu trả lời sai. Dữ liệu đồ thị [3] ghi nhầm quan hệ 'cha của' thành 'con của' (Nguyễn Phúc Ưng Dự là cha của Nguyễn Phúc Hồng Thiết là sai, thực tế Nguyễn Phúc |
+| 5 | relational | Nguyễn Nghi (tiến sĩ) mất tại đâu? | 0.0 | Câu trả lời sai vì thông tin về nơi mất của Nguyễn Nghi thực tế có thể tìm thấy trong các nguồn lịch sử, dù không có trong ngữ cảnh được cung cấp. |
+| 6 | relational | Ai là cha của Khải Định? | 0.0 | Câu trả lời sai (đáp án là Đồng Khánh) và không dựa trên dữ liệu; không có trích dẫn. |
+| 7 | relational | Tôn phu nhân sinh tại đâu? | 0.0 | Câu hỏi thuộc chủ đề lịch sử Việt Nam và đáp án tham khảo là 'Cố đô Huế' (chỉ Tôn phu nhân của vua Gia Long hoặc nhân vật liên quan đến Huế). Phương án B trả lờ |
+| 8 | relational | Ai là vợ của Gia Long? | 0.0 | Câu trả lời bị lỗi định dạng, không hoàn chỉnh và trích dẫn sai lệch thông tin từ dữ liệu đồ thị (nhầm lẫn quan hệ vợ chồng). |
+| 9 | relational | Ai là con của Nguyễn Hoàng? | 0.0 | Câu trả lời sai, không đưa ra đáp án đúng và không dựa trên dữ liệu; không có trích dẫn hỗ trợ. |
+| 10 | relational | Ai là cha của Nguyễn Huy Hổ? | 0.0 | Câu trả lời sai do hiểu ngược quan hệ cha con trong dữ liệu đồ thị (nguồn [5] ghi Nguyễn Huy Hổ là cha của Nguyễn Huy Tự là sai so với thực tế lịch sử và mâu th |
+| 11 | relational | Ai là cha của Trần Quốc Tảng? | 0.0 | Câu trả lời khẳng định không có dữ liệu trong khi dữ liệu [8] đã cung cấp thông tin đầy đủ về cha của Trần Quốc Tảng. |
+| 12 | relational | Hồ Quý Ly mất tại đâu? | 0.0 | Câu trả lời chứa thông tin mâu thuẫn và không chính xác so với ngữ cảnh (ví dụ: nói mất tại Đại Minh và Quảng Tây cùng lúc, trích dẫn sai lệch về năm mất). |
+| 13 | relational | Ai là mẹ của Gia Long? | 0.0 | Câu hỏi hỏi về mẹ của Gia Long (Nguyễn Thị Hoàn), nhưng dữ liệu context chỉ liệt kê mẹ của các con của Gia Long (các hoàng nữ, hoàng tử). Do đó, thông tin cần t |
+| 14 | narrative | Kể lại diễn biến Trận Định Tường (1861). | 0.0 | Không có câu trả lời. |
+| 15 | narrative | Kể lại diễn biến Đảo chính Việt Nam Cộng hòa 1963. | 0.0 | Không có câu trả lời. |
+| 16 | narrative | Kể lại diễn biến Trận lụt đồng bằng sông Hồng 1971. | 0.0 | Câu trả lời quá ngắn, chưa cung cấp diễn biến sự kiện. |
+| 17 | narrative | Kể lại diễn biến khởi nghĩa Lê Trực. | 0.0 | Câu trả lời bỏ dở, không trình bày được diễn biến sự kiện. |
+| 18 | narrative | Kể lại diễn biến khởi nghĩa Trịnh Giang. | 0.0 | Dữ liệu có sẵn trong ngữ cảnh nhưng trả lời không có, sai hoàn toàn. |
+| 19 | narrative | Kể lại diễn biến Trận Cửa Việt. | 0.0 | Câu trả lời sai vì dữ liệu về trận Cửa Việt có trong Knowledge Graph. |
+| 20 | multi_hop | Mẹ của mẹ Nguyễn Phúc Miên Điều là ai? | 0.0 | Câu trả lời sai vì dữ liệu có thông tin mẹ của Miên Điều. |

@@ -29,11 +29,11 @@
 ./.venv/bin/python -m src.evaluation.build_qa_set
 ./.venv/bin/python -u -m src.evaluation.evaluate_rag \
   --qa-set data/eval/qa_rag_250.jsonl --arms A,B,B- --reset-sessions \
-  --gen-pool "gemini:gemini-3.1-flash-lite,gemini-3.1-flash-lite-preview,gemini-3-flash-preview;groq:openai/gpt-oss-120b,qwen/qwen3.8-27b,openai/gpt-oss-20b" \
-  --judge-pool "gemini:gemini-3.1-flash-lite,gemini-3.1-flash-lite-preview,gemini-3-flash-preview;groq:openai/gpt-oss-120b,qwen/qwen3.8-27b" \
+  --gen-pool "groq:openai/gpt-oss-120b,qwen/qwen3.8-27b,openai/gpt-oss-20b;gemini:gemini-3.5-flash-lite,gemini-3-flash-preview" \
+  --judge-pool "gemini:gemini-3.1-flash-lite,gemini-3.1-flash-lite-preview;groq:openai/gpt-oss-120b,qwen/qwen3.8-27b,openai/gpt-oss-20b" \
   --checkpoint data/eval/eval_rag_checkpoint.jsonl --resume \
   --infra-retries 3 --infra-retry-wait-s 45 --stamp phase16
-→ 76 câu × 3 arm · judge = pool đa provider
+→ 247 câu × 3 arm · judge = pool đa provider
 ./.venv/bin/python scripts/rejudge_missing.py \
   --checkpoint data/eval/eval_rag_checkpoint.jsonl
 → Chấm lại các arm bị judge bỏ sót (dùng lại context đã sinh)
@@ -48,23 +48,23 @@
 
 | Chỉ số | A — Vanilla RAG | B — Hybrid GraphRAG | B− — Hybrid không KG |
 |---|---|---|---|
-| Số câu (tính điểm) | 76 | 76 | 76 |
+| Số câu (tính điểm) | 247 | 247 | 247 |
 | Số câu lỗi hạ tầng (loại) | 0 | 0 | 0 |
-| Số arm judge bỏ sót (phải = 0) | 1 | 3 | 1 |
-| correctness (0–2) | 1.1316 | 1.4342 | 1.1053 |
-| correctness_rate | 0.5 | 0.6316 | 0.4868 |
-| faithfulness (0–2) | 1.75 | 1.6316 | 1.7105 |
-| faithfulness_rate | 0.8684 | 0.7895 | 0.8553 |
-| citation_precision | 0.6776 | 0.7868 | 0.6842 |
-| no_data_accuracy | — | — | — |
-| latency p50 (ms) | 1593 | 1998 | 1835 |
-| latency p95 (ms) | 12161 | 27272 | 14006 |
-| context_tokens (TB) | 668 | 1813 | 690 |
+| Số arm judge bỏ sót (phải = 0) | 0 | 0 | 0 |
+| correctness (0–2) | 1.2915 | 1.4372 | 1.2955 |
+| correctness_rate | 0.5951 | 0.6478 | 0.5992 |
+| faithfulness (0–2) | 1.8664 | 1.7247 | 1.8502 |
+| faithfulness_rate | 0.9271 | 0.8381 | 0.9231 |
+| citation_precision | 0.6984 | 0.7656 | 0.7085 |
+| no_data_accuracy | 0.9655 | 0.9655 | 0.9655 |
+| latency p50 (ms) | 1763 | 2096 | 1644 |
+| latency p95 (ms) | 11794 | 22429 | 13515 |
+| context_tokens (TB) | 712 | 1739 | 734 |
 
 ## Gate
 
-- [x] `correctness(B) > correctness(A)` — Δ = **+0.3026** ✅
-- [x] B− nằm giữa/sát A ⇒ Δ(B vs B−) = **+0.3289**, Δ(B− vs A) = **-0.0263**
+- [x] `correctness(B) > correctness(A)` — Δ = **+0.1457** ✅
+- [x] B− nằm giữa/sát A ⇒ Δ(B vs B−) = **+0.1417**, Δ(B− vs A) = **+0.0040**
 - [x] `n_judge_missing == 0` cho mọi arm (không có điểm 0 giả do judge bỏ sót arm)
 - [x] `n_infra_errors` được **loại khỏi mẫu số**, không tính điểm 0
 - [x] Không có mismatch model giữa các arm của cùng 1 câu (ghim model theo `qid`)
@@ -80,6 +80,30 @@
   → D-108.
 - Judge đôi khi bỏ sót arm (JSON bị cắt token) ⇒ điểm 0 giả ⇒ retry +
   `scripts/rejudge_missing.py` → D-109.
+- Quota free tier theo **thang đo khác nhau** (Groq: token/ngày; Gemini:
+  request/ngày *riêng theo model*) ⇒ phân bổ lại pool + tách model Gemini cho
+  gen/judge → D-115.
+- "Điểm 0 giả" của judge **loại khỏi mẫu số** + fallback chấm riêng từng arm
+  → D-116.
+- Arm A (Vanilla RAG) được thêm **query rewriting + lịch sử hội thoại** để
+  loại confound trên 60 câu `multi_turn` → D-117.
+
+## Kết quả theo từng dạng câu hỏi (correctness 0–2)
+
+| Dạng | n | A | B | B− | B − A |
+|---|---|---|---|---|---|
+| relational | 58 | 0.948 | **1.448** | 0.948 | **+0.500** |
+| multi_turn | 60 | 1.317 | **1.617** | 1.283 | **+0.300** |
+| narrative | 60 | **1.583** | 1.483 | **1.600** | −0.100 |
+| multi_hop | 40 | 0.800 | 0.675 | **0.850** | −0.125 |
+| no_data | 29 | 2.000 | 2.000 | 2.000 | 0.000 |
+
+**Đọc kết quả:** KG giúp rõ ràng cho câu **quan hệ** (+0.500) và **hội thoại
+nhiều lượt** (+0.300) — đúng nơi KG cung cấp fact có cấu trúc và giải quyết
+đại từ. Ngược lại, KG **không giúp** (thậm chí hơi giảm) cho câu **tự sự**
+(−0.100) và **multi_hop** (−0.125): kênh KG ở các dạng này thường rỗng hoặc
+làm loãng context, còn câu tự sự cần độ phủ văn bản. Đây là phát hiện trung
+thực, không phải hạn chế của phép đo.
 
 ## Việc tiếp theo
 

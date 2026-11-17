@@ -80,15 +80,15 @@ do retriever, mà do kênh đồ thị.
 
 | Chỉ số | A — Vanilla RAG | B — Hybrid GraphRAG | B− — Hybrid không KG |
 |---|---|---|---|
-| correctness (0–2) | 1.1316 | 1.4342 | 1.1053 |
-| correctness_rate | 0.5 | 0.6316 | 0.4868 |
-| faithfulness (0–2) | 1.75 | 1.6316 | 1.7105 |
-| faithfulness_rate | 0.8684 | 0.7895 | 0.8553 |
-| citation_precision | 0.6776 | 0.7868 | 0.6842 |
-| no_data_accuracy | — | — | — |
-| latency p50 (ms) | 1593 | 1998 | 1835 |
-| latency p95 (ms) | 12161 | 27272 | 14006 |
-| context_tokens (TB) | 668 | 1813 | 690 |
+| correctness (0–2) | 1.2915 | 1.4372 | 1.2955 |
+| correctness_rate | 0.5951 | 0.6478 | 0.5992 |
+| faithfulness (0–2) | 1.8664 | 1.7247 | 1.8502 |
+| faithfulness_rate | 0.9271 | 0.8381 | 0.9231 |
+| citation_precision | 0.6984 | 0.7656 | 0.7085 |
+| no_data_accuracy | 0.9655 | 0.9655 | 0.9655 |
+| latency p50 (ms) | 1763 | 2096 | 1644 |
+| latency p95 (ms) | 11794 | 22429 | 13515 |
+| context_tokens (TB) | 712 | 1739 | 734 |
 
 **Công bằng của phép so sánh** (D-104 · D-108 · D-109):
 
@@ -195,8 +195,8 @@ python -m src.evaluation.build_qa_set
 # Chạy 3 arm + LLM-judge (pool đa provider + ghim model theo câu)
 python -u -m src.evaluation.evaluate_rag \
   --qa-set data/eval/qa_rag_250.jsonl --arms A,B,B- \
-  --gen-pool "gemini:gemini-3.1-flash-lite,gemini-3.1-flash-lite-preview,gemini-3-flash-preview;groq:openai/gpt-oss-120b,qwen/qwen3.8-27b,openai/gpt-oss-20b" \
-  --judge-pool "gemini:gemini-3.1-flash-lite,gemini-3.1-flash-lite-preview,gemini-3-flash-preview;groq:openai/gpt-oss-120b,qwen/qwen3.8-27b" \
+  --gen-pool "groq:openai/gpt-oss-120b,qwen/qwen3.8-27b,openai/gpt-oss-20b;gemini:gemini-3.5-flash-lite,gemini-3-flash-preview" \
+  --judge-pool "gemini:gemini-3.1-flash-lite,gemini-3.1-flash-lite-preview;groq:openai/gpt-oss-120b,qwen/qwen3.8-27b,openai/gpt-oss-20b" \
   --checkpoint data/eval/eval_rag_checkpoint.jsonl --resume \
   --infra-retries 3 --infra-retry-wait-s 45 --stamp phase16
 
@@ -208,7 +208,10 @@ python scripts/make_phase16_log.py --report reports/eval_rag_phase16_phase16.jso
 
 > ⚠️ **Quota LLM**: quota free tier **tính riêng theo model** (Gemini 500 RPD/model,
 > Groq 200K TPD/model) ⇒ **không** dùng 1 provider ⇒ pool đa provider + cooldown.
-> Xem D-103, D-104, D-108, D-109, D-111.
+> Ngoài ra: Groq giới hạn theo **token/ngày** (hợp sinh câu trả lời), Gemini theo
+> **request/ngày** (hợp LLM-judge) ⇒ phân bổ pool theo **thang đo** + **không
+> dùng trùng model Gemini** cho gen và judge.
+> Xem D-103, D-104, D-108, D-109, D-111, D-114, D-115, D-116, D-117.
 
 ### Hỏi thử từng arm
 

@@ -1945,3 +1945,46 @@ A `n=83` correctness 1,1687 · B `n=80` correctness 1,5000 · B− `n=82` correc
 
 **Cập nhật file:** `src/evaluation/evaluate_rag.py`, `scripts/rebuild_phase16_report.py`,
 `tests/test_phase16_eval.py`.
+
+
+---
+
+## D-117 — Arm A (Vanilla RAG) được trang bị **query rewriting + lịch sử hội thoại** để loại confound trên nhóm câu `multi_turn`
+
+**Ngày:** 17/11/2026 · **Phase:** 16
+
+**Bối cảnh đo lường:** bộ 247 câu gồm **60 câu `multi_turn`** (hỏi tiếp trong
+cùng một phiên bằng **đại từ**: *"Ông ấy sinh năm nào?"*).
+
+**Vấn đề phát hiện (17/11 ~13:45):**
+- Arm A (Vanilla RAG) gọi `RagAnswerer.answer(question)` **không có** session ⇒
+  **không** viết lại câu hỏi đại từ ⇒ **không truy xuất được** văn bản về chủ
+  thể ⇒ trả lời sai hoặc "không có dữ liệu".
+- Arm B (Hybrid) **có** `rewrite_question()` + lịch sử hội thoại trong prompt.
+- ⇒ Chênh lệch điểm A vs B trên 60 câu `multi_turn` là do **hội thoại**, không
+  phải do KG ⇒ **confound** ⇒ kết luận "KG giúp RAG" bị gán nhầm lợi ích của
+  query rewriting. Đây là loại lỗi làm sai kết luận nghiên cứu, không phải
+  lỗi số liệu.
+
+**Xử lý:**
+
+| # | Cơ chế | Vị trí | Tác dụng |
+|---|---|---|---|
+| 1 | `RagAnswerer` nhận `session_store` + `linker` ⇒ viết lại câu hỏi đại từ (giống hệt arm B) | `src/qa/rag_answer.py` | Baseline công bằng |
+| 2 | Lịch sử hội thoại được chèn vào prompt arm A (giống arm B) | `src/qa/rag_answer.py` | Công bằng về ngữ cảnh |
+| 3 | Ghi lượt vào session (tách theo arm: `<session_id>__<arm>`) | `src/qa/rag_answer.py` | Lượt sau kế thừa chủ thể |
+| 4 | `SessionStore.record_turn()` **bỏ qua lượt trùng** | `src/qa/conversation.py` | Vòng `--resume` chạy lại câu đã xử lý không làm phình lịch sử |
+
+**Lưu ý phương pháp:** arm A dùng entity linker **chỉ** để nhận biết câu đó
+có entity mới hay không (để quyết định kế thừa chủ thể) — **không** lấy bất
+kỳ fact nào từ KG. Thứ duy nhất khác biệt giữa A và B vẫn là **kênh KG**.
+
+**Kiểm chứng:** 2 test mới trong `tests/test_phase14_rag.py`
+(`test_rag_answerer_rewrites_pronoun_question`, `test_session_store_ignores_duplicate_turn`);
+toàn bộ `tests/` = **754 pass**.
+
+**Kết quả sau khi sửa (247 câu, 0 mismatch model, 0 arm bị judge bỏ sót):**
+`multi_turn` — A 1,317 · B **1,617** · B− 1,283 (Δ B−A = **+0,300**).
+
+**Cập nhật file:** `src/qa/rag_answer.py`, `src/qa/conversation.py`,
+`src/evaluation/evaluate_rag.py`, `tests/test_phase14_rag.py`.
