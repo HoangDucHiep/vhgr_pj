@@ -2222,16 +2222,44 @@ def main() -> int:
     if isinstance(judge_client, PooledLLM):
         judge_client.save_state(judge_state_path)
     if deferred_qids:
-        # Ghi mốc quota hồi sớm nhất ⇒ supervisor ngủ đúng tới lúc đó
-        # thay vì poll mỗi 60s (mỗi vòng nạp lại 65K chunk + embedding).
-        next_available = min(
-            (
-                until
-                for until in gen_client._cooldown_until.values()
-                if until > time.time()
-            ),
-            default=0.0,
-        )
+        # Ghi mốc quota hồi ⇒ supervisor ngủ đúng tới lúc đó thay vì poll
+        # mỗi 60s (mỗi vòng nạp lại 65K chunk + embedding ~60s).
+        #
+        # Vì sao lấy **max** chứ không phải min?
+        # Một câu chỉ chạy được khi có **cả**:
+        #   (1) model **sinh** câu trả lời còn quota, VÀ
+        #   (2) model **judge** còn quota (nếu không, câu bị hoãn ngay ở
+        #       bước pre-check judge ⇒ tốn 0 token sinh).
+        # ⇒ Thời điểm sớm nhất có thể chạy tiếp = **max** (hồi gen, hồi
+        # judge). Nếu lấy min ⇒ supervisor thức dậy sớm khi Groq hồi nhưng
+        # Gemini (judge) vẫn cạn ⇒ mọi câu lại bị hoãn ⇒ vòng `--resume`
+        # tiếp theo chỉ để nạp lại index rồi hoãn tiếp ⇒ lãng phí hàng chục
+        # vòng × 60s.
+        now = time.time()
+
+        def _earliest_recovery(pool: Any) -> float:
+            """Mốc hồi sớm nhất của 1 pool (0 nếu không có model nào cooldown).
+
+            Args:
+                pool: Pool LLM.
+
+            Returns:
+                Epoch giây của mốc hồi sớm nhất.
+            """
+            if not isinstance(pool, PooledLLM):
+                return 0.0
+            return min(
+                (
+                    until
+                    for until in pool._cooldown_until.values()
+                    if until > now
+                ),
+                default=0.0,
+            )
+
+        gen_recovery = _earliest_recovery(gen_client)
+        judge_recovery = _earliest_recovery(judge_client)
+        next_available = max(gen_recovery, judge_recovery)
         state_path = checkpoint_path.with_name(
             checkpoint_path.stem + ".deferred.json"
         )
@@ -2250,10 +2278,12 @@ def main() -> int:
         except OSError:
             pass
         logger.info(
-            "ĐÃ HOÃN %d câu (mọi model hết quota) — quota hồi sớm nhất sau %.0fs "
-            "(%s) — chạy lại với --resume",
+            "ĐÃ HOÃN %d câu (mọi model hết quota) — quota hồi sau %.0fs "
+            "(sinh: +%.0fs, judge: +%.0fs) — chạy lại với --resume",
             len(deferred_qids),
-            max(0.0, next_available - time.time()),
+            max(0.0, next_available - now),
+            max(0.0, gen_recovery - now),
+            max(0.0, judge_recovery - now),
             ", ".join(deferred_qids[:20]),
         )
     for arm in arms:

@@ -69,7 +69,10 @@ try:
     with open(sys.argv[1], encoding="utf-8") as handle:
         data = json.load(handle)
     nxt = float(data.get("next_available_epoch") or 0)
-    print(max(60, min(3600, int(nxt - time.time()) + 30)))
+    # Trần 4 giờ: Gemini free tier báo "retry in 3h11m" ⇒ cần ngủ dài hơn
+    # 1 giờ, nếu không sẽ thức dậy hàng chục lần chỉ để nạp lại index
+    # (65K chunk + embedding ~60s/vòng) rồi lại hoãn.
+    print(max(60, min(14400, int(nxt - time.time()) + 30)))
 except Exception:
     print(120)
 PY
