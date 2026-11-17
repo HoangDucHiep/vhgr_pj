@@ -289,3 +289,37 @@ class TestFusionBudget:
         assert text_chars > 0, "phần văn bản không được bị bóp về 0"
         assert text_chars >= int(12000 * MIN_TEXT_RATIO) * 0.5
         assert kg_chars > 0
+
+    def test_no_graph_gives_full_budget_to_text(self) -> None:
+        """Không có KG ⇒ văn bản dùng **toàn bộ** ngân sách (công bằng B− vs A)."""
+        from src.qa.fusion import fuse
+        from src.qa.intent import IntentResult
+        from src.qa.graph_context import GraphContext
+
+        class _Chunk:
+            chunk_id = "chunk_1"
+            doc_id = "doc_1"
+            title = "T"
+            section = ""
+            section_path = ""
+            source_url = "https://example.org"
+            text = "x" * 20000
+            entity_ids: list[str] = []
+
+            def cite_label(self) -> str:
+                return "[x] T"
+
+        class _Retrieved:
+            chunk = _Chunk()
+            rrf_score = 1.0
+
+        intent = IntentResult(intent="relational", confidence=1.0, source="rule")
+        fused = fuse(
+            intent=intent,
+            text_results=[_Retrieved()],
+            graph=GraphContext(),
+            char_budget=12000,
+        )
+        text_chars = sum(len(block["text"]) for block in fused.text_blocks)
+        assert text_chars >= 12000, "văn bản phải dùng toàn bộ ngân sách"
+        assert not fused.kg_blocks

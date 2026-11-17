@@ -201,7 +201,14 @@ def fuse(
 
     edges = list(graph.edges)
 
-    if strategy == "kg_first":
+    if not edges:
+        # **Không có KG** (arm B−, hoặc câu hỏi không khớp entity) ⇒ văn bản
+        # dùng **toàn bộ** ngân sách. Cần thiết để ablation B− là **công
+        # bằng** với arm A: nếu B− bị bóp còn 60% context so với A thì
+        # khác biệt giữa A và B− không còn là "KG" mà là "ngân sách context".
+        kg_budget = 0
+        text_budget = char_budget
+    elif strategy == "kg_first":
         # D-118: giới hạn **cả hai** phần bằng tỉ lệ cố định (kg 40% / text 60%)
         # thay vì để KG chiếm hết rồi bóp text về ~0.
         kg_budget = max(int(char_budget * KG_FIRST_BUDGET_RATIO), 0)

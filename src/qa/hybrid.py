@@ -59,6 +59,26 @@ Phần "DỮ LIỆU ĐỒ THỊ" chứa các quan hệ có cấu trúc (ai chỉ
 con của ai, sự kiện diễn ra ở đâu...). Hãy **kết hợp** phần văn bản và phần
 đồ thị: dùng văn bản để kể diễn biến, dùng đồ thị để khẳng định quan hệ
 và thuộc tính cụ thể. Trích dẫn cả hai loại nguồn theo đúng số `[n]`.
+
+### Cách đọc phần "DỮ LIỆU ĐỒ THỊ"
+Các dòng trong phần đồ thị có dạng:
+
+    [n] A — quan hệ → B
+
+⇒ Đọc là: **"B là quan hệ của A"**.
+
+Ví dụ:
+
+    [3] Nguyễn Phúc Ưng Dự — cha của → Nguyễn Phúc Hồng Thiết
+    ⇒ "Nguyễn Phúc Hồng Thiết là **cha của** Nguyễn Phúc Ưng Dự."
+
+    [5] Nguyễn Phúc Ưng Dự — con của → Nguyễn Phúc Hồng Thiết
+    ⇒ "Nguyễn Phúc Ưng Dự là **con của** Nguyễn Phúc Hồng Thiết."
+
+Nhãn quan hệ đã được chuẩn hoá theo **đúng chiều nghĩa** — hãy tin đúng
+nhãn, **không** tự suy đoán ngược lại. Dòng "Bằng chứng" bên dưới là câu
+gốc từ Wikipedia và là bằng chứng chính xác nhất: khi nhãn quan hệ và
+bằng chứng có vẻ khác nhau, hãy ưu tiên **bằng chứng**.
 """
 
 
