@@ -112,6 +112,8 @@ class RagAnswerer:
         client: LLMClient | None = None,
         *,
         config: dict[str, Any] | None = None,
+        session_store: Any = None,
+        linker: Any = None,
     ) -> None:
         """Khởi tạo.
 
@@ -119,15 +121,44 @@ class RagAnswerer:
             retriever: Tầng truy xuất.
             client: LLM client (None ⇒ dựng từ `configs/llm.yaml`).
             config: Cấu hình retrieval.
+            session_store: Kho phiên hội thoại (dùng cho query rewriting).
+                Vì sao cần cho arm A? Trong đánh giá Phase 16 có 60 câu
+                `multi_turn` (câu dùng đại từ "ông ấy"). Nếu arm A **không**
+                viết lại câu hỏi, nó **không** truy xuất được văn bản về chủ
+                thể ⇒ trả lời sai ⇒ **khác biệt điểm do hội thoại chứ không
+                phải do KG** ⇒ confound ⇒ kết luận "KG giúp RAG" bị sai.
+                ⇒ Cho arm A **cùng** cơ chế query rewriting với arm B; khác
+                biệt còn lại là **KG** (đó mới là thứ cần đo).
+            linker: Entity linker (dùng **chỉ** để nhận diện chủ thể cho
+                query rewriting, **không** dùng để lấy fact từ KG).
         """
         self.retriever = retriever
         self.config = config or {}
         self.prompt_template = load_prompt()
         self._client = client
+        self.session_store = session_store
+        self._linker = linker
 
     # ------------------------------------------------------------------
     # LLM
     # ------------------------------------------------------------------
+
+    @property
+    def linker(self) -> Any:
+        """Lấy (và cache) entity linker.
+
+        Vì sao arm A cần linker? Chỉ để **nhận diện chủ thể** khi câu hỏi
+        dùng đại từ ("ông ấy") — tức là biết câu đó **không** có entity mới
+        nên cần kế thừa chủ thể từ lượt trước. Không dùng để lấy fact.
+
+        Returns:
+            `EntityLinker`.
+        """
+        if self._linker is None:
+            from backend.app.services.entity_linker import get_linker
+
+            self._linker = get_linker()
+        return self._linker
 
     @property
     def client(self) -> LLMClient:
@@ -151,6 +182,7 @@ class RagAnswerer:
         *,
         top_k: int | None = None,
         use_llm: bool = True,
+        session_id: str | None = None,
     ) -> dict[str, Any]:
         """Trả lời một câu hỏi bằng Vanilla RAG.
 
@@ -158,6 +190,7 @@ class RagAnswerer:
             question: Câu hỏi.
             top_k: Số chunk đưa vào context (None ⇒ lấy từ cấu hình).
             use_llm: Có gọi LLM hay không (tắt ⇒ trả context thô, dùng cho test).
+            session_id: Id phiên hội thoại (dùng để viết lại câu hỏi có đại từ).
 
         Returns:
             Dict theo output contract của Phase 14.
@@ -166,7 +199,41 @@ class RagAnswerer:
         retrieval = self.config.get("retrieval") or {}
         generation = self.config.get("generation") or {}
 
-        results = self.retriever.retrieve(question, top_k=top_k)
+        # --- Query rewriting (kế thừa chủ thể từ lượt trước) -----------
+        # Xem giải thích ở `__init__`: cần thiết để so sánh A vs B **công
+        # bằng** trên nhóm câu `multi_turn` (khác biệt phải là KG, không
+        # phải là hội thoại).
+        rewritten = question
+        history = ""
+        subject_entity_id = ""
+        subject_name = ""
+        if session_id and self.session_store is not None:
+            from src.qa.conversation import rewrite_question
+
+            session = self.session_store.get_or_create(session_id)
+            # Nhận diện chủ thể (entity linking) để biết câu này có entity
+            # **mới** hay không ⇒ quyết định có cần kế thừa chủ thể lượt
+            # trước hay không (giống hệt cách arm B làm).
+            try:
+                linked = self.linker.link(question)
+            except Exception as error:  # noqa: BLE001 - linking lỗi không chặn RAG
+                logger.warning("Entity linking lỗi (RAG): %s", error)
+                linked = []
+            has_new_entity = bool(linked)
+            if linked:
+                subject_entity_id = linked[0][1]
+                subject_name = linked[0][2]
+            elif session.last_subject_entity_id:
+                subject_entity_id = session.last_subject_entity_id
+                subject_name = session.last_subject_name
+            rewritten = rewrite_question(
+                question, session, has_new_entity=has_new_entity
+            )
+            history = self.session_store.history_text(session)
+            if rewritten != question:
+                logger.info("Query rewriting (RAG): %r → %r", question, rewritten)
+
+        results = self.retriever.retrieve(rewritten, top_k=top_k)
         if not results:
             return {
                 "status": "not_in_data",
@@ -198,8 +265,15 @@ class RagAnswerer:
             }
 
         prompt = self.prompt_template.format(
-            context=context, question=question, no_data=NO_DATA_ANSWER
+            context=context, question=rewritten, no_data=NO_DATA_ANSWER
         )
+        if history:
+            # Lịch sử hội thoại (giống cách arm B làm) ⇒ **công bằng**: khác
+            # biệt giữa A và B chỉ còn là KG, không còn là hội thoại.
+            prompt = prompt.replace(
+                "## CÂU HỎI",
+                f"## LỊCH SỬ HỘI THOẠI\n{history}\n\n## CÂU HỎI",
+            )
         retries = 0
         max_retry = (
             int(generation.get("max_faithfulness_retry", 1))
@@ -234,6 +308,21 @@ class RagAnswerer:
             # Retry hết vẫn không trích dẫn ⇒ đánh dấu để Phase 16 đo.
             logger.warning("Câu trả lời không có trích dẫn [n] sau retry.")
 
+        # Ghi lượt vào session ⇒ lượt sau ("ông ấy sinh năm nào?") kế thừa
+        # được chủ thể (giống arm B) ⇒ so sánh công bằng trên `multi_turn`.
+        if session_id and self.session_store is not None:
+            session = self.session_store.get_or_create(session_id)
+            self.session_store.record_turn(
+                session,
+                question=question,
+                rewritten_question=rewritten,
+                answer=answer,
+                entities=[],
+                subject_entity_id=subject_entity_id,
+                subject_name=subject_name,
+            )
+            self.session_store.save(session)
+
         return {
             "status": status,
             "answer": answer,
@@ -242,6 +331,7 @@ class RagAnswerer:
             "context_chars": len(context),
             "faithfulness_ok": bool(cited) or status == "not_in_data",
             "retries": retries,
+            "rewritten_question": rewritten,
             "elapsed_ms": int((time.time() - started) * 1000),
         }
 

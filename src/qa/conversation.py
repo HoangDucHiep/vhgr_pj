@@ -453,6 +453,15 @@ class SessionStore:
         Returns:
             Session đã cập nhật.
         """
+        # **Chống ghi trùng**: cùng 1 câu hỏi đã có trong session ⇒ không
+        # ghi lại. Vì sao? Vòng `--resume` của Phase 16 có thể chạy lại câu
+        # đã xử lý (vì lỗi hạ tầng ở arm khác) ⇒ nếu ghi trùng thì lịch sử
+        # hội thoại bị **phình** ⇒ context prompt dài dần ⇒ tốn token vô ích
+        # và làm lệch hành vi giữa các vòng (không tái lập được).
+        for turn in session.turns:
+            if turn.question.strip() == question.strip():
+                logger.debug("Bỏ qua lượt trùng trong session: %s", question[:60])
+                return session
         session.turns.append(
             Turn(
                 question=question,

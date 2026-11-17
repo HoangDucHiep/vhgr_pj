@@ -1162,12 +1162,18 @@ def run_arm_a(
         question: Câu hỏi.
         retriever: Retriever (dùng chung với arm B).
         answerer: `RagAnswerer`.
-        session_id: Id phiên (arm A không dùng hội thoại).
+        session_id: Id phiên (tách theo arm ⇒ không ô nhiễm lượt trả lời).
 
     Returns:
         Dict kết quả thô của arm.
     """
-    result = answerer.answer(question)
+    # Truyền `session_id` ⇒ arm A cũng có **query rewriting** (kế thừa chủ
+    # thể) như arm B. Vì sao? Nhóm câu `multi_turn` (60/247 câu) dùng đại từ
+    # ("ông ấy sinh năm nào?") ⇒ nếu arm A không viết lại câu hỏi, nó **không
+    # truy xuất được** văn bản về chủ thể ⇒ trả lời sai ⇒ chênh lệch điểm
+    # A vs B là do **hội thoại**, không phải do KG ⇒ **confound** ⇒ kết luận
+    # nghiên cứu bị sai. ⇒ Cho A cùng cơ chế; thứ khác biệt còn lại là KG.
+    result = answerer.answer(question, session_id=session_id)
     context_text = "\n\n".join(
         f"[{i}] {item.get('title', '')} > {item.get('section', '')}\n{item.get('text', '')}"
         for i, item in enumerate(result.get("context_used") or [], start=1)
@@ -1856,6 +1862,7 @@ def main() -> int:
     )
     args = parser.parse_args()
 
+    from src.qa.conversation import SessionStore
     from src.qa.hybrid import HybridAnswerer
     from src.qa.rag_answer import RagAnswerer
     from src.qa.retriever import Retriever
@@ -1891,8 +1898,16 @@ def main() -> int:
         # token/ngày (Groq) để **giữ** quota request/ngày (Gemini) cho judge.
         provider_priority=("groq", "gemini"),
     )
-    rag_answerer = RagAnswerer(retriever, config=config, client=gen_client)
-    hybrid_answerer = HybridAnswerer(retriever, config=config, client=gen_client)
+    # **Session store dùng chung** cho cả 2 answerer ⇒ nhưng mỗi arm có
+    # session **tách riêng** (`<session_id>__<arm>`) ⇒ không ô nhiễm lượt
+    # trả lời của nhau (xem `_arm_session_id`).
+    session_store = SessionStore()
+    rag_answerer = RagAnswerer(
+        retriever, config=config, client=gen_client, session_store=session_store
+    )
+    hybrid_answerer = HybridAnswerer(
+        retriever, config=config, client=gen_client, session_store=session_store
+    )
 
     if args.reset_sessions:
         sessions_dir = REPO_ROOT / "data" / "interim" / "sessions"

@@ -390,3 +390,121 @@ def test_ask_rag_endpoint_rejects_empty_question() -> None:
     client = TestClient(create_app())
     response = client.post("/api/ask/rag", json={"question": ""})
     assert response.status_code == 422
+
+
+# ----------------------------------------------------------------------
+# 5. Arm A có hội thoại (công bằng với arm B trên nhóm câu `multi_turn`)
+# ----------------------------------------------------------------------
+
+
+def test_rag_answerer_rewrites_pronoun_question(tmp_path) -> None:
+    """Arm A viết lại câu hỏi đại từ ⇒ kế thừa chủ thể lượt trước.
+
+    Vì sao cần? Nhóm câu `multi_turn` (60/247 câu) hỏi tiếp bằng đại từ
+    ("Ông ấy sinh năm nào?"). Nếu arm A **không** viết lại ⇒ không truy xuất
+    được văn bản về chủ thể ⇒ chênh lệch điểm A vs B là do **hội thoại**
+    chứ không phải do KG ⇒ confound ⇒ kết luận nghiên cứu sai.
+    """
+    from src.qa.conversation import SessionStore
+    from src.qa.rag_answer import RagAnswerer
+
+    seen_queries: list[str] = []
+
+    class _Retrieved:
+        """Chunk giả có `to_dict`."""
+
+        def __init__(self, chunk: Chunk) -> None:
+            """Khởi tạo.
+
+            Args:
+                chunk: Chunk.
+            """
+            self.chunk = chunk
+            self.index = 0
+            self.rrf_score = 0.02
+
+        def to_dict(self) -> dict:
+            """Dict giả.
+
+            Returns:
+                Dict rỗng.
+            """
+            return {}
+
+    class _Retriever:
+        """Retriever giả — ghi lại câu hỏi đã truy xuất."""
+
+        def retrieve(self, query: str, **_: object) -> list:
+            """Ghi query và trả 1 chunk.
+
+            Args:
+                query: Câu hỏi (đã viết lại).
+                **_: Bỏ qua.
+
+            Returns:
+                Danh sách 1 chunk.
+            """
+            seen_queries.append(query)
+            return [_Retrieved(_make_chunk(0, "Lý Thường Kiệt", "nội dung về Lý Thường Kiệt"))]
+
+    class _Client:
+        """LLM giả — trả câu có trích dẫn."""
+
+        def complete(self, *args: object, **kwargs: object) -> str:
+            """Trả câu trả lời giả.
+
+            Args:
+                *args: Bỏ qua.
+                **kwargs: Bỏ qua.
+
+            Returns:
+                Câu trả lời có trích dẫn.
+            """
+            return "Lý Thường Kiệt sinh năm 974 [1]"
+
+    class _Linker:
+        """Entity linker giả — chỉ link được tên riêng ở lượt 1."""
+
+        def link(self, question: str) -> list:
+            """Trả entity nếu câu có tên riêng.
+
+            Args:
+                question: Câu hỏi.
+
+            Returns:
+                Danh sách entity (rỗng nếu câu dùng đại từ).
+            """
+            if "Lý Thường Kiệt" in question:
+                return [("Lý Thường Kiệt", "ent_ly_thuong_kiet", "Lý Thường Kiệt")]
+            return []
+
+    store = SessionStore(directory=tmp_path / "sessions")
+    answerer = RagAnswerer(
+        _Retriever(), _Client(), session_store=store, linker=_Linker()
+    )
+
+    # Lượt 1: giới thiệu chủ thể.
+    answerer.answer("Lý Thường Kiệt là ai?", session_id="s1")
+    # Lượt 2: câu dùng đại từ ⇒ phải viết lại thành tên chủ thể.
+    answerer.answer("Ông ấy sinh năm nào?", session_id="s1")
+
+    assert seen_queries[0] == "Lý Thường Kiệt là ai?"
+    assert "Lý Thường Kiệt" in seen_queries[1]
+    assert "Ông ấy" not in seen_queries[1]
+
+
+def test_session_store_ignores_duplicate_turn(tmp_path) -> None:
+    """Ghi lượt trùng (do `--resume` chạy lại) ⇒ không phình lịch sử."""
+    from src.qa.conversation import SessionStore
+
+    store = SessionStore(directory=tmp_path / "sessions_dup")
+    session = store.get_or_create("s2")
+    for _ in range(3):
+        store.record_turn(
+            session,
+            question="Câu hỏi X",
+            rewritten_question="Câu hỏi X",
+            answer="đáp án",
+            entities=[],
+        )
+    assert len(session.turns) == 1
