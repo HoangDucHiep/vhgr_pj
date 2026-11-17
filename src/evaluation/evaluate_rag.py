@@ -1809,6 +1809,18 @@ def main() -> int:
         ),
     )
     parser.add_argument(
+        "--judge-max-cooldown-s",
+        type=float,
+        default=14400.0,
+        help=(
+            "Trần cooldown **riêng cho pool judge** (giây, mặc định 4 giờ). "
+            "Vì sao khác pool sinh? Judge dùng Gemini (hạn mức **request/ngày**, "
+            "reset ~15:00 UTC+7) ⇒ hết quota thì **cả ngày** không hồi ⇒ "
+            "probe lại mỗi 15 phút chỉ để nhận 429 ⇒ **ăn vô ích** quota RPD. "
+            "⇒ Trần dài hơn ⇒ ít probe lãng phí hơn."
+        ),
+    )
+    parser.add_argument(
         "--infra-retries",
         type=int,
         default=2,
@@ -1900,7 +1912,7 @@ def main() -> int:
         quota_cooldown_s=args.quota_cooldown_s,
         label="LLM-judge",
         max_quota_wait_s=args.max_quota_wait_s,
-        max_cooldown_s=args.max_cooldown_s,
+        max_cooldown_s=args.judge_max_cooldown_s,
         # Judge **gọn** (1 request/câu, prompt ~2.8k token) ⇒ ưu tiên
         # provider giới hạn theo request/ngày (Gemini) vì token/ngày của
         # Groq cần dành cho sinh câu trả lời.

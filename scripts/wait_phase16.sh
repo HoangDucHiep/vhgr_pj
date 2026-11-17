@@ -115,6 +115,7 @@ run_eval() {
         --quota-cooldown-s 600 \
         --max-quota-wait-s 300 \
         --max-cooldown-s 900 \
+        --judge-max-cooldown-s 14400 \
         --quota-wait-s 900 \
         > "$log" 2>&1
 }
