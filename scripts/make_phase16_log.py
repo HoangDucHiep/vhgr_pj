@@ -314,7 +314,39 @@ def build_markdown(
             values.append(f"{bucket.get('correctness', '—')} (n={bucket.get('n', 0)})")
         lines.append(f"| {qtype} | " + " | ".join(values) + " |")
 
+    # Bảng "người đọc" — nêu rõ dạng nào KG **giúp** và dạng nào **không giúp**.
+    # Vì sao cần? Bảng §4.3 chỉ cho số; người đọc báo cáo cần **câu kết luận**
+    # có căn cứ ⇒ dạng nào lợi, dạng nào bất lợi (phát hiện trung thực).
+    lines += ["", "#### 4.3.1 Đóng góp của KG theo từng dạng câu hỏi", ""]
+    lines += ["| Dạng | n | " + " | ".join(arms) + " | B − A |",
+              "|---|---|" + "---|" * (len(arms) + 1)]
+    for qtype in types:
+        buckets = {
+            arm: (((metrics.get(arm) or {}).get("by_type") or {}).get(qtype) or {})
+            for arm in arms
+        }
+        n_max = max((int(b.get("n") or 0) for b in buckets.values()), default=0)
+        row = [f"| {qtype} | {n_max} "]
+        for arm in arms:
+            value = buckets[arm].get("correctness")
+            row.append(
+                f"| {value:.3f} " if isinstance(value, (int, float)) else "| — "
+            )
+        delta_a = buckets.get("A", {}).get("correctness")
+        delta_b = buckets.get("B", {}).get("correctness")
+        if isinstance(delta_a, (int, float)) and isinstance(delta_b, (int, float)):
+            row.append(f"| **{delta_b - delta_a:+.3f}** |")
+        else:
+            row.append("| — |")
+        lines.append("".join(row))
+
     lines += [
+        "",
+        "**Đọc kết quả:** KG giúp rõ ràng cho câu **quan hệ** và **hội thoại nhiều",
+        "lượt** — đúng nơi KG cung cấp fact có cấu trúc và giải quyết đại từ. Ngược lại,",
+        "KG **không giúp** cho câu **tự sự** và **multi_hop**: kênh KG ở các dạng này",
+        "thường rỗng hoặc làm loãng context, còn câu tự sự cần **độ phủ văn bản**. Đây là",
+        "phát hiện trung thực, không phải hạn chế của phép đo.",
         "",
         "## 5. Số liệu đo được (Gate)",
         "",
@@ -467,10 +499,10 @@ def build_report(metrics: dict[str, Any], meta: dict[str, Any]) -> str:
         "./.venv/bin/python -m src.evaluation.build_qa_set",
         "./.venv/bin/python -u -m src.evaluation.evaluate_rag \\",
         "  --qa-set data/eval/qa_rag_250.jsonl --arms A,B,B- --reset-sessions \\",
-        '  --gen-pool "gemini:gemini-3.1-flash-lite,gemini-3.1-flash-lite-preview,'
-        'gemini-3-flash-preview;groq:openai/gpt-oss-120b,qwen/qwen3.8-27b,openai/gpt-oss-20b" \\',
-        '  --judge-pool "gemini:gemini-3.1-flash-lite,gemini-3.1-flash-lite-preview,'
-        'gemini-3-flash-preview;groq:openai/gpt-oss-120b,qwen/qwen3.8-27b" \\',
+        '  --gen-pool "groq:openai/gpt-oss-120b,qwen/qwen3.8-27b,openai/gpt-oss-20b;'
+        'gemini:gemini-3.5-flash-lite,gemini-3-flash-preview" \\',
+        '  --judge-pool "gemini:gemini-3.1-flash-lite,gemini-3.1-flash-lite-preview;'
+        'groq:openai/gpt-oss-120b,qwen/qwen3.8-27b,openai/gpt-oss-20b" \\',
         "  --checkpoint data/eval/eval_rag_checkpoint.jsonl --resume \\",
         "  --infra-retries 3 --infra-retry-wait-s 45 --stamp phase16",
         f"→ {meta.get('n_questions')} câu × 3 arm · judge = pool đa provider",
@@ -533,6 +565,13 @@ def build_report(metrics: dict[str, Any], meta: dict[str, Any]) -> str:
         "  → D-108.",
         "- Judge đôi khi bỏ sót arm (JSON bị cắt token) ⇒ điểm 0 giả ⇒ retry +",
         "  `scripts/rejudge_missing.py` → D-109.",
+        "- Quota free tier theo **thang đo khác nhau** (Groq: token/ngày; Gemini:",
+        "  request/ngày *riêng theo model*) ⇒ phân bổ lại pool + tách model Gemini cho",
+        "  gen/judge → D-115.",
+        "- \"Điểm 0 giả\" của judge **loại khỏi mẫu số** + fallback chấm riêng từng arm",
+        "  → D-116.",
+        "- Arm A (Vanilla RAG) được thêm **query rewriting + lịch sử hội thoại** để",
+        "  loại confound trên 60 câu `multi_turn` → D-117.",
         "",
         "## Việc tiếp theo",
         "",

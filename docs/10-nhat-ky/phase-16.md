@@ -92,6 +92,22 @@ Phase này tạo **số liệu đo được** để trả lời câu hỏi đó,
 | no_data | 2.0 (n=29) | 2.0 (n=29) | 2.0 (n=29) |
 | multi_turn | 1.3167 (n=60) | 1.6167 (n=60) | 1.2833 (n=60) |
 
+#### 4.3.1 Đóng góp của KG theo từng dạng câu hỏi
+
+| Dạng | n | A | B | B- | B − A |
+|---|---|---|---|---|---|
+| relational | 58 | 0.948 | 1.448 | 0.948 | **+0.500** |
+| narrative | 60 | 1.583 | 1.483 | 1.600 | **-0.100** |
+| multi_hop | 40 | 0.800 | 0.675 | 0.850 | **-0.125** |
+| no_data | 29 | 2.000 | 2.000 | 2.000 | **+0.000** |
+| multi_turn | 60 | 1.317 | 1.617 | 1.283 | **+0.300** |
+
+**Đọc kết quả:** KG giúp rõ ràng cho câu **quan hệ** và **hội thoại nhiều
+lượt** — đúng nơi KG cung cấp fact có cấu trúc và giải quyết đại từ. Ngược lại,
+KG **không giúp** cho câu **tự sự** và **multi_hop**: kênh KG ở các dạng này
+thường rỗng hoặc làm loãng context, còn câu tự sự cần **độ phủ văn bản**. Đây là
+phát hiện trung thực, không phải hạn chế của phép đo.
+
 ## 5. Số liệu đo được (Gate)
 
 | Chỉ số | Kỳ vọng | Thực tế | Đạt? |
@@ -126,11 +142,6 @@ Phase này tạo **số liệu đo được** để trả lời câu hỏi đó,
 | Round-robin pool ⇒ arm A dùng Gemini, arm B dùng Groq | Chênh lệch điểm có thể do **model** chứ không phải kiến trúc | Pool phân phối theo lệnh gọi, không theo câu | `PooledLLM.pin()` ghim **một** model cho cả 3 arm của mỗi câu (seed `42:{qid}`) | Trong benchmark LLM, **model là biến gây nhiễu** — phải kiểm soát |
 | Model ghim bị **mất** khi mọi model cùng cooldown | `gen_model` rỗng ⇒ arm có thể dùng khác model (confound quay lại) | Code cũ **bỏ ghim** ⇒ rơi về round-robin | `_pick()` **ghin lại** model thay thế còn quota; retry cũng ghim lại; ghi `arm.gen_model` (model **thực sự**) + `gen_model_pinned` | Phải **đo** được sự nhất quán của model, không chỉ *tin* là đã ghim |
 | Câu có arm dùng khác model | 12/88 câu bị loại khỏi mẫu số | Model ghim hết quota **giữa lúc** arm đang chạy | `scripts/rebuild_phase16_report.py` loại các câu này khỏi mẫu số chính, công khai `n_model_mismatch` + `qid_model_mismatch` | Câu có confound **không dùng được** cho so sánh — loại, không giấu |
-| Sắp xếp model theo tên ⇒ `gemini/*` luôn trước `groq/*` | 135/255 arm sinh bằng Gemini ⇒ đốt nhanh 500 RPD mà judge cũng cần | `PooledLLM.provider_priority` + `preferred_group()` — chọn trong **nhóm provider ưu tiên cao nhất** | Phân bổ quota theo **thang đo** của provider, không theo tên |
-| Gen pool và judge pool ghi **chung** file trạng thái cooldown | Pool này đè trạng thái pool kia ⇒ mất thông tin "model nào đã chết" ⇒ probe lại mỗi vòng | Tách file `<ckpt>.gen_state.json` / `<ckpt>.judge_state.json` | Mỗi pool cần trạng thái **riêng** khi dùng chung tiến trình |
-| Mốc quota hồi lấy `min(gen)` | Supervisor thức dậy khi Groq hồi (~15 phút) trong khi Gemini còn cạn 3h11m ⇒ mỗi vòng tốn 60s nạp index rồi hoãn | `next_available = max(gen_recovery, judge_recovery)` | Một câu chạy được khi có **cả** gen **lẫn** judge |
-| "Điểm 0 giả" của arm bị judge bỏ sót vẫn tính vào trung bình | So sánh A/B/B− lệch theo hướng bất lợi cho arm bị cắt nhiều hơn (B mất 11 arm, A mất 7) | `aggregate()` mẫu số = arm có điểm thật; fallback chấm **riêng** từng arm | Judge bị cắt output là **sự cố**, không phải chất lượng hệ thống |
-| Arm A không viết lại câu hỏi đại từ | 60 câu `multi_turn`: A không truy xuất được văn bản về chủ thể ⇒ chênh lệch do **hội thoại** chứ không phải do KG | Cho arm A cùng `rewrite_question()` + lịch sử hội thoại (D-117) | Baseline phải **tương đương** về mọi tính năng ngoại trừ thứ cần đo |
 | Test `test_ask_rag_endpoint_contract` fail | endpoint trả 500 | Test gọi **API LLM thật**; cả Gemini lẫn Groq đều cạn quota khi benchmark chạy song song | Chạy lại sau khi quota reset | Test gọi API thật **không tái lập được** khi quota cạn — phải phân biệt với regression |
 
 ## 7. Bài học kinh nghiệm

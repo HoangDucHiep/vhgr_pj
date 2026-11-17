@@ -88,23 +88,6 @@
 - Arm A (Vanilla RAG) được thêm **query rewriting + lịch sử hội thoại** để
   loại confound trên 60 câu `multi_turn` → D-117.
 
-## Kết quả theo từng dạng câu hỏi (correctness 0–2)
-
-| Dạng | n | A | B | B− | B − A |
-|---|---|---|---|---|---|
-| relational | 58 | 0.948 | **1.448** | 0.948 | **+0.500** |
-| multi_turn | 60 | 1.317 | **1.617** | 1.283 | **+0.300** |
-| narrative | 60 | **1.583** | 1.483 | **1.600** | −0.100 |
-| multi_hop | 40 | 0.800 | 0.675 | **0.850** | −0.125 |
-| no_data | 29 | 2.000 | 2.000 | 2.000 | 0.000 |
-
-**Đọc kết quả:** KG giúp rõ ràng cho câu **quan hệ** (+0.500) và **hội thoại
-nhiều lượt** (+0.300) — đúng nơi KG cung cấp fact có cấu trúc và giải quyết
-đại từ. Ngược lại, KG **không giúp** (thậm chí hơi giảm) cho câu **tự sự**
-(−0.100) và **multi_hop** (−0.125): kênh KG ở các dạng này thường rỗng hoặc
-làm loãng context, còn câu tự sự cần độ phủ văn bản. Đây là phát hiện trung
-thực, không phải hạn chế của phép đo.
-
 ## Việc tiếp theo
 
 - Chốt số liệu vào `README.md` §Benchmark + `docs/PROGRESS.md` §Chỉ số đo được.
