@@ -475,7 +475,12 @@ class PooledLLM:
             or "rate_limit" in text
         )
 
-    def wait_for_any_quota(self, max_wait_s: float) -> bool:
+    def wait_for_any_quota(
+        self,
+        max_wait_s: float,
+        *,
+        deadline: float | None = None,
+    ) -> bool:
         """Chờ cho tới khi **ít nhất một** model hết cooldown.
 
         Vì sao chờ ở đây thay vì defer + restart?
@@ -485,21 +490,28 @@ class PooledLLM:
         rẻ hơn nhiều so với thoát ra rồi vào lại.
 
         Args:
-            max_wait_s: Thời gian chờ tối đa (giây).
+            max_wait_s: Thời gian chờ tối đa cho lần chờ này (giây).
+            deadline: Mốc thời gian ** tuyệt đối** (epoch) mà vượt quá thì
+                dừng chờ. Dùng để giới hạn **tổng** thời gian chờ của cả
+                lượt chạy: nếu không, 163 câu × 900s = **40 giờ** chờ vô ích.
 
         Returns:
             ``True`` nếu có model dùng được, ``False`` nếu hết thời gian chờ.
         """
-        deadline = time.time() + max(0.0, float(max_wait_s))
+        wait_deadline = time.time() + max(0.0, float(max_wait_s))
         while True:
             if self.healthy_keys():
                 return True
             wait_s = self._sleep_until_next_cooldown()
             if wait_s is None or wait_s <= 0:
                 return bool(self.healthy_keys())
-            remaining = deadline - time.time()
+            remaining = wait_deadline - time.time()
             if remaining <= 0:
                 return bool(self.healthy_keys())
+            if deadline is not None:
+                remaining = min(remaining, deadline - time.time())
+                if remaining <= 0:
+                    return bool(self.healthy_keys())
             sleep_s = min(wait_s, remaining)
             logger.info(
                 "Chờ quota hồi %.0fs (tối đa %.0fs nữa)",
@@ -642,7 +654,53 @@ class PooledLLM:
         self.index = (self.index + 1) % count
         return client
 
-    def probe_all(self) -> dict[str, bool]:
+    def save_state(self, path: str | Path) -> None:
+        """Lưu trạng thái cooldown ra file (để vòng sau khỏi probe lại).
+
+        Vì sao?
+        --------
+        Gemini có hạn mức **500 request/ngày/model**. Mỗi vòng `--resume`
+        gọi `probe_all()` (1 lời gọi/model) ⇒ 40 vòng × 7 model = 280 lời
+        gọi lãng phí (>50% hạn mức) ⇒ chạy được ít câu hơn. ⇒ Lưu mốc
+        cooldown giữa các vòng ⇒ vòng sau bỏ qua model đã biết chết.
+
+        Args:
+            path: Đường dẫn file JSON.
+        """
+        try:
+            Path(path).write_text(
+                json.dumps(
+                    {
+                        "cooldown_until": dict(self._cooldown_until),
+                        "errors": dict(self.errors),
+                        "saved_at": time.time(),
+                    },
+                    ensure_ascii=False,
+                ),
+                encoding="utf-8",
+            )
+        except OSError:
+            pass
+
+    def load_state(self, path: str | Path) -> None:
+        """Khôi phục trạng thái cooldown từ file (xem `save_state`).
+
+        Args:
+            path: Đường dẫn file JSON.
+        """
+        file_path = Path(path)
+        if not file_path.exists():
+            return
+        try:
+            data = json.loads(file_path.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError):
+            return
+        for key, until in (data.get("cooldown_until") or {}).items():
+            self._cooldown_until[str(key)] = float(until)
+        for key, count in (data.get("errors") or {}).items():
+            self.errors[str(key)] = int(count)
+
+    def probe_all(self, *, skip_cooling: bool = False) -> dict[str, bool]:
         """Thử **một** lời gọi rất nhỏ với từng model để biết model nào còn
         quota.
 
@@ -651,12 +709,25 @@ class PooledLLM:
         Nếu không probe thì pool có thể ghim nhầm model đã chết ⇒ câu đó
         lỗi hoặc lệch model ⇒ mất dữ liệu.
 
+        Args:
+            skip_cooling: Bỏ qua các model **đang cooldown** (đã biết là
+                chết) ⇒ không tốn lời gọi probe cho chúng. Vì sao cần?
+                Gemini có hạn mức **500 request/ngày/model**; mỗi vòng
+                `--resume` probe lại toàn bộ pool ⇒ 40 vòng × 7 model = 280
+                lời gọi lãng phí (hơn nửa hạn mức!) ⇒ phải bỏ qua model
+                đã biết chết.
+
         Returns:
             Mapping ``model key`` → ``True`` nếu model còn dùng được.
         """
         healthy: dict[str, bool] = {}
+        now = time.time()
         for client in self.clients:
             key = self._model_key(client)
+            if skip_cooling and self._cooldown_until.get(key, 0.0) > now:
+                # Đã biết chết (đang cooldown) ⇒ không tốn lời gọi probe.
+                healthy[key] = False
+                continue
             try:
                 client.complete(
                     "Trả về đúng một chữ: OK",
@@ -1567,6 +1638,17 @@ def main() -> int:
         ),
     )
     parser.add_argument(
+        "--total-quota-wait-s",
+        type=float,
+        default=3600.0,
+        help=(
+            "Tổng thời gian **tối đa** được chờ quota hồi trong 1 lượt chạy "
+            "(giây). Nếu không giới hạn: 163 câu × 900s = 40 giờ chờ vô ích. "
+            "Hết hạn ⇒ câu còn lại bị hoãn ⇒ vòng `--resume` sau xử lý. "
+            "Mặc định 3600 (1 giờ)."
+        ),
+    )
+    parser.add_argument(
         "--max-cooldown-s",
         type=float,
         default=900.0,
@@ -1673,10 +1755,20 @@ def main() -> int:
     # Free tier có thể đã cạn từ trước ⇒ ghim nhầm model chết ⇒ câu lỗi
     # hoặc lệch model. Probe 1 lời gọi nhỏ cho từng model để biết model
     # nào còn quota (model chết bị loại khỏi `healthy_keys`).
+    #
+    # Trạng thái cooldown được **lưu lại** giữa các vòng `--resume` ⇒ vòng
+    # sau không probe lại model đã biết chết (Gemini chỉ 500 RPD/model ⇒
+    # probe lặp lại 40 vòng sẽ ăn hơn nửa hạn mức!).
+    checkpoint_path = resolve_path(args.checkpoint)
+    pool_state_path = checkpoint_path.with_name(
+        checkpoint_path.stem + ".pool_state.json"
+    )
     if isinstance(gen_client, PooledLLM):
-        gen_client.probe_all()
+        gen_client.load_state(pool_state_path)
+        gen_client.probe_all(skip_cooling=True)
     if isinstance(judge_client, PooledLLM):
-        judge_client.probe_all()
+        judge_client.load_state(pool_state_path)
+        judge_client.probe_all(skip_cooling=True)
 
     arms = [a.strip() for a in args.arms.split(",") if a.strip()]
     all_results: dict[str, list[dict[str, Any]]] = {arm: [] for arm in arms}
@@ -1694,7 +1786,6 @@ def main() -> int:
     # --- Checkpoint / resume -------------------------------------------
     # Quota LLM free có thể hết giữa chừng (429 TPD/RPD) ⇒ lưu từng câu đã
     # xong để chạy lại không phải làm lại (cache LLM cũng giúp).
-    checkpoint_path = resolve_path(args.checkpoint)
     checkpoint_path.parent.mkdir(parents=True, exist_ok=True)
     done: dict[str, dict[str, Any]] = {}
     if args.resume and checkpoint_path.exists():
@@ -1723,6 +1814,16 @@ def main() -> int:
     #: Danh sách qid bị **hoãn** (mọi model hết quota) ⇒ không ghi checkpoint
     #: ⇒ vòng `--resume` sau chạy lại.
     deferred_qids: list[str] = []
+    #: **Deadline tổng** cho thời gian chờ quota trong lượt chạy này.
+    #: Vì sao: nếu mỗi câu chờ tối đa `--quota-wait-s` (900s) và có 163 câu
+    #: đều hết quota ⇒ 163 × 900s = **40 giờ** chờ vô ích. ⇒ Giới hạn
+    #: **tổng** thời gian chờ; hết hạn ⇒ các câu còn lại bị hoãn ⇒ vòng
+    #: `--resume` sau xử lý (quota Groq hồi theo rolling window ~10–20 phút).
+    quota_wait_deadline = (
+        time.time() + max(0.0, float(args.total_quota_wait_s))
+        if args.total_quota_wait_s > 0
+        else None
+    )
 
     for index, question in enumerate(questions, start=1):
         qid = str(question.get("qid"))
@@ -1779,7 +1880,8 @@ def main() -> int:
                     qid,
                 )
                 if not gen_client.wait_for_any_quota(
-                    max(0.0, float(args.quota_wait_s))
+                    max(0.0, float(args.quota_wait_s)),
+                    deadline=quota_wait_deadline,
                 ):
                     logger.info(
                         "Câu %s — hết thời gian chờ ⇒ HOÃN câu", qid,
@@ -2005,6 +2107,11 @@ def main() -> int:
             logger.info("đã chạy %d/%d câu", index, len(questions))
 
     checkpoint_handle.close()
+    # Lưu trạng thái cooldown để vòng sau bỏ qua model đã biết chết.
+    if isinstance(gen_client, PooledLLM):
+        gen_client.save_state(pool_state_path)
+    if isinstance(judge_client, PooledLLM):
+        judge_client.save_state(pool_state_path)
     if deferred_qids:
         # Ghi mốc quota hồi sớm nhất ⇒ supervisor ngủ đúng tới lúc đó
         # thay vì poll mỗi 60s (mỗi vòng nạp lại 65K chunk + embedding).
