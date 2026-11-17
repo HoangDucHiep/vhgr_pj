@@ -26,18 +26,19 @@ CHECKPOINT=data/eval/eval_rag_checkpoint.jsonl
 #   như không giới hạn ⇒ dùng cho **LLM-judge** (1 lời gọi/câu, ~2.8K token
 #   prompt ⇒ 247 câu chỉ tốn 247 request ⇒ rất thoải mái).
 # ⇒ Tách 2 pool ⇒ không tranh nhau hạn mức ⇒ tận dụng tối đa cả 2 provider.
-# ⇒ Tách 2 pool ⇒ không tranh nhau hạn mức ⇒ tận dụng tối đa cả 2 provider.
 #
 # **Quan trọng — không dùng trùng model Gemini ở 2 pool**:
 # hạn mức Gemini là **500 RPD *riêng theo model*** ⇒ nếu cả 2 pool dùng
 # cùng `gemini-3.1-flash-lite` thì 500 request/ngày bị **chia sẻ** ⇒
 # sinh câu trả lời ăn hết quota của judge ⇒ phải chờ tới hôm sau.
-# ⇒ **Không giao model nào cho cả 2 pool**:
-#   - Sinh: Groq (3 model) + Gemini `gemini-3.5-flash-lite`
-#   - Judge: Gemini `gemini-3.1-flash-lite`, `gemini-3.1-flash-lite-preview`,
-#            `gemini-3-flash-preview` + Groq (3 model) **dự phòng**
-GEN_POOL="${PHASE16_GEN_POOL:-groq:openai/gpt-oss-120b,qwen/qwen3.8-27b,openai/gpt-oss-20b;gemini:gemini-3.5-flash-lite}"
-JUDGE_POOL="${PHASE16_JUDGE_POOL:-gemini:gemini-3.1-flash-lite,gemini-3.1-flash-lite-preview,gemini-3-flash-preview;groq:openai/gpt-oss-120b,qwen/qwen3.8-27b,openai/gpt-oss-20b}"
+# ⇒ **Không giao model nào cho cả 2 pool** (4 model Gemini × 500 RPD =
+#   2.000 request/ngày ⇒ chia đều 2 pool ⇒ 1.000 request/ngày/pool):
+#   - Sinh: Groq (3 model, chính) + Gemini `gemini-3.5-flash-lite`,
+#           `gemini-3-flash-preview` (dự phòng khi Groq cạn token)
+#   - Judge: Gemini `gemini-3.1-flash-lite`, `gemini-3.1-flash-lite-preview`
+#            + Groq (3 model) **dự phòng** (chỉ khi Gemini cạn RPD)
+GEN_POOL="${PHASE16_GEN_POOL:-groq:openai/gpt-oss-120b,qwen/qwen3.8-27b,openai/gpt-oss-20b;gemini:gemini-3.5-flash-lite,gemini-3-flash-preview}"
+JUDGE_POOL="${PHASE16_JUDGE_POOL:-gemini:gemini-3.1-flash-lite,gemini-3.1-flash-lite-preview;groq:openai/gpt-oss-120b,qwen/qwen3.8-27b,openai/gpt-oss-20b}"
 
 count_done() {
     # Đếm **qid duy nhất** (không tính bản ghi lỗi hạ tầng).
