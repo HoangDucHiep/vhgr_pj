@@ -1880,3 +1880,68 @@ sau khi sửa, checkpoint giữ nguyên 88 câu hợp lệ với **0 mismatch mo
 
 **Cập nhật file:** `src/evaluation/evaluate_rag.py`, `tests/test_phase16_eval.py`,
 `scripts/wait_phase16.sh`.
+
+---
+
+## D-115 — Phân bổ quota theo **thang đo** của provider (không phải theo tên model) + tách model Gemini cho gen/judge
+
+**Ngày:** 17/11/2026 · **Phase:** 16
+
+**Bối cảnh đo lường:** hai provider giới hạn quota theo **hai thang đo khác nhau**:
+- **Groq**: 200.000 **token**/ngày/model ⇒ nặng token ⇒ hợp với **sinh câu trả lời** (3 lời gọi/câu, ~730 token/lời gọi).
+- **Gemini**: 500 **request**/ngày/**model** ⇒ token gần như không giới hạn ⇒ hợp với **LLM-judge** (1 lời gọi/câu, ~2.8K token prompt).
+
+**Vấn đề phát hiện (17/11 ~11:15–13:00):**
+1. `healthy_keys()` sắp xếp **theo tên** ⇒ `gemini/*` luôn đứng trước `groq/*` ⇒ **135/255** arm sinh bằng Gemini ⇒ đốt nhanh hạn mức 500 RPD *mà judge cũng cần dùng* ⇒ cả hai pool cùng cạn trong vòng 2 giờ.
+2. Gen pool và judge pool ghi **chung 1 file trạng thái cooldown** ⇒ pool này **đè** trạng thái pool kia ⇒ mất thông tin "model nào đã chết" ⇒ phải probe lại mỗi vòng ⇒ ăn quota Gemini vô ích.
+3. Mốc quota hồi lấy **min(gen)** ⇒ supervisor thức dậy khi Groq hồi (~15 phút) trong khi Gemini còn cạn tới **3h11m** ⇒ mỗi vòng tốn 60s nạp lại index rồi hoãn tiếp.
+4. Gen và judge dùng **chung model Gemini** ⇒ tranh giành cùng một hạn mức 500 RPD/model.
+
+**Xử lý (5 cơ chế, đều có test):**
+
+| # | Cơ chế | Vị trí | Tác dụng |
+|---|---|---|---|
+| 1 | `provider_priority` + `preferred_group()` — chọn model trong **nhóm provider ưu tiên cao nhất** còn quota (không chọn ngẫu nhiên trên toàn bộ danh sách) | `evaluate_rag.py` | Sinh → Groq; judge → Gemini |
+| 2 | `_sort_key()` — sắp xếp ổn định theo (ưu tiên provider, tên model) | `evaluate_rag.py` | Giữ tính tái lập (cache hit) |
+| 3 | File trạng thái **riêng**: `<ckpt>.gen_state.json` / `<ckpt>.judge_state.json` | `evaluate_rag.py` | Không đè trạng thái lẫn nhau |
+| 4 | `next_available = max(gen_recovery, judge_recovery)` | `evaluate_rag.py` | Supervisor ngủ tới khi **cả hai** pool sẵn sàng |
+| 5 | Tách model Gemini cho 2 pool (gen: `3.5-flash-lite`, `3-flash-preview`; judge: `3.1-flash-lite`, `3.1-flash-lite-preview`) | `wait_phase16.sh` | 4×500 = 2.000 RPD/ngày thay vì 3×500 chia sẻ |
+
+Kèm: trần ngủ supervisor 3600s → **14400s** (4h); `MAX_ROUNDS` 40 → **120** (sống sót qua các lần reset quota);
+`rejudge_missing.py` chạy **nhiều vòng** cho tới khi hết arm bị bỏ sót (dùng lại context+answer ⇒ không tốn quota sinh).
+
+**Kiểm chứng:** 49 test `tests/test_phase16_eval.py` pass; checkpoint 88 câu hợp lệ, **0 mismatch model**;
+log probe xác nhận pool gen ưu tiên `groq/*`, pool judge ưu tiên `gemini/*`.
+
+**Cập nhật file:** `src/evaluation/evaluate_rag.py`, `scripts/wait_phase16.sh`,
+`scripts/rebuild_phase16_report.py`, `scripts/rejudge_missing.py`, `tests/test_phase16_eval.py`.
+
+---
+
+## D-116 — "Điểm 0 giả" của LLM-judge làm sai lệch so sánh A/B/B−: loại khỏi mẫu số + chấm lại riêng từng arm
+
+**Ngày:** 17/11/2026 · **Phase:** 16
+
+**Bối cảnh đo lường:** `Judge.score()` gộp cả 3 arm vào **một** prompt ⇒ JSON output dài ⇒
+đôi khi bị **cắt token** ⇒ các arm phía sau không có entry ⇒ bị gán điểm 0.
+
+**Vấn đề phát hiện (17/11 ~11:15):**
+- Đo được **19/247 arm ≈ 7,7%** bị "judge không trả về điểm" ⇒ điểm 0 **giả**.
+- Trước đó các arm này **vẫn được tính vào trung bình** ⇒ kéo điểm của arm đó xuống ⇒
+  **so sánh A/B/B− bị lệch** theo hướng bất lợi cho arm nào bị cắt nhiều hơn
+  (tại thời điểm đo: B mất 6 arm, B− mất 4 arm, A mất 3 arm).
+
+**Xử lý (3 cơ chế):**
+
+| # | Cơ chế | Vị trí | Tác dụng |
+|---|---|---|---|
+| 1 | `aggregate()` — mẫu số của mọi chỉ số = **số arm có điểm thật** (`scored`); arm bị bỏ sót chỉ được đếm ở `n_judge_missing` | `evaluate_rag.py` | Mẫu số công bằng giữa 3 arm |
+| 2 | Fallback **chấm riêng từng arm** còn thiếu (`max_tokens=600`) khi 3 lần gộp đều bị cắt | `evaluate_rag.py` | Gần như không còn arm bị bỏ sót |
+| 3 | `rebuild_phase16_report.py` **cảnh báo** khi `n_judge_missing > 0` + pool mặc định khớp pool thật | `rebuild_phase16_report.py` | Không ai đọc nhầm báo cáo là đã chấm đủ |
+
+**Kiểm chứng:** 50 test `tests/test_phase16_eval.py` pass (thêm `test_solo_retry_scores_missing_arm`,
+`test_missing_arm_excluded_from_means`); số liệu 88 câu sau khi sửa:
+A `n=83` correctness 1,1687 · B `n=80` correctness 1,5000 · B− `n=82` correctness 1,1585.
+
+**Cập nhật file:** `src/evaluation/evaluate_rag.py`, `scripts/rebuild_phase16_report.py`,
+`tests/test_phase16_eval.py`.
