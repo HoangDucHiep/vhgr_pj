@@ -18,7 +18,15 @@ cd "$REPO" || exit 1
 TARGET=247
 MAX_ROUNDS="${PHASE16_MAX_ROUNDS:-40}"
 CHECKPOINT=data/eval/eval_rag_checkpoint.jsonl
-GEN_POOL="${PHASE16_GEN_POOL:-gemini:gemini-3.1-flash-lite,gemini-3.1-flash-lite-preview,gemini-3-flash-preview,gemini-3.5-flash-lite;groq:openai/gpt-oss-120b,qwen/qwen3.8-27b,openai/gpt-oss-20b}"
+# --- Phân bổ quota theo đặc tính hạn mức từng provider ------------------
+# **Groq**: hạn mức theo **token/ngày** (200.000 token/model) ⇒ dùng cho
+#   **sinh câu trả lời** (3 lời gọi/câu, mỗi lời gọi ~730 token ⇒ ~2.2K
+#   token/câu ⇒ 600K token/ngày chia 3 model đủ ~90 câu/ngày).
+# **Gemini**: hạn mức theo **số request/ngày** (500 RPD/model) ⇒ token gần
+#   như không giới hạn ⇒ dùng cho **LLM-judge** (1 lời gọi/câu, ~2.8K token
+#   prompt ⇒ 247 câu chỉ tốn 247 request ⇒ rất thoải mái).
+# ⇒ Tách 2 pool ⇒ không tranh nhau hạn mức ⇒ tận dụng tối đa cả 2 provider.
+GEN_POOL="${PHASE16_GEN_POOL:-groq:openai/gpt-oss-120b,qwen/qwen3.8-27b,openai/gpt-oss-20b;gemini:gemini-3.1-flash-lite,gemini-3.1-flash-lite-preview,gemini-3-flash-preview}"
 JUDGE_POOL="${PHASE16_JUDGE_POOL:-gemini:gemini-3.1-flash-lite,gemini-3.1-flash-lite-preview,gemini-3-flash-preview,gemini-3.5-flash-lite;groq:openai/gpt-oss-120b,qwen/qwen3.8-27b,openai/gpt-oss-20b}"
 
 count_done() {

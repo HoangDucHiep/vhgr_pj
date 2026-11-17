@@ -1842,6 +1842,27 @@ def main() -> int:
         #: Danh sách arm cần **chạy lại** (chỉ arm lỗi hạ tầng) ⇒ tiết kiệm
         #: token Groq.
         retry_arms: list[str] | None = None
+
+        # --- Pre-check: judge có sẵn sàng không? -------------------------
+        # Vì sao kiểm tra TRƯỚC khi sinh câu trả lời?
+        # ---------------------------------------------
+        # Quota của 2 provider khác nhau:
+        # - **Gemini**: hạn mức theo **số request/ngày** (500 RPD/model) ⇒
+        #   token gần như không giới hạn ⇒ **judge** nên chạy ở đây.
+        # - **Groq**: hạn mức theo **token/ngày** (200K token/model) ⇒
+        #   **sinh câu trả lời** nên chạy ở đây.
+        # Nếu judge (Gemini) hết quota mà vẫn sinh câu trả lời (Groq) ⇒ tốn
+        # token Groq rồi câu vẫn bị hoãn vì judge lỗi ⇒ **lãng phí 100%**.
+        # ⇒ Kiểm tra judge **trước**, hoãn câu ngay nếu judge chưa sẵn sàng.
+        if isinstance(judge_client, PooledLLM) and not judge_client.healthy_keys():
+            logger.info(
+                "Câu %s — judge chưa sẵn sàng (hết quota) ⇒ HOÃN câu "
+                "(không tốn token sinh câu trả lời)",
+                qid,
+            )
+            deferred = True
+            deferred_qids.append(qid)
+            continue
         #: Câu bị **hoãn** (mọi model hết quota) ⇒ không ghi checkpoint,
         #: để vòng sau chạy lại (nhờ `_has_infra_error` bỏ qua bản ghi lỗi).
         deferred = False
