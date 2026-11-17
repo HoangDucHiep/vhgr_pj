@@ -55,8 +55,7 @@ def main() -> int:
         "--gen-pool",
         default=(
             "groq:openai/gpt-oss-120b,qwen/qwen3.8-27b,openai/gpt-oss-20b;"
-            "gemini:gemini-3.1-flash-lite,gemini-3.1-flash-lite-preview,"
-            "gemini-3-flash-preview"
+            "gemini:gemini-3.5-flash-lite"
         ),
     )
     parser.add_argument(
