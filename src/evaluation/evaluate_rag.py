@@ -1356,6 +1356,64 @@ class Judge:
                 ",".join(missing), attempt_no, len(attempts),
             )
 
+        # --- Vòng cuối: chấm **riêng từng arm** còn thiếu ----------------
+        # Vì sao?
+        # ------
+        # Gộp cả 3 arm vào 1 prompt ⇒ JSON output dài ⇒ dễ bị **cắt token**
+        # ⇒ judge trả về arm đầu rồi hết output ⇒ các arm sau bị bỏ sót
+        # (đo được ~19/247 arm ≈ 7,7%). Thử tăng `max_tokens` chỉ giúp
+        # một phần (prompt + output vẫn có thể vượt trần).
+        # ⇒ Gọi lại với **chỉ 1 arm** còn thiếu mỗi lần ⇒ output cực ngắn
+        # ⇒ hầu như không bao giờ bị cắt ⇒ giảm "điểm 0 giả" gần về 0.
+        # Chi phí: 1 request cho mỗi arm còn thiếu (nhỏ hơn nhiều so với
+        # mất 1 câu trong mẫu số của cả 1 arm).
+        still_missing = [
+            str(c.get("arm"))
+            for c in candidates
+            if str(c.get("arm")) not in scores
+            and str(c.get("answer") or "").strip()
+        ]
+        for missing_arm in still_missing:
+            solo = [c for c in candidates if str(c.get("arm")) == missing_arm]
+            try:
+                parsed = self.client.complete_json(
+                    JUDGE_PROMPT.format(
+                        question_type=QUESTION_TYPE_LABELS.get(
+                            question_type, question_type or "(không rõ)"
+                        ),
+                        question=question,
+                        expected_answer=expected_answer or "(không có đáp án tham khảo)",
+                        candidates="\n\n".join(
+                            f"### PHƯƠNG ÁN {c.get('arm')}\n"
+                            f"CONTEXT:\n{compact_context(str(c.get('context') or '')) or '(không có context)'}\n\n"
+                            f"CÂU TRẢ LỜI:\n{str(c.get('answer') or '')[:3000]}"
+                            for c in solo
+                        ),
+                    ),
+                    temperature=0.0,
+                    max_tokens=600,
+                )
+            except Exception as error:  # noqa: BLE001
+                logger.warning("Judge lỗi khi chấm riêng %s: %s", missing_arm, error)
+                continue
+            if not isinstance(parsed, dict):
+                continue
+            for item in parsed.get("scores") or []:
+                if not isinstance(item, dict):
+                    continue
+                arm = _normalize_arm_name(str(item.get("arm") or ""), solo)
+                if arm != missing_arm:
+                    continue
+                scores[arm] = {
+                    "correctness": _clamp_int(item.get("correctness"), 0, 2),
+                    "faithfulness": _clamp_int(item.get("faithfulness"), 0, 2),
+                    "citation_precision": _clamp_float(
+                        item.get("citation_precision"), 0.0, 1.0
+                    ),
+                    "reason": str(item.get("reason") or "")[:300],
+                }
+                break
+
         for candidate in candidates:
             arm = str(candidate.get("arm"))
             if arm not in scores:

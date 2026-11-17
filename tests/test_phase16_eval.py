@@ -315,7 +315,7 @@ class TestJudgeRetry:
         """Judge hỏng hoàn toàn ⇒ vẫn trả điểm 0 (nhưng đếm được)."""
         from src.evaluation.evaluate_rag import Judge
 
-        client = self._FakeClient([None, None, None])
+        client = self._FakeClient([None, None, None, None])
         judge = Judge(client)  # type: ignore[arg-type]
         scores = judge.score(
             question="hỏi",
@@ -324,6 +324,40 @@ class TestJudgeRetry:
         )
         assert scores["A"]["correctness"] == 0
         assert "không trả về điểm" in scores["A"]["reason"]
+
+    def test_solo_retry_scores_missing_arm(self) -> None:
+        """Judge cắt output khi gộp 3 arm ⇒ chấm **riêng** arm còn thiếu.
+
+        Vì sao: gộp 3 arm ⇒ JSON dài ⇒ dễ bị cắt token ⇒ arm cuối bị bỏ
+        sót ⇒ điểm 0 **giả** ⇒ số liệu bị lệch. ⇒ Fallback: gọi lại với
+        đúng 1 arm còn thiếu ⇒ output cực ngắn ⇒ không bị cắt.
+        """
+        from src.evaluation.evaluate_rag import Judge
+
+        # 3 lần gộp đều bị cắt (chỉ trả về arm A) ⇒ rồi chấm riêng arm B.
+        client = self._FakeClient(
+            [
+                {"scores": [{"arm": "A", "correctness": 2, "faithfulness": 2,
+                             "citation_precision": 1.0, "reason": "ok"}]},
+                {"scores": [{"arm": "A", "correctness": 2, "faithfulness": 2,
+                             "citation_precision": 1.0, "reason": "ok"}]},
+                {"scores": [{"arm": "A", "correctness": 2, "faithfulness": 2,
+                             "citation_precision": 1.0, "reason": "ok"}]},
+                {"scores": [{"arm": "B", "correctness": 1, "faithfulness": 2,
+                             "citation_precision": 0.5, "reason": "thiếu chi tiết"}]},
+            ]
+        )
+        judge = Judge(client)  # type: ignore[arg-type]
+        scores = judge.score(
+            question="hỏi",
+            expected_answer="đáp án",
+            candidates=[
+                {"arm": "A", "context": "ctx", "answer": "a"},
+                {"arm": "B", "context": "ctx", "answer": "b"},
+            ],
+        )
+        assert scores["B"]["correctness"] == 1
+        assert "không trả về điểm" not in scores["B"]["reason"]
 
 
 class TestAggregateJudgeMissing:
