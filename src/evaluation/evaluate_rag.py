@@ -89,6 +89,9 @@ JUDGE_PROMPT = """Bạn là giám khảo đánh giá câu trả lời hỏi đá
 ## ĐÁP ÁN THAM KHẢO (từ Wikidata — nguồn độc lập)
 {expected_answer}
 
+## CHỦ THỂ CỦA CÂU HỎI (nếu có)
+{subject_hint}
+
 ## CÁC PHƯƠNG ÁN CẦN CHẤM
 {candidates}
 
@@ -107,6 +110,9 @@ Với **mỗi** phương án, chấm:
    có trong đoạn tham chiếu, không đòi hỏi trùng văn bản.
    Nếu loại câu hỏi là `multi_turn` ⇒ câu hỏi là lượt tiếp theo trong hội thoại,
    dùng đại từ; hãy hiểu đại từ theo lượt trước trong CONTEXT (nếu có).
+   Nếu mục "CHỦ THỂ CỦA CÂU HỎI" có nêu tên ⇒ đó **chính là** đối tượng mà
+   đại từ ("ông ấy", "vị ấy"…) chỉ tới ⇒ hãy dùng tên đó để đánh giá, và
+   **không** coi câu trả lời là "tự suy diễn" khi nó nêu đúng tên đó.
 
 2. **faithfulness** (0–2): mọi mệnh đề trong câu trả lời có được CONTEXT hỗ trợ?
    - 2 = tất cả mệnh đề đều có căn cứ trong CONTEXT
@@ -1259,6 +1265,7 @@ class Judge:
         expected_answer: str,
         candidates: list[dict[str, Any]],
         question_type: str = "",
+        subject_name: str = "",
     ) -> dict[str, dict[str, Any]]:
         """Chấm điểm nhiều phương án của **cùng một câu hỏi**.
 
@@ -1267,6 +1274,9 @@ class Judge:
             expected_answer: Đáp án tham khảo.
             candidates: Danh sách `{"arm", "context", "answer"}`.
             question_type: Loại câu hỏi (`relational`, `narrative`, ...).
+            subject_name: Tên chủ thể mà đại từ trong câu hỏi chỉ tới (dùng cho
+                câu `multi_turn` — không có nó, judge coi đại từ là "không xác
+                định đối tượng" ⇒ chấm 0 cho cả 3 arm dù câu trả lời đúng).
 
         Returns:
             Dict `arm` → `{"correctness", "faithfulness", "citation_precision",
@@ -1284,6 +1294,12 @@ class Judge:
                 }
             return result
 
+        subject_hint = (
+            f"Câu hỏi dùng đại từ chỉ tới: **{subject_name}**."
+            if subject_name
+            else "(không có — câu hỏi tự nêu rõ chủ thể)"
+        )
+
         blocks: list[str] = []
         for candidate in usable:
             arm = str(candidate.get("arm"))
@@ -1300,6 +1316,7 @@ class Judge:
             ),
             question=question,
             expected_answer=expected_answer or "(không có đáp án tham khảo)",
+            subject_hint=subject_hint,
             candidates="\n\n".join(blocks),
         )
         # Judge phải chấm **đủ** mọi phương án. Nếu output JSON bị cắt (thiếu
@@ -1389,6 +1406,7 @@ class Judge:
                         ),
                         question=question,
                         expected_answer=expected_answer or "(không có đáp án tham khảo)",
+                        subject_hint=subject_hint,
                         candidates="\n\n".join(
                             f"### PHƯƠNG ÁN {c.get('arm')}\n"
                             f"CONTEXT:\n{compact_context(str(c.get('context') or '')) or '(không có context)'}\n\n"
@@ -2275,6 +2293,7 @@ def main() -> int:
                 expected_answer=str(question.get("expected_answer") or ""),
                 candidates=candidates,
                 question_type=str(question.get("type") or ""),
+                subject_name=str(question.get("subject_name") or ""),
             )
 
         # Câu còn arm lỗi hạ tầng ⇒ **không** ghi checkpoint.

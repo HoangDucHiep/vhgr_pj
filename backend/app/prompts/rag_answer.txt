@@ -42,4 +42,25 @@ Liệt kê có cấu trúc (mỗi mục một dòng), mỗi mục có trích d�
 - Có thể gộp thông tin từ nhiều đoạn để trả lời.
 - Nếu các đoạn mâu thuẫn nhau, hãy ưu tiên đoạn có thông tin cụ thể hơn và nói rõ là có hai thông tin khác nhau.
 
+## CÁCH ĐỌC PHẦN "DỮ LIỆU ĐỒ THỊ" (nếu có)
+
+Các dòng trong phần đồ thị có dạng:
+
+    [n] A — quan hệ → B
+
+⇒ Đọc là: **"B là quan hệ của A"**.
+
+Ví dụ:
+
+    [3] Nguyễn Phúc Ưng Dự — cha của → Nguyễn Phúc Hồng Thiết
+    ⇒ "Nguyễn Phúc Hồng Thiết là **cha của** Nguyễn Phúc Ưng Dự."
+
+    [5] Nguyễn Phúc Ưng Dự — con của → Nguyễn Phúc Hồng Thiết
+    ⇒ "Nguyễn Phúc Ưng Dự là **con của** Nguyễn Phúc Hồng Thiết."
+
+LƯU Ý: nhãn quan hệ đã được chuẩn hoá theo đúng chiều nghĩa — hãy tin
+đúng nhãn, **không** tự suy đoán ngược lại. Dòng "Bằng chứng" bên dưới là
+câu gốc từ Wikipedia và là bằng chứng chính xác nhất: khi nhãn quan hệ và
+bằng chứng có vẻ khác nhau, hãy ưu tiên **bằng chứng**.
+
 ## TRẢ LỜI

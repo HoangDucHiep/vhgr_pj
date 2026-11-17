@@ -37,6 +37,7 @@ from typing import Any
 
 from src.common.logger import get_logger
 
+from src.graph.direction import normalize_edges
 from src.graph.noise_filter import filter_noisy_edges
 
 logger = get_logger("src.qa.graph_context")
@@ -66,6 +67,9 @@ INVERSE_RELATION: dict[str, str] = {
 }
 
 #: Nhãn quan hệ hiển thị cho người dùng (tiếng Việt).
+#:
+#: Quy ước đọc: ``[n] {source} — {label} → {target}`` nghĩa là
+#: *"target là {label} của source"*. Ví dụ ``A — cha của → B`` ⇒ B là cha của A.
 RELATION_LABEL: dict[str, str] = {
     "cha_cua": "cha của",
     "me_cua": "mẹ của",
@@ -85,6 +89,9 @@ RELATION_LABEL: dict[str, str] = {
     "mat_tai": "mất tại",
     "dien_ra_tai": "diễn ra tại",
     "dong_doi_tai": "đóng đôi tại",
+    # Nhãn **đảo** — sinh ra khi hiển thị cạnh theo chiều ngược (D-118).
+    "con_cua": "con của",
+    "con_cua_va_me_cua": "con của",
 }
 
 #: Trần số cạnh trả về mỗi truy vấn (không vượt quy tắc `LIMIT ≤ 100`).
@@ -167,11 +174,12 @@ _INTENT_TEMPLATES: dict[str, dict[str, Any]] = {
         "description": "Quan hệ trực tiếp của entity (2 chiều)",
         "cypher": """
             MATCH (e {entity_id: $entity_id})-[r]-(other)
-            RETURN e.entity_id AS source_id,
-                   e.name AS source_name,
+            WITH startNode(r) AS s, endNode(r) AS t, r
+            RETURN s.entity_id AS source_id,
+                   s.name AS source_name,
                    type(r) AS relation,
-                   other.entity_id AS target_id,
-                   other.name AS target_name,
+                   t.entity_id AS target_id,
+                   t.name AS target_name,
                    r.confidence AS confidence,
                    r.evidence_sentence AS evidence_sentence,
                    r.source_url AS source_url,
@@ -202,11 +210,12 @@ _INTENT_TEMPLATES: dict[str, dict[str, Any]] = {
         "cypher": """
             MATCH (e {entity_id: $entity_id})-[r]-(other)
             WHERE type(r) IN $event_relations
-            RETURN e.entity_id AS source_id,
-                   e.name AS source_name,
+            WITH startNode(r) AS s, endNode(r) AS t, r
+            RETURN s.entity_id AS source_id,
+                   s.name AS source_name,
                    type(r) AS relation,
-                   other.entity_id AS target_id,
-                   other.name AS target_name,
+                   t.entity_id AS target_id,
+                   t.name AS target_name,
                    r.confidence AS confidence,
                    r.evidence_sentence AS evidence_sentence,
                    r.source_url AS source_url,
@@ -253,11 +262,12 @@ _INTENT_TEMPLATES: dict[str, dict[str, Any]] = {
         "description": "Mở rộng 1-hop từ entity của chunk",
         "cypher": """
             MATCH (e {entity_id: $entity_id})-[r]-(other)
-            RETURN e.entity_id AS source_id,
-                   e.name AS source_name,
+            WITH startNode(r) AS s, endNode(r) AS t, r
+            RETURN s.entity_id AS source_id,
+                   s.name AS source_name,
                    type(r) AS relation,
-                   other.entity_id AS target_id,
-                   other.name AS target_name,
+                   t.entity_id AS target_id,
+                   t.name AS target_name,
                    r.confidence AS confidence,
                    r.evidence_sentence AS evidence_sentence,
                    r.source_url AS source_url,
@@ -370,6 +380,8 @@ class GraphContextBuilder:
         records = _run(template["cypher"], params)
         edges = filter_noisy_edges(records)
         edges = _dedupe_edges(edges)[: self.max_edges]
+        # D-118: chuẩn hoá chiều để mốc (entity người hỏi về) luôn là chủ thể.
+        edges = normalize_edges(edges, anchor_id=entity_id)
         entities = self._entities_from_edges(edges)
         return GraphContext(
             entities=entities,
@@ -416,11 +428,12 @@ class GraphContextBuilder:
             """
             MATCH (e)-[r]-(other)
             WHERE e.entity_id IN $entity_ids
-            RETURN e.entity_id AS source_id,
-                   e.name AS source_name,
+            WITH startNode(r) AS s, endNode(r) AS t, r
+            RETURN s.entity_id AS source_id,
+                   s.name AS source_name,
                    type(r) AS relation,
-                   other.entity_id AS target_id,
-                   other.name AS target_name,
+                   t.entity_id AS target_id,
+                   t.name AS target_name,
                    r.confidence AS confidence,
                    r.evidence_sentence AS evidence_sentence,
                    r.source_url AS source_url,

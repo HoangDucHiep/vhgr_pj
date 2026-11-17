@@ -303,6 +303,12 @@ class RagAnswerer:
 
         answer = (raw or "").strip()
         cited = extract_citations(answer)
+        if not answer:
+            # LLM trả về rỗng (lỗi hạ tầng / context quá ngắn) ⇒ coi như
+            # **không có dữ liệu** thay vì để câu trả lời rỗng (D-118).
+            # Câu rỗng làm judge chấm 0 ⇒ điểm 0 "ảo" cho cả 3 arm.
+            logger.warning("LLM trả về câu trả lời rỗng — quy về not_in_data.")
+            answer = NO_DATA_ANSWER
         status = "not_in_data" if is_no_data(answer) else "found"
         if status == "found" and not cited:
             # Retry hết vẫn không trích dẫn ⇒ đánh dấu để Phase 16 đo.

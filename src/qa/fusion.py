@@ -44,6 +44,22 @@ logger = get_logger("src.qa.fusion")
 #: Tỉ lệ ngân sách ký tự dành cho phần KG (phần còn lại cho text).
 KG_BUDGET_RATIO = 0.35
 
+#: Tỉ lệ ngân sách dành cho phần KG khi chiến lược là `kg_first`.
+#:
+#: Vì sao cần hạ từ 0,60 xuống 0,40 (D-118)?
+#: ---------------------------------------------
+#: Công thức cũ dùng `text_budget = char_budget - kg_size` ⇒ khi KG **thực sự**
+#: chiếm nhiều ký tự, ngân sách text bị bóp về ~0 (đo được: câu hỏi
+#: `relational` có **98%** context là KG, chỉ còn 2% văn bản ⇒ LLM không đủ
+#: bằng chứng văn bản để trả lời và bịa hoặc trả lời "không có trong dữ liệu").
+#:
+#: Nay **cả hai** phần đều bị giới hạn bằng tỉ lệ cố định, và luôn giữ lại
+#: **ít nhất** `MIN_TEXT_RATIO` cho văn bản.
+KG_FIRST_BUDGET_RATIO = 0.40
+
+#: Ngân sách text **tối thiểu** (tỉ lệ) — bảo đảm luôn có văn bản để đối chiếu.
+MIN_TEXT_RATIO = 0.30
+
 
 @dataclass
 class FusedContext:
@@ -117,6 +133,10 @@ class FusedContext:
 def _format_edge(edge: dict[str, Any], index: int) -> str:
     """Định dạng 1 cạnh KG thành khối văn bản có số `[n]`.
 
+    Quy ước đọc: ``[n] {source} — {label} → {target}`` nghĩa
+    *"target là {label} của source"*. Cạnh đã được chuẩn hoá chiều ở
+    `src/graph/direction.py` (D-118) nên nhãn luôn đúng nghĩa.
+
     Args:
         edge: Cạnh KG.
         index: Số thứ tự (1-based).
@@ -180,18 +200,24 @@ def fuse(
         graph = GraphContext()
 
     edges = list(graph.edges)
-    kg_size = _kg_char_size(edges)
-    text_size = sum(len(item.chunk.text) + 80 for item in text_results)
 
     if strategy == "kg_first":
-        kg_budget = max(int(char_budget * 0.6), 0)
-        text_budget = max(char_budget - kg_size, 0)
+        # D-118: giới hạn **cả hai** phần bằng tỉ lệ cố định (kg 40% / text 60%)
+        # thay vì để KG chiếm hết rồi bóp text về ~0.
+        kg_budget = max(int(char_budget * KG_FIRST_BUDGET_RATIO), 0)
+        text_budget = max(char_budget - kg_budget, 0)
     elif strategy == "text_first":
         kg_budget = max(int(char_budget * KG_BUDGET_RATIO), 0)
         text_budget = max(char_budget - kg_budget, 0)
     else:
         kg_budget = max(int(char_budget * KG_BUDGET_RATIO), 0)
         text_budget = max(char_budget - kg_budget, 0)
+
+    # Luôn giữ lại tối thiểu `MIN_TEXT_RATIO` cho văn bản (D-118).
+    min_text = int(char_budget * MIN_TEXT_RATIO)
+    if text_budget < min_text:
+        kg_budget = max(char_budget - min_text, 0)
+        text_budget = min_text
 
     # 1) Phần KG — giới hạn theo ngân sách riêng.
     used_kg = 0

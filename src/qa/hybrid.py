@@ -414,6 +414,12 @@ class HybridAnswerer:
                 logger.warning("Hybrid: thiếu trích dẫn [n] — retry %d", attempt + 1)
 
         status = "not_in_data" if is_no_data(answer) else "found"
+        if not answer:
+            # LLM trả về rỗng (lỗi hạ tầng / context quá ngắn) ⇒ coi như
+            # **không có dữ liệu** thay vì để câu trả lời rỗng (D-118).
+            logger.warning("Hybrid: LLM trả về câu trả lời rỗng — quy về not_in_data.")
+            answer = NO_DATA_ANSWER
+            status = "not_in_data"
         faithfulness_ok = bool(cited) or status == "not_in_data"
         return answer, status, cited, faithfulness_ok, retries
 
