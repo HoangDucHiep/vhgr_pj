@@ -430,16 +430,20 @@ class PooledLLM:
             Danh sách khóa model ưu tiên (có thể rỗng).
         """
         cooldown = set(self.cooldown_keys())
-        fresh = [
+        # **Sắp xếp theo tên** ⇒ thứ tự ổn định giữa các vòng `--resume`.
+        # Vì sao: danh sách "còn dùng được" phụ thuộc trạng thái quota ⇒ đổi
+        # giữa các vòng ⇒ nếu chọn model theo thứ tự này thì cùng 1 câu có
+        # thể đổi model ⇒ **mất LLM cache hit** ⇒ tốn token Groq lần nữa.
+        fresh = sorted(
             key
             for key in self.keys()
             if key not in cooldown and self.errors.get(key, 0) == 0
-        ]
-        recovered = [
+        )
+        recovered = sorted(
             key
             for key in self.keys()
             if key not in cooldown and self.errors.get(key, 0) > 0
-        ]
+        )
         return fresh + recovered
 
     @staticmethod
@@ -1842,6 +1846,9 @@ def main() -> int:
         #: Danh sách arm cần **chạy lại** (chỉ arm lỗi hạ tầng) ⇒ tiết kiệm
         #: token Groq.
         retry_arms: list[str] | None = None
+        #: Câu bị **hoãn** (mọi model hết quota) ⇒ không ghi checkpoint,
+        #: để vòng sau chạy lại (nhờ `_has_infra_error` bỏ qua bản ghi lỗi).
+        deferred = False
 
         # --- Pre-check: judge có sẵn sàng không? -------------------------
         # Vì sao kiểm tra TRƯỚC khi sinh câu trả lời?
@@ -1863,9 +1870,6 @@ def main() -> int:
             deferred = True
             deferred_qids.append(qid)
             continue
-        #: Câu bị **hoãn** (mọi model hết quota) ⇒ không ghi checkpoint,
-        #: để vòng sau chạy lại (nhờ `_has_infra_error` bỏ qua bản ghi lỗi).
-        deferred = False
 
         # --- Ghim model cho cả 3 arm của câu này -----------------------
         # Vì sao: nếu arm A dùng Gemini còn arm B dùng Groq thì chênh lệch
@@ -1886,8 +1890,16 @@ def main() -> int:
                     if key not in set(gen_client.cooldown_keys())
                 ]
             if available:
-                pinned_model = available[
-                    random.Random(f"{SEED}:model:{qid}").randrange(len(available))
+                # **Thứ tự ưu tiên ổn định** (để tận dụng LLM cache):
+                # danh sách `available` phụ thuộc trạng thái quota ⇒ thay đổi
+                # giữa các vòng `--resume` ⇒ cùng 1 câu có thể đổi model
+                # ⇒ mất cache hit ⇒ tốn token Groq lần nữa. ⇒ Sắp xếp theo
+                # thứ tự **cố định** (theo tên model) rồi chọn theo seed
+                # ⇒ cùng `qid` ⇒ cùng model (nếu model đó còn quota) ⇒
+                # cache hit ⇒ **miễn phí**.
+                ordered = sorted(available)
+                pinned_model = ordered[
+                    random.Random(f"{SEED}:model:{qid}").randrange(len(ordered))
                 ]
                 gen_client.pin_strict(pinned_model)
             elif set(gen_client.keys()) <= set(gen_client.cooldown_keys()):
@@ -1982,8 +1994,9 @@ def main() -> int:
                         if key not in set(gen_client.cooldown_keys())
                     ]
                 if retry_available:
-                    pinned_model = retry_available[
-                        random.Random(f"{SEED}:model:{qid}").randrange(len(retry_available))
+                    ordered = sorted(retry_available)
+                    pinned_model = ordered[
+                        random.Random(f"{SEED}:model:{qid}").randrange(len(ordered))
                     ]
                     gen_client.pin_strict(pinned_model)
                     # (b) Đổi model ⇒ chạy lại **toàn bộ** câu.

@@ -493,6 +493,28 @@ class TestPooledLLMPinning:
 
         assert PooledLLM._retry_after_s(RuntimeError("boom")) is None
 
+    def test_healthy_keys_order_is_stable(self) -> None:
+        """Thứ tự `healthy_keys` **ổn định** theo tên model.
+
+        Vì sao: danh sách model dùng được phụ thuộc trạng thái quota ⇒ đổi
+        giữa các vòng `--resume` ⇒ nếu chọn model theo thứ tự đó thì cùng
+        1 câu có thể đổi model ⇒ **mất LLM cache hit** ⇒ tốn token Groq lần
+        nữa. ⇒ Sắp xếp theo tên ⇒ ổn định.
+        """
+        from src.evaluation.evaluate_rag import PooledLLM
+
+        pool = PooledLLM(
+            [
+                _FakeLLMClient("groq/m3"),
+                _FakeLLMClient("groq/m1"),
+                _FakeLLMClient("gemini/m2"),
+            ],
+        )
+        first = pool.healthy_keys()
+        assert first == sorted(first)
+        # Thứ tự không đổi dù pool có biến động khác.
+        assert pool.healthy_keys() == first
+
     def test_cooldown_capped_by_max_cooldown_s(self) -> None:
         """Cooldown bị **cắt** ở `max_cooldown_s` (provider báo 5h14m).
 
