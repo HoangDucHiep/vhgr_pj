@@ -357,6 +357,16 @@ Kết quả Phase 5 đã chốt:
 | % cạnh có bằng chứng | 100% | **100%** (0/13.379 thiếu — Phase 10) |
 | Cypher p95 (s) | < 2 | — (chưa đo, cần ≥100 truy vấn) |
 | End-to-end p50 (s) | < 10 | **2,5–8,0** (Phase 11) |
+| RAG — số câu benchmark | ≥ 200 | **247** (Phase 16 — đủ 5 dạng) |
+| RAG — correctness A (Vanilla) | — | **1,2915** (247 câu, LLM-judge) |
+| RAG — correctness B (Hybrid GraphRAG) | > A | **1,4372** (Δ **+0,1457**) |
+| RAG — correctness B− (Hybrid không KG) | ≈ A | **1,2955** (Δ(B vs B−) = **+0,1417**) |
+| RAG — citation_precision B | ≥ 0.70 | **0,7656** (A 0,6984 · B− 0,7085) |
+| RAG — faithfulness_rate | ≥ 0.90 | A **0,9271** · B **0,8381** (⚠️ B thấp hơn — xem D-116) |
+| RAG — no_data_accuracy | ≥ 0.90 | **0,9655** (cả 3 arm) |
+| RAG — mismatch model giữa 3 arm | 0 | **0** / 247 câu |
+| RAG — arm bị judge bỏ sót | 0 | **0** (cả 3 arm) |
+| RAG — câu lỗi hạ tầng | 0 | **0** (cả 3 arm) |
 | Faithfulness (không bịa) | ≥ 0.90 | — |
 
 ## Tài liệu liên quan
