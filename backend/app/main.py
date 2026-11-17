@@ -13,7 +13,7 @@ from typing import Any, AsyncIterator
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from backend.app.api import ask, health, lookup, stats
+from backend.app.api import ask, ask_hybrid, ask_rag, health, lookup, stats
 from backend.app.settings import get_settings
 
 
@@ -61,6 +61,8 @@ def create_app() -> FastAPI:
     app.include_router(health.router)
     app.include_router(stats.router)
     app.include_router(ask.router)
+    app.include_router(ask_rag.router)
+    app.include_router(ask_hybrid.router)
     app.include_router(lookup.router)
 
     @app.get("/")
@@ -78,6 +80,9 @@ def create_app() -> FastAPI:
                 "/api/health",
                 "/api/stats",
                 "/api/ask",
+                "/api/ask/rag",
+                "/api/ask/hybrid",
+                "/api/session/{session_id}",
                 "/api/search",
                 "/api/graph/{entity_id}",
                 "/api/entity/{entity_id}",

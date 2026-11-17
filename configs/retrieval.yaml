@@ -1,0 +1,65 @@
+# Phase 14 — Cấu hình tầng truy xuất (dùng chung cho arm A = Vanilla RAG
+# và arm B = Hybrid GraphRAG ⇒ so sánh công bằng).
+#
+# Nguồn sự thật cho `src/qa/retriever.py` và `src/qa/embed_chunks.py`.
+
+chunking:
+  documents: data/interim/documents_clean.jsonl
+  coref: data/interim/coref_resolved.jsonl
+  chunks: data/interim/chunks.jsonl
+  stats: data/interim/chunks_stats.json
+  unit: paragraph          # 1 đoạn văn = 1 chunk
+  min_chars: 1            # bỏ đoạn rỗng
+
+embedding:
+  model: sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2
+  dim: 384
+  max_length: 256
+  batch_size: 64
+  pooling: mean
+  normalize: true
+  dtype: float16
+  out: data/interim/chunk_embeddings.npy
+  meta_out: data/interim/chunk_embeddings_meta.json
+
+retrieval:
+  top_k: 8                 # số chunk đưa vào context
+  candidate_k: 50          # số candidate mỗi nhánh trước khi fusion
+
+  bm25:
+    k1: 1.5
+    b: 0.75
+    # Trọng số trường khi dựng "document" cho BM25.
+    # Đo tối ưu trên 6 câu thật: chỉ-body trượt top-1, có boost thì top-1 đúng bài.
+    field_weights:
+      title: 3
+      section: 2
+      body: 1
+    # Chỉ mục BM25 (CSR sparse) — build 1 lần offline, cache đĩa
+    index: data/interim/bm25_index.npz
+    index_meta: data/interim/bm25_index_meta.json
+    # Ngưỡng: chunk không khớp từ khoá nào ⇒ không thuộc chủ đề
+    min_keyword_hits: 1
+
+  dense:
+    enabled: true
+    weight: 1.0
+    max_query_chars: 512
+
+  fusion:
+    method: rrf             # reciprocal rank fusion
+    k: 60                   # hằng số RRF
+    # Ngưỡng: RRF score thấp hơn ⇒ coi như "không có trong dữ liệu"
+    min_rrf_score: 0.005
+    # Chunk cuối được giữ nếu điểm >= tỉ lệ này × điểm top-1
+    relative_score_floor: 0.35
+
+  # Token budget cho context (ước lượng 1 token ≈ 3 ký tự tiếng Việt)
+  context_char_budget: 12000
+
+generation:
+  max_tokens: 900
+  temperature: 0.0
+  min_citations: 1
+  faithfulness_retry: true
+  max_faithfulness_retry: 1

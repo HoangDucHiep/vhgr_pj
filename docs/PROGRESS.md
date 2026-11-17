@@ -20,16 +20,40 @@
 | 10 | Đồ thị + Neo4j (F1–F4) | ✅ Xong (nạp lại 16/11) | 16/11/2026 | **19.548 node / 13.379 edge** · validate **13/13 PASS** · idempotent **+0/+0** · 0 orphan · 0 node thiếu `wiki_url` |
 | 11 | Text-to-Cypher backend (G1–G4/G6/G8) | ✅ Xong | 15/11/2026 | `POST /api/ask` đúng contract · **49/49** test validator · 4/4 câu mẫu đúng · 100% Cypher có `LIMIT ≤ 100` · end-to-end **2,5–8,0 s** · `/api/search` `/api/graph/{id}` `/api/entity/{id}` |
 | 12 | Giao diện web (H1–H4) | ✅ Xong | 15/11/2026 | **7 component + 2 page** · `tsc --noEmit` **0 lỗi** · `npm run build` ✓ · 4/4 hành vi H1–H4 hoạt động · Cytoscape render node theo label |
-| 13 | Đánh giá (I3/I4) | ⬜ Chưa bắt đầu | — | — |
-| 14 | Mở rộng + đóng gói | ⬜ Chưa bắt đầu | — | — |
+| 13 | **Sửa chất lượng** (entity linking · chiều đảo · lọc nhiễu KG) | ✅ Xong | 17/11/2026 | **12/12** ca lỗi demo → 0 · alias 13.760 → **13.582** (−178) · exact-case + 176 alias thường + 42 đại từ · chiều đảo: **5/5** con Trần Nhân Tông · lọc **23** cạnh nhiễu (0 tổn thương đúng) · guard chống trả N người ngẫu nhiên · **644 test pass** |
+| 14 | **Vanilla RAG (nhánh A)** | ✅ Xong | 17/11/2026 | **65.608 chunk** (1 đoạn = 1 chunk, giữ ranh giới `section`; kế hoạch ghi 101.628 — xem deviations D-105) · MiniLM-L12 **384-dim** float16 · BM25 (title×3 + section×2 + body×1) + dense + **RRF k=60** · `POST /api/ask/rag` ✓ · top-1 đúng bài 6/6 câu thật · **700 test pass** · D-099, D-100 |
+| 15 | **Hybrid GraphRAG (nhánh B)** | ✅ Xong | 17/11/2026 | Kênh KG = **template Cypher tất định** + mở rộng 1-hop (bài Bạch Đằng: **30 entity → 60 cạnh / 0,11 s**) · 6 ý định · fusion `text_first`/`kg_first` với **không gian `[n]` liên tục** · hội thoại nhiều lượt (`SessionStore` + query rewriting) · `POST /api/ask/hybrid` + `GET /api/session/{id}` ✓ · D-101, D-102 |
+| 16 | **Đánh giá A vs B vs B− (LLM-judge)** | 🟡 Đang làm | 17/11/2026 | Bộ câu hỏi **247 câu / 5 dạng** (60 narrative · 60 multi_turn · 58 relational · 40 multi_hop · 29 no_data) từ Wikidata (độc lập KG) · judge **gộp 3 arm/câu** + hoán vị thứ tự theo `qid` (seed 42) · pool LLM **đa provider** (Gemini + Groq) + **ghim model theo câu** + **tách session theo arm** + **loại lỗi hạ tầng khỏi mẫu số** · **retry judge khi thiếu arm** (`n_judge_missing`) + `scripts/rejudge_missing.py` · **loại câu có confound model** (`n_model_mismatch`) · D-103, D-104, D-106, D-108, D-109, D-111 |
+| 17 | **Giao diện so sánh + đóng gói** | ✅ Xong | 17/11/2026 | Toggle **A / B / B−** · `CitationPanel` click-to-source (phân biệt `KG` / `Văn bản`) · đồ thị 1-hop từ `KgGraph` · `npm run typecheck` **0 lỗi** · `npm run build` ✓ · `docker compose up` 3 service healthy (`/api/health` → `neo4j: up`, frontend HTTP 200) · 2 ảnh demo trong `reports/screenshots/` · D-099..D-103 |
 
 Ký hiệu: ⬜ chưa · 🟡 đang làm · ✅ xong (đạt Gate) · ⚠️ xong nhưng lệch kế hoạch (xem `reports/deviations.md`)
 
 ## Việc tiếp theo
 
-**Phase hiện tại: Phase 8 — Mô hình RE, LLM bulk, hợp nhất triple (D1/D2/D3)** — ✅ **đã đóng Gate (11/11) — 16/11/2026**.
+**Phase hiện tại: Phase 16 — Đánh giá A vs B vs B− (LLM-judge)** + **Phase 17 — Giao diện + đóng gói** — 17/11/2026.
 
-Chi tiết ở `docs/09-ke-hoach-thuc-thien.md` → mục "Phase 8".
+> **Định hướng mới (chốt 16/11/2026):** so sánh **Vanilla RAG (A)** vs **Hybrid GraphRAG (B)** vs **Hybrid không KG (B−)**.
+> Nhánh Text-to-Cypher không còn là arm so sánh.
+
+Chi tiết ở `docs/09-ke-hoach-thuc-thien.md` → mục "Phase 16" và "Phase 17".
+
+Lệnh chạy đánh giá (Phase 16):
+```bash
+./.venv/bin/python -m src.evaluation.build_qa_set
+./.venv/bin/python -u -m src.evaluation.evaluate_rag \
+  --qa-set data/eval/qa_rag_250.jsonl --arms A,B,B- --reset-sessions \
+  --gen-pool "gemini:gemini-3.1-flash-lite,gemini-3.1-flash-lite-preview,gemini-3-flash-preview;groq:openai/gpt-oss-120b,qwen/qwen3.8-27b,openai/gpt-oss-20b" \
+  --judge-pool "gemini:gemini-3.1-flash-lite,gemini-3.1-flash-lite-preview,gemini-3-flash-preview;groq:openai/gpt-oss-120b,qwen/qwen3.8-27b" \
+  --checkpoint data/eval/eval_rag_checkpoint.jsonl --resume \
+  --infra-retries 3 --infra-retry-wait-s 45 --stamp phase16
+```
+> ⚠️ Quota free tier **không đủ** nếu dùng 1 provider: Gemini 500 RPD/**model**,
+> Groq `gpt-oss-20b` 200K TPD ⇒ dùng pool **đa provider** — D-108.
+>
+> Sau khi run xong: `scripts/rejudge_missing.py` (chấm lại arm bị judge bỏ sót)
+> → `scripts/rebuild_phase16_report.py` → `scripts/make_phase16_log.py`.
+
+**Phase 8 (đã đóng Gate 11/11 — 16/11/2026)** — xem `docs/10-nhat-ky/phase-08.md`.
 
 > Báo cáo: `reports/phase_08_report.md` · Nhật ký: `docs/10-nhat-ky/phase-08.md` ·
 > Chấm Gate máy đọc được: `reports/phase_08_gate_check.json` ·
@@ -285,6 +309,7 @@ Kết quả Phase 5 đã chốt:
 | 15/11/2026 | 10 | **Hoàn thành Phase 10** — Đồ thị + Neo4j (F1–F4) | **19.758 node / 12.313 edge** trong Neo4j · **13/13** kiểm tra validate PASS (0 node thiếu prop, 0 edge thiếu bằng chứng, 0 quan hệ ngoài danh mục 18, 0 self-loop) · nạp **3 lần** → **+0/+0** (idempotent) · nạp 8,3 phút · user `reader` bị chặn ghi (`Neo.ClientError.Statement.AccessMode`) · sửa: node thiếu `wiki_url` 14.167 → **0**; mâu thuẫn năm âm lịch 3 → **0**; `SET n = {}` để DB khớp artifact. **D-074** (force-recreate container Neo4j) · **D-076** (Neo4j Community không APOC → gom theo 9 label + 18 quan hệ, Cypher tĩnh). Sai lệch: edge 12.313 < 50.000; nạp 50k ≈ 34 phút (> Gate 10 phút). Báo cáo: `reports/phase_10_report.md` · Nhật ký: `docs/10-nhat-ky/phase-10.md` |
 | 15/11/2026 | 11 | **Hoàn thành Phase 11** — Text-to-Cypher backend (G1–G4, G6, G8) | `POST /api/ask` trả đúng output contract · **49/49 test** validator (25 payload độc hại chặn hết · 12 Cypher hợp lệ pass) · 4/4 câu mẫu đúng `status`: "Lê Lợi sinh năm nào?" → **1385** · "Lê Lợi là vua nhà nào?" → **Nhà Lê sơ** · "Ai là vua năm 1855?" → `not_in_data` · "MATCH (n) DETACH DELETE n" → `error` · **100%** Cypher có `LIMIT ≤ 100` · 0 quan hệ ngoài danh mục · end-to-end **2,5–8,0 s** (Gate p50 <10 s) · thêm `/api/search`, `/api/graph/{id}`, `/api/entity/{id}` · 3 lớp bảo vệ: validator tĩnh → session READ → prompt. **D-077**. Chưa đo G1 (execution accuracy) + p95 — cần tập câu hỏi có đáp án. Báo cáo: `reports/phase_11_report.md` · Nhật ký: `docs/10-nhat-ky/phase-11.md` |
 | 15/11/2026 | 12 | **Hoàn thành Phase 12** — Giao diện web (H1–H4) | **7 component + 2 page** (`ChatPanel`, `MessageBubble`, `CypherBlock`, `GraphView` Cytoscape, `EntityCard`, `EvidencePanel`, `Legend`; `Home`, `EntityPage` `/entity/:id`) · `tsc --noEmit` **0 lỗi** · `npm run build` **✓ 1,89 s** (46 modules, JS 624 kB gzip 202 kB) · **4/4** hành vi H1–H4 hoạt động, xác nhận end-to-end trên trình duyệt ("Lê Lợi sinh năm 1385." 7.986 ms) · UI 100% tiếng Việt · node chưa xác minh viền đứt · mở rộng láng giềng ≤ 30 node. **D-078**. Sai lệch: dùng `useState` thay TanStack Query (rule `frontend.mdc`). Báo cáo: `reports/phase_12_report.md` · Nhật ký: `docs/10-nhat-ky/phase-12.md` |
+| 17/11/2026 | 13 | **Hoàn thành Phase 13** — sửa chất lượng (entity linking · chiều đảo quan hệ · lọc cạnh nhiễu KG) | **12/12** ca lỗi người dùng báo → hết · **19 test** regression mới · **644 test** tổng pass (0 fail) · KG **không đổi**: 19.548 node / 13.379 cạnh. (a) **Exact-case ở lớp giữ dấu** (`_case_pattern_ok`) + loại **176** alias toàn-chữ-thường + chặn **42** đại từ ⇒ alias **13.760 → 13.582**; fix false positive (Đổi mới đất nước → Đổi Mới, Ông ấy → George H. W. Bush), giữ true positive (Trần Hưng Đạo, triều Lê, Le Loi không dấu); (b) **bảng chiều đảo 19 dòng** + 6 few-shot ngược trong prompt ⇒ câu hỏi về con của Trần Nhân Tông trả **5/5** con đúng (verify trực tiếp Neo4j); (c) **bộ lọc cạnh nhiễu** (`src/graph/noise_filter.py`) ở **TẦNG ĐỌC** (D-095) — 3.518 cạnh địa danh → lo **23** (11 Quốc lộ 14 + 2 bệnh viện + 10 tên rác LLM), **0** địa danh hợp lệ bị lo nhầm (giữ Vạn Kiếp, Trường An, Nghi Lộc (huyện), Đại Việt); so sánh 3 phương án: theo QID **1.405** / theo nhãn **126** / theo ngữ nghĩa **23**; (d) **guard chống bịa** (`has_filtering_predicate`) — câu đại từ trước trả 10 người ngẫu nhiên, sau trả `not_in_data` + hướng dẫn (D-096). Sai lệch D-095 → D-098. Báo cáo: `reports/phase_13_report.md` · Nhật ký: `docs/10-nhat-ky/phase-13.md` · Số liệu: `docs/10-nhat-ky/so-lieu/phase-13-chat-luong-kien-thuc.json` |
 | 13/11/2026 | 0 | Bootstrap repo, cấu hình, hạ tầng | 56 test pass · Neo4j 5.26.32 ở `:7474` · `/api/health` → `ok`/`neo4j: up` · `READ_ACCESS` chặn ghi ở cấp server ✅ · `npm run build` 0 lỗi TS. Báo cáo: `reports/phase_00_report.md` |
 | 14/11/2026 | 0–1 | Tạo `docs/10-nhat-ky/` — nhật ký triển khai chi tiết cho báo cáo/slide | Nhật ký chi tiết Phase 0 & 1 (quyết định, thang số liệu so sánh A/B/C/D, lỗi & bài học) + `so-lieu/*.json` máy đọc được. Xem `docs/10-nhat-ky/README.md` |
 | 14/11/2026 | — | Cập nhật rules/skills để bắt buộc ghi nhật ký sau mỗi phase | `workflow-phases.mdc` (bước 7 + mục "Định dạng nhật ký"), `run-phase/SKILL.md` (Bước 7 mới), `check-context/SKILL.md`, `data-contracts.mdc` (hợp đồng JSON `so-lieu/`), `docs/09` + `AGENTS.md` |
@@ -321,6 +346,12 @@ Kết quả Phase 5 đã chốt:
 | Alias hit rate (linking) | ≥ 0.60 | **0,7282** (Phase 9) |
 | Linking accuracy | ≥ 0.85 | **0,8049** (Phase 9, auto-gold; chưa đạt) |
 | QA execution accuracy | ≥ 0.70 | — (Phase 11: 4 câu mẫu 4/4 đúng `status`) |
+| Entity linking — false positive (exact-case) | 0 | **0** / 12 ca regression (Phase 13; trước: Đổi mới đất nước → Đổi Mới, Ông ấy → George H. W. Bush) |
+| Entity linking — alias toàn-chữ-thường trong chỉ mục | 0 | **0** (Phase 13; trước: 211) |
+| Alias đại từ trong chỉ mục | 0 | **0** (Phase 13; trước: 2) |
+| Quan hệ đảo chiều (con của X) | 5/5 | **5/5** (Phase 13, verify Neo4j) |
+| Cạnh nhiễu KG lọc khỏi context | 0 | **0** (Phase 13; lo 23 cạnh ở tầng đọc) |
+| Câu hỏi không có entity cụ thể | `not_in_data` | **`not_in_data`** (Phase 13, guard D-096) |
 | Số node KG | 5k–30k | **19.548** (Phase 10, nạp lại 16/11/2026) |
 | Số cạnh KG | 50k–200k | **13.379** (thấp hơn mục tiêu — đánh đổi có chủ đích do bộ lọc chất lượng, xem D-083) |
 | % cạnh có bằng chứng | 100% | **100%** (0/13.379 thiếu — Phase 10) |

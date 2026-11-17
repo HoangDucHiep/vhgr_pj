@@ -54,8 +54,8 @@ export default function Home(): JSX.Element {
         <div>
           <h1>Knowledge Graph Lịch sử Việt Nam</h1>
           <p className="page__subtitle">
-            Hỏi đáp Text-to-Cypher — 9 triều đại, 18 quan hệ, mọi cạnh đều có
-            bằng chứng.
+            Hỏi đáp <strong>Vanilla RAG</strong> vs <strong>Hybrid GraphRAG</strong> (văn bản
+            + Knowledge Graph) — 9 triều đại, 18 quan hệ, mọi cạnh đều có bằng chứng.
           </p>
         </div>
         <div className="page__stats">

@@ -5,20 +5,24 @@
 
 ## 1. Trạng thái hiện tại
 
+> **Định hướng đề tài (chốt 16/11/2026): so sánh Vanilla RAG vs Hybrid GraphRAG.**
+> Nhánh "KG thuần / Text-to-Cypher" **không còn là arm so sánh** — trở thành **kênh KG bên trong Hybrid**.
+> `POST /api/ask` giữ nguyên làm tính năng phụ.
+
 | Hạng mục | Trạng thái |
 |---|---|
-| Giai đoạn | **Đang triển khai** — Phase 1–12 xong (16/11/2026) |
-| Phase hiện tại | **Phase 8 — Mô hình RE, LLM bulk, hợp nhất triple (D1/D2/D3)** — 🟢 **đã đóng** (19/19 Gate, 12/12 mục objective đối chiếu PASS) |
-| Phase đã xong | 0 Bootstrap · 1 Lọc bài · 2 Làm sạch+tách câu · 3 Infobox · 4 Nhãn bạc NER · 5 Huấn luyện+suy luận NER · **6 Coreference (C1/C2)** · **7 Wikidata DS + tập train RE (D1.1)** · **8 Mô hình RE + LLM + hợp nhất triple (D1/D2/D3)** · 9 Entity linking · 10 Đồ thị + Neo4j · 11 Text-to-Cypher backend · 12 Giao diện web |
-| Tài liệu | `docs/00` … `docs/09` đã hoàn thành · `docs/10-nhat-ky/` nhật ký triển khai chi tiết theo phase |
+| Giai đoạn | **Đang triển khai** — Phase 1–17 trong khuôn khung mới (17/11/2026) |
+| Phase hiện tại | **Phase 16 — Đánh giá A vs B vs B− (LLM-judge)** · **Phase 17 — Giao diện + đóng gói** |
+| Phase đã xong | 0 Bootstrap · 1 Lọc bài · 2 Làm sạch+tách câu · 3 Infobox · 4 Nhãn bạc NER · 5 Huấn luyện+suy luận NER · 6 Coreference · 7 Wikidata DS + tập train RE · 8 Mô hình RE + LLM + hợp nhất triple · 9 Entity linking · 10 Đồ thị + Neo4j · 11 Text-to-Cypher backend · 12 Giao diện web · **13 Sửa chất lượng nền tảng (linking exact-case, chiều đảo quan hệ, lọc nhiễu KG)** · **14 Vanilla RAG (chunking + embedding + BM25/dense/RRF + sinh câu trả lời)** · **15 Hybrid GraphRAG (KG template + intent + fusion + hội thoại)** |
+| Tài liệu | `docs/00` … `docs/09` (đã đánh số lại 13–17) · `docs/10-nhat-ky/` nhật ký triển khai chi tiết theo phase |
 | Môi trường | Python 3.12.3, Docker 29.9.2, Node 24.15, RAM 23GB, đĩa 2.5TB, **không GPU local** |
 | Hạ tầng | `.venv` đã tạo + cài `requirements.txt` ✅ · Neo4j 5.26.32 Community ở `:7474`/`:7687` ✅ · user `reader` đã tạo ✅ |
-| Backend | FastAPI chạy ở `:8000` — `/api/health` → `{"status":"ok","neo4j":"up"}` ✅ |
-| Frontend | Vite + React 18 + TS — `npm run build` 0 lỗi ✅ |
+| Backend | FastAPI chạy ở `:8000` — `/api/health` → `{"status":"ok","neo4j":"up"}` ✅ · `/api/ask/rag` ✅ · `/api/ask/hybrid` ✅ · `/api/session/{id}` ✅ |
+| Frontend | Vite + React 18 + TS — `npm run build` 0 lỗi ✅ · toggle A/B/B− + citations click-to-source ✅ |
 | Kaggle | `KAGGLE_USERNAME=hoangduchiep` + `KAGGLE_KEY` trong `.env` ✅ (auth bằng `Authorization: Bearer`) — ⚠️ CLI ≥ 2.2: `~/.kaggle/access_token` **đè** env ⇒ phải `env -u KAGGLE_USERNAME -u KAGGLE_KEY KAGGLE_API_TOKEN=<tok>` (D-089) |
 | API key | `GEMINI_API_KEY`, `GROQ_API_KEY` trong `.env` ✅ |
-| Test | `pytest -q tests/` → **625 passed** (480 Phase 7 + 76 Phase 8 + 7 entity linker + 8 kaggle LLM notebook + 1 `alt_evidence` regression) |
-| Số liệu hiện tại | 2.441 bài · 186.960 câu · 10.078 triple infobox · 143.108 entity NER · **197.610 mention coref** (resolve 69,62%) · **15.580 mẫu POSITIVE RE** / 17 quan hệ · **25.947** ví dụ train RE (19 đầu) · **13.379** triple hợp nhất (13 trường) · KG **19.548 node / 13.379 edge** |
+| Test | `pytest -q tests/` → **700 passed** (Phase 13 thêm 19 regression; Phase 14/15 thêm test chunking/retriever/hybrid) |
+| Số liệu hiện tại | 2.441 bài · 186.960 câu · **65.608 chunk** (1 đoạn = 1 chunk; kế hoạch ghi 101.628 — thực tế thấp hơn vì `min_chars=40` loại đoạn stub, xem `reports/deviations.md` D-105) · **65.608 chunk đã embed** (MiniLM-L12, 384-dim float16) · 10.078 triple infobox · **13.379** triple hợp nhất (13 trường) · KG **19.548 node / 13.379 edge** · bộ đánh giá **247 câu / 5 dạng** (`data/eval/qa_rag_250.jsonl`) |
 
 ## 2. Quyết định đã chốt (KHÔNG đổi nếu không có lý do ghi vào DECISIONS.md)
 
@@ -213,6 +217,20 @@ Chi tiết đầy đủ: `docs/04-schema-knowledge-graph.md`.
 
 ## 3. Chỉ số mục tiêu
 
+### 3.1. Chỉ số chính của đề tài mới (RAG vs GraphRAG — Phase 16)
+
+| Chỉ số | Mục tiêu | Thực tế |
+|---|---|---|
+| `correctness(B)` (LLM-judge 0–2) | **> `correctness(A)`** | xem `reports/eval_rag_*.md` |
+| `correctness(B−)` | nằm giữa A và B (chứng minh đóng góp đến từ **kênh KG**) | xem `reports/eval_rag_*.md` |
+| `faithfulness_rate` | ≥ 0.90 | xem `reports/eval_rag_*.md` |
+| `citation_precision` | ≥ 0.70 | xem `reports/eval_rag_*.md` |
+| `no_data_accuracy` | ≥ 0.90 | xem `reports/eval_rag_*.md` |
+| `latency_p95` | < 6 s | xem `reports/eval_rag_*.md` |
+| Bộ câu hỏi đánh giá | 250 câu / 5 dạng | **247 câu** (`data/eval/qa_rag_250.jsonl`) — 60 narrative · 60 multi_turn · 58 relational · 40 multi_hop · 29 no_data |
+
+### 3.2. Chỉ số pipeline (giai đoạn trước)
+
 | Chỉ số | Mục tiêu | Thực tế |
 |---|---|---|
 | NER F1 (token-level) | ≥ 0.85 | 0,6832 (Phase 5) |
@@ -225,7 +243,7 @@ Chi tiết đầy đủ: `docs/04-schema-knowledge-graph.md`.
 | Text-to-Cypher execution accuracy | ≥ 0.70 |
 | Cypher p95 | < 2s |
 | End-to-end p50 | < 10s |
-| % cạnh có bằng chứng | 100% |
+| % cạnh có bằng chứng | 100% | **100%** (`validate_graph.py` 13/13 PASS) |
 
 ## 4. Câu hỏi đang mở
 

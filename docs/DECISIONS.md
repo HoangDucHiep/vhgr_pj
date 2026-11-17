@@ -1417,3 +1417,317 @@ Phase 10.
 `tests/test_merge_triples.py` (+1 test regression),
 `AGENTS.md` §7, `data/interim/triples_merged.jsonl`, `data/knowledge_base/graph.jsonl`,
 Neo4j (3.308 edge nay có `alt_evidence`).
+
+---
+
+## D-095 — Lọc cạnh nhiễu KG ở **TẦNG ĐỌC**, không xoá khỏi Neo4j
+
+**Ngày:** 17/11/2026 · **Phase:** 13
+
+**Bối cảnh.** KG có 23 cạnh sai nghĩa, điển hình:
+`Trần Hưng Đạo -mat_tai-> Quốc lộ 14` (11 cạnh), `sinh_tai -> "Lang hoi
+khanh"` (10 tên rác do LLM sinh), `mat_tai -> "Bệnh viện Trung ương Quân đội
+108"` (2 cạnh).
+
+**Quyết định.** Không xoá cạnh khỏi Neo4j. Thay vào đó, mọi kênh đọc KG đi qua
+`src/graph/noise_filter.py`:
+
+| Hàm | Dùng ở đâu |
+|---|---|
+| `filter_noisy_edges(edges)` | Dựng đồ thị cho UI / context KG |
+| `filter_noisy_records(records)` | Kết quả truy vấn trả về cho người dùng |
+| `noisy_edge_cypher_filter()` | Điều kiện `WHERE` cho truy vấn mở rộng 1-hop (Phase 15) |
+
+**Tiêu chí nhiễu (2 tầng):**
+
+- **F1** — object có nhãn `Entity` (tên rác do LLM sinh) trong quan hệ địa danh.
+- **F2** — object là hạ tầng/cơ quan ("Quốc lộ …", "Bệnh viện …", "Trường Đại
+  học …") trong quan hệ sinh/mất.
+
+**Lý do.**
+1. Gate Phase 13 yêu cầu KG **không đổi** (19.548 node / 13.379 cạnh) để giữ
+   khả năng tái lập artifact.
+2. Xoá trong DB mất dấu vết audit — mọi lỗi KG đều nên **sửa ở pipeline rồi
+   nạp lại**, không sửa tay trong DB (`AGENTS.md` §11).
+3. Bộ lọc theo **ngữ nghĩa** loại 23 cạnh mà không tổn thương địa danh hợp lệ
+   (giữ "Vạn Kiếp", "Trường An", "Đường Lâm", "Nghi Lộc (huyện)", "Đại Việt").
+
+**Ảnh hưởng:** file mới `src/graph/noise_filter.py`;
+`backend/app/services/text_to_cypher.py` (2 điểm gọi + truy vấn edge lấy
+thêm `b.name`/`labels(b)`). Số liệu: `docs/10-nhat-ky/so-lieu/phase-13-chat-luong-kien-thuc.json`.
+
+---
+
+## D-096 — Exact-case ở lớp khớp giữ dấu + chặn alias toàn-chữ-thường + chặn đại từ
+
+**Ngày:** 17/11/2026 · **Phase:** 13
+
+**Bối cảnh.** Lỗi demo 16/11/2026:
+- "Đổi mới đất nước" → entity "Đổi Mới" (`ent_doi_moi_1b2ad4f7`)
+- "Ông ấy" → `ent_george_h_5df82ed5` (George H. W. Bush)
+
+Nguyên nhân: `_match(keep_accents=True)` dùng `text.casefold()` ⇒ **mất thông
+tin hoa/thường**, không kiểm tra chữ hoa.
+
+**Quyết định.** 3 lớp, mỗi lớp bắt một nhóm lỗi:
+
+1. **Exact-case**: khớp case-sensitive trên `text` gốc; mỗi từ trong span
+   phải viết hoa đúng như bề mặt alias, trừ từ chức năng `LOWERCASE_OK_WORDS`.
+2. **Loại alias toàn-chữ-thường**: alias mà **mọi** bề mặt gốc đều viết
+   thường và ≥ 2 từ ("chiến thắng", "triều đại", "phong kiến"…) — 176 alias.
+3. **Chặn đại từ**: `PRONOUN_ALIASES` (42 bề mặt: "ông ấy", "ông ta",
+   "vị vua đó"…) — đại từ là **vị trí cần điền từ ngữ cảnh hội thoại**
+   (Phase 15), không phải thứ tra cứu trong KG.
+
+**Lý do.** Ba lớp độc lập, đo được riêng: alias 13.760 → 13.582 (−178);
+false positive đã biết 2 → 0; true positive giữ nguyên ("Trần Hưng Đạo",
+"triều Lê", "Trần Nhân Tông", "Le Loi" không dấu).
+
+**Ảnh hưởng:** `backend/app/services/entity_linker.py` — thêm
+`PRONOUN_ALIASES`, `_case_pattern_ok()`, đổi logic `_match()`. Chỉ mục entity
+**không** bị sửa ⇒ Phase 9/10 không cần nạp lại.
+
+---
+
+## D-097 — Bảng chiều đảo quan hệ đưa vào prompt Text-to-Cypher
+
+**Ngày:** 17/11/2026 · **Phase:** 13
+
+**Bối cảnh.** "Ai là con của Trần Nhân Tông" không được, chỉ "ai là cha" mới
+được. Nguyên nhân: KG lưu quan hệ gia đình **MỘT CHIỀU** (`cha_cua`: subject =
+cha), còn prompt chỉ có few-shot chiều thuận.
+
+**Quyết định.** Thêm bảng tra cứu 19 dòng vào
+`backend/app/prompts/text_to_cypher.txt` (câu hỏi chiều ngược → quan hệ →
+cách viết Cypher đảo mũi tên) + 6 few-shot ngược + quy tắc "hỏi người **bị
+tác động** ⇒ đảo mũi tên; hỏi người **thực hiện** ⇒ giữ chiều".
+
+**Lý do.** Cypher đảo chiều đã verify **5/5 con đúng** cho Trần Nhân Tông
+(`MATCH (p)<-[:cha_cua|me_cua]-(c)`). Đưa bảng vào prompt rẻ hơn nhiều so với
+để LLM tự suy luận chiều, và **tất định** (không có biến thiên giữa 2 lần chạy).
+
+**Ảnh hưởng:** `backend/app/prompts/text_to_cypher.txt`. Phase 15 dùng lại
+đúng bảng này làm **template Cypher tất định** cho kênh KG trong Hybrid.
+
+---
+
+## D-098 — Guard "Cypher phải lọc theo giá trị cụ thể" ⇒ `not_in_data`
+
+**Ngày:** 17/11/2026 · **Phase:** 13
+
+**Bối cảnh.** Khi câu hỏi không xác định được entity nào (đại từ), LLM sinh
+`MATCH (p:Person) WHERE p.death_year IS NOT NULL RETURN … LIMIT 10` ⇒ trả về
+**10 người bất kỳ**. Người dùng thấy "có dữ liệu" nhưng nội dung không liên
+quan — vi phạm nguyên tắc #3 (`AGENTS.md` §5: không bịa).
+
+**Quyết định.** `has_filtering_predicate()` trong
+`backend/app/services/cypher_validator.py`. Cypher chỉ hợp lệ khi lọc theo
+**giá trị cụ thể**: `entity_id`, so sánh số, so sánh chuỗi, `CONTAINS`, `IN`,
+`COUNT(...)`. `IS NOT NULL` **không** đủ. Không đạt ⇒ trả `not_in_data` kèm
+hướng dẫn, **không retry** (LLM lặp lại cùng dạng câu ⇒ lãng phí quota).
+
+**Lý do.** Bảo vệ nguyên tắc "không bịa" ở **tầng ứng dụng**, không phụ thuộc
+vào LLM tự kiêng dè. Chi phí: 0 request LLM thêm.
+
+**Ảnh hưởng:** `backend/app/services/cypher_validator.py` (+1 hàm),
+`backend/app/services/text_to_cypher.py` (1 nhánh guard).
+---
+
+## D-099 — Đơn vị chunk = **1 đoạn văn** (không gộp 1000 ký tự), giữ ranh giới `section`
+
+**Ngày:** 17/11/2026 · **Phase:** 14
+
+**Bối cảnh.** Bộ gộp đoạn (~1000 ký tự) làm mất ranh giới `section`: bài
+"Trận Bạch Đằng (1288)" (`doc_136933`) rơi vào section `Ý kiến khác về Ghềnh
+Cốc` thay vì `Diễn biến trận đánh` ⇒ câu hỏi "diễn biến trận Bạch Đằng"
+không thể trả lời đúng. Đã verify ánh xạ đoạn→section là **1:1 chính xác**
+(`paragraphs[i].heading == True` khớp tuần tự `doc['headings'][k]['title']`):
+10/10 ở `doc_136933`, toàn corpus 8.293 section-title, 145 bài có section
+`Diễn biến`.
+
+**Quyết định.** `src/qa/chunking.py` sinh **1 chunk = 1 đoạn văn**
+(101.628 chunk), mỗi chunk mang `section`, `section_path`, `entity_ids`,
+`source_url`, `title`.
+
+**Lý do.** Bộ gộp có độ phủ entity 81,8% (cao hơn) nhưng **mất ranh giới
+section** ⇒ retriever không biết "đoạn nào thuộc section Diễn biến". Ưu tiên
+**ranh giới ngữ nghĩa** hơn độ phủ entity.
+
+**Ảnh hưởng:** `src/qa/chunking.py`, `data/interim/chunks.jsonl` (11 trường),
+`configs/retrieval.yaml` (`chunking.unit: paragraph`).
+
+---
+
+## D-100 — Cùng **một** `Retriever` cho arm A và arm B ⇒ so sánh công bằng
+
+**Ngày:** 17/11/2026 · **Phase:** 14/15
+
+**Bối cảnh.** Nếu A và B dùng 2 retriever khác nhau thì chênh lệch kết quả có
+thể do retriever chứ không do KG ⇒ **không chứng minh được** luận điểm "KG
+bổ sung cho RAG".
+
+**Quyết định.** `Retriever` được khởi tạo **một lần** và chia sẻ cho
+`RagAnswerer` (arm A) và `HybridAnswerer` (arm B/B−). Thêm **arm B−**
+(Hybrid nhưng `use_graph=False`) để tách đóng góp của *đồ thị* khỏi đóng góp
+của *prompt/fusion*.
+
+**Lý do.** Ablation 3 nhánh A / B / B− là thiết kế tối thiểu để trả lời
+"chênh lệch đến từ đồ thị hay từ prompt". B− dùng **cùng** `HybridAnswerer`,
+**cùng** prompt, **cùng** retriever — chỉ tắt kênh KG.
+
+**Ảnh hưởng:** `src/evaluation/evaluate_rag.py`, `backend/app/api/ask_hybrid.py`
+(tham số `use_graph`).
+
+---
+
+## D-101 — Kênh KG của Hybrid = **template Cypher tất định**, không LLM sinh Cypher
+
+**Ngày:** 17/11/2026 · **Phase:** 15
+
+**Bối cảnh.** Text-to-Cypher dùng LLM sinh Cypher ⇒ có biến thiên giữa 2 lần
+chạy, có lỗi cú pháp, và chiều quan hệ có thể sai (đã gặp: "con của" ↔
+"cha của"). Đã verify Cypher đảo chiều cho Trần Nhân Tông cho **5/5 con
+đúng**.
+
+**Quyết định.** `src/qa/graph_context.py` dùng **template Cypher tất định**
+theo ý định, dựa trên bảng chiều đảo của D-097. Mở rộng **1-hop** từ
+`entity_ids` của chunk đã truy xuất.
+
+**Lý do.** Đảo chiều chính xác 100%, không có biến thiên LLM giữa 2 nhánh ⇒
+so sánh công bằng; nhanh 0,11 s; **không tốn quota** LLM.
+
+**Số liệu.** Bài Bạch Đằng: **30 entity → 60 cạnh trong 0,11 s**, gồm
+`Trần Hưng Đạo -chi_huy_tran-> Trận Bạch Đằng (1288)`,
+`Ô Mã Nhi -chi_huy_tran-> …`, `Trận Bạch Đằng -dien_ra_tai-> Sông Bạch Đằng`
+— mỗi cạnh có `evidence_sentence`.
+
+**Ảnh hưởng:** file mới `src/qa/graph_context.py`.
+
+---
+
+## D-102 — Không gian trích dẫn `[n]` **dùng chung** cho văn bản và KG
+
+**Ngày:** 17/11/2026 · **Phase:** 15
+
+**Bối cảnh.** Nếu văn bản dùng `[1..N]` và KG dùng `[1..M]` riêng thì người
+dùng không phân biệt được trích dẫn nào từ đâu, và LLM dễ trộn.
+
+**Quyết định.** `src/qa/fusion.py` (`FusedContext`) đánh số **liên tục**
+`[1..N]` trên cả text lẫn KG, theo chiến lược:
+- `text_first` (ý định `narrative`): text `[1..M]` rồi KG `[M+1..N]`.
+- `kg_first` (ý định `relational`, `count`): KG `[1..M]` rồi text `[M+1..N]`.
+
+`FusedContext.to_text()` sắp xếp **theo `block["n"]`** (không hard-code thứ tự
+text trước KG) — nếu không, trong `kg_first` các khối KG sẽ nằm **sau** text
+trong prompt trong khi số `[n]` của chúng lại nhỏ hơn ⇒ LLM trích dẫn sai
+chỉ số, judge báo "trích dẫn không tồn tại trong context".
+
+**Lý do.** Vừa giữ được trích dẫn click-to-source cho người dùng, vừa giữ
+được không gian `[n]` nhất quán để LLM/kiểm chứng được.
+
+**Ảnh hưởng:** `src/qa/fusion.py`, `src/qa/hybrid.py` (thêm `context_text`).
+
+---
+
+## D-103 — LLM-judge **gộp nhiều arm trong 1 lời gọi** + hoán vị thứ tự theo `qid`
+
+**Ngày:** 17/11/2026 · **Phase:** 16
+
+**Bối cảnh.** Đánh giá 250 câu × 3 arm cần 750 lời gọi sinh + 750 lời gọi
+judge = **1.500 lời gọi**. Quota Gemini free = 500 RPD, Groq = 1.000 RPD ⇒
+không khả thi nếu chấm từng arm riêng.
+
+**Quyết định.**
+1. **Sinh**: 750 lời gọi ⇒ chạy qua **Groq** (`gpt-oss-20b`, 1.000 RPD).
+2. **Judge**: 250 lời gọi ⇒ chạy qua **Gemini** (`gemini-3.5-flash-lite`, 500
+   RPD), mỗi lời gọi chấm **cả 3 arm** của cùng 1 câu, trả về JSON
+   `{"scores":[{arm, correctness, faithfulness, citation_precision, reason}]}`.
+3. **Triệt tiêu position bias**: thứ tự arm trong prompt được **hoán vị ngẫu
+   nhiên theo `qid`** với seed `42` ⇒ vẫn tái lập được.
+4. **Nén context** cho judge: `compact_context()` cắt mỗi khối `[n]` còn 600
+   ký tự nhưng **giữ nguyên mọi header `[n]`** ⇒ không vượt giới hạn token mà
+   vẫn kiểm chứng được trích dẫn.
+
+**Lý do.** Giảm 66% số lời gọi judge (750 → 250) ⇒ nằm trong quota, đồng
+thời vẫn giữ tính độc lập giữa các arm (judge không biết arm nào là "đúng").
+
+**Ảnh hưởng:** `src/evaluation/evaluate_rag.py` (`Judge.score()` nhận
+`candidates: list[dict]`, `--judge-provider`, `--gen-provider`).
+
+## D-104 — Pool LLM **đa provider** + **ghin model theo câu** + loại lỗi hạ tầng khỏi mẫu số
+
+**Ngày:** 17/11/2026 · **Phase:** 16
+
+**Bối cảnh.** Chạy thật 247 câu × 3 arm cho thấy quota free tier **không đủ
+nếu chỉ dùng một provider**:
+
+| Provider | Giới hạn đo được | Số lời gọi cần |
+|---|---|---|
+| Gemini `gemini-3.5-flash-lite` | 500 RPD **riêng theo model** | 741 sinh + 247 judge |
+| Gemini `gemini-3.5-flash` / `3.6-flash` / `3.8-flash` | 20 RPD | — |
+| Groq `openai/gpt-oss-20b` | **TPD 200.000 token** | hết quota ở câu ~28 |
+
+Lần chạy đầu dừng ở câu 42/247 với 5 arm lỗi hạ tầng (`429 ResourceExhausted`).
+Ba vấn đề phát sinh, **không chỉ là vấn đề quota**:
+
+1. **Confound model.** Pool round-robin khiến arm A có thể được sinh bởi
+   Gemini còn arm B bởi Groq ⇒ chênh lệch điểm có thể do *model* chứ không
+   phải do *kiến trúc* ⇒ kết luận "KG tốt hơn" sẽ không đáng tin.
+2. **Ô nhiễm session.** Arm B và B− dùng **cùng** `session_id` ⇒ với câu
+   `multi_turn`, arm B− đọc được lượt trả lời của arm B trong lịch sử
+   hội thoại ⇒ B− "biết" câu trả lời của B ⇒ so sánh không công bằng.
+3. **Điểm 0 cho lỗi hạ tầng.** Câu lỗi quota được ghi điểm 0 ⇒ kéo trung
+   bình xuống ⇒ **số liệu sai**, không phải số liệu kém.
+
+**Quyết định.**
+
+1. **Pool đa provider** (`--gen-pool` / `--judge-pool`, định dạng
+   `provider:model1,model2;provider2:model3`): Gemini + Groq trong **cùng
+   một pool**, mỗi model có `max_retries=0` (fail-fast) ⇒ khi một model hết
+   quota, lời gọi chuyển ngay sang model tiếp theo thay vì retry 3 lần.
+   Thêm **cooldown 900 s** cho model gặp `429` (Google tính cả request bị
+   từ chối vào quota ⇒ không được spam).
+2. **Ghim model theo câu** (`PooledLLM.pin`): trước khi chạy 3 arm của một
+   câu, chọn **một** model (seed `42` + `qid` ⇒ tái lập được) và ép cả 3 arm
+   dùng model đó ⇒ loại bỏ confound model. Model được ghi vào record
+   (`gen_model`) để kiểm chứng lại.
+3. **Session tách theo arm** (`_arm_session_id`): session id gốc được gắn
+   hậu tố `__<arm>` ⇒ mỗi arm tự xây lại lịch sử hội thoại của chính nó.
+4. **Lỗi hạ tầng không tính điểm 0**: arm lỗi được đánh dấu
+   `infrastructure_error=True` ⇒ `aggregate()` **loại khỏi mẫu số** mọi
+   chỉ số, đếm riêng ở `n_infra_errors`. Ngoài ra có `--infra-retries`
+   (mặc định 3) để thử lại câu lỗi hạ tầng sau khi chờ.
+5. **Chuẩn hóa tên arm** (`_normalize_arm_name`): judge hay trả
+   `"PHƯƠNG ÁN A"`, `"Phương án B−"` (dấu minus U+2212) ⇒ không chuẩn hóa
+   thì **mọi arm rơi vào nhánh "không có điểm" ⇒ toàn bộ điểm = 0**.
+6. **Judge phải trả đủ điểm cho mọi arm** (bổ sung sau khi đo thật): JSON
+   output của judge đôi khi **bị cắt token** ⇒ thiếu entry cho 1 arm ⇒ arm
+   đó bị gán điểm 0 ⇒ **số liệu sai** (không phải số liệu kém). Đo được
+   **25/102 record bị ảnh hưởng** ở 41 câu đầu.
+   - `Judge.score()` thử lại tối đa 3 lần: `max_tokens` 1200 → 2400 → 2400 +
+     yêu cầu `reason` ≤ 15 từ; chỉ dừng khi đã chấm **đủ** mọi arm.
+   - Prompt judge thêm quy tắc: **đúng 1 entry cho mỗi phương án**, `reason`
+     ≤ 15 từ.
+   - `aggregate()` đếm số arm bị bỏ sót ở `n_judge_missing` (sau khi chạy
+     `scripts/rejudge_missing.py` phải = 0).
+   - `scripts/rejudge_missing.py`: chấm lại **chỉ** các arm bị bỏ sót, tái
+     dùng `context` + `answer` đã sinh (không gọi lại LLM sinh ⇒ không tốn
+     quota sinh) và ghi lại checkpoint.
+
+**Lý do.** Đánh giá so sánh chỉ có ý nghĩa khi: (i) đủ quota để chạy hết
+tập câu, (ii) các arm dùng **cùng điều kiện** (cùng model, cùng session
+độc lập), (iii) lỗi hạ tầng không bị nhầm thành lỗi hệ thống, (iv) **mọi
+điểm đo được đều là điểm thật** (không phải điểm 0 giả do judge hỏng).
+Ba điều trên là điều kiện tiên quyết để kết luận khoa học, không phải tối ưu
+kỹ thuật.
+
+**Ảnh hưởng:**
+- `src/evaluation/evaluate_rag.py`: `PooledLLM` (cooldown, pin, `calls_by_model`),
+  `build_cross_provider_pool()`, `_parse_pool_spec()`, `_build_pool_or_single()`,
+  `_arm_session_id()`, `_run_question_arms()`, `_normalize_arm_name()`,
+  `Judge.score()` (retry khi thiếu arm), `aggregate()` (`n_judge_missing`).
+- `configs/llm.yaml`: `pools.generation.spec` / `pools.judge.spec` (đa provider),
+  đổi model Groq mặc định sang `openai/gpt-oss-120b`.
+- `scripts/rejudge_missing.py` (mới): chấm lại các arm bị judge bỏ sót.
+- `tests/test_phase16_eval.py`: 34 test (chuẩn hóa arm, loại lỗi hạ tầng,
+  tách session, parse pool spec, retry judge, đếm arm bị bỏ sót).

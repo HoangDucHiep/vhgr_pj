@@ -353,6 +353,16 @@ class PooledLLM:
         self.max_quota_wait_s = max(0.0, float(max_quota_wait_s))
         #: Trần thời gian loại tạm một model sau lỗi quota (giây).
         self.max_cooldown_s = max(1.0, float(max_cooldown_s))
+        #: Thứ tự **ưu tiên provider** khi chọn model (ví dụ: ``("groq",
+        #: "gemini")`` ⇒ ưu tiên Groq trước Gemini). Vì sao: quota free tier
+        #: mỗi provider hữu hạn theo **thang đo khác nhau** — Groq giới hạn
+        #: theo **token/ngày** (TPD), Gemini giới hạn theo **request/ngày**
+        #: (RPD). ⇒ Đặt provider **token-heavy** (sinh câu trả lời dài) ở
+        #: vị trí ưu tiên cao, provider **request-heavy** (judge gọn) ở vị trí
+        #: thấp. Nếu không, phép sắp xếp theo tên sẽ luôn xếp
+        #: ``gemini/...`` trước ``groq/...`` ⇒ sinh câu trả lời cũng đi qua
+        #: Gemini ⇒ đốt nhanh hạn mức 500 RPD/model mà judge cũng cần dùng.
+        self.provider_priority: tuple[str, ...] = ()
         #: Tổng số giây đã chờ vì hết quota (ghi vào báo cáo).
         self.quota_wait_total_s = 0.0
         #: Model → mốc thời gian hết cooldown.
@@ -434,17 +444,64 @@ class PooledLLM:
         # Vì sao: danh sách "còn dùng được" phụ thuộc trạng thái quota ⇒ đổi
         # giữa các vòng ⇒ nếu chọn model theo thứ tự này thì cùng 1 câu có
         # thể đổi model ⇒ **mất LLM cache hit** ⇒ tốn token Groq lần nữa.
-        fresh = sorted(
+        fresh = [
             key
             for key in self.keys()
             if key not in cooldown and self.errors.get(key, 0) == 0
-        )
-        recovered = sorted(
+        ]
+        recovered = [
             key
             for key in self.keys()
             if key not in cooldown and self.errors.get(key, 0) > 0
-        )
-        return fresh + recovered
+        ]
+        return sorted(fresh, key=self._sort_key) + sorted(recovered, key=self._sort_key)
+
+    def _sort_key(self, key: str) -> tuple[int, str]:
+        """Khóa sắp xếp ổn định: ưu tiên provider trước, rồi theo tên model.
+
+        Args:
+            key: Khóa ``provider/model``.
+
+        Returns:
+            Tuple ``(ưu tiên provider, tên model)``.
+        """
+        provider = key.split("/", 1)[0]
+        try:
+            rank = self.provider_priority.index(provider)
+        except ValueError:
+            rank = len(self.provider_priority)
+        return (rank, key)
+
+    def preferred_group(self, available: list[str]) -> list[str]:
+        """Lọc ra các model thuộc provider **ưu tiên cao nhất** còn dùng được.
+
+        Vì sao cần?
+        -----------
+        Nếu chỉ sắp xếp theo ưu tiên provider rồi chọn **ngẫu nhiên trên
+        toàn bộ** danh sách ⇒ xác suất chọn provider thứ 2 vẫn rất cao ⇒
+        vẫn đốt quota của provider không ưu tiên. ⇒ Phải chọn **chỉ trong
+        nhóm provider ưu tiên cao nhất** còn quota; chỉ khi nhóm đó hết
+        mới lùi xuống nhóm kế tiếp.
+
+        Args:
+            available: Danh sách khóa model còn dùng được.
+
+        Returns:
+            Danh sách khóa thuộc provider ưu tiên cao nhất (có thể rỗng).
+        """
+        if not available:
+            return []
+        if not self.provider_priority:
+            return list(available)
+        groups: dict[str, list[str]] = {}
+        for key in available:
+            provider = key.split("/", 1)[0]
+            groups.setdefault(provider, []).append(key)
+        for provider in self.provider_priority:
+            members = groups.get(provider)
+            if members:
+                return sorted(members, key=self._sort_key)
+        return sorted(available, key=self._sort_key)
 
     @staticmethod
     def _model_key(client: LLMClient) -> str:
@@ -946,6 +1003,7 @@ def _build_pool_or_single(
     label: str,
     max_quota_wait_s: float = 0.0,
     max_cooldown_s: float = 900.0,
+    provider_priority: tuple[str, ...] = (),
 ) -> Any:
     """Dựng client sinh/judge: ưu tiên pool đa provider, fallback pool 1 provider.
 
@@ -958,6 +1016,8 @@ def _build_pool_or_single(
         label: Nhãn để log.
         max_quota_wait_s: Tổng thời gian tối đa được chờ để quota hồi lại.
         max_cooldown_s: Trần thời gian loại tạm 1 model sau lỗi quota.
+        provider_priority: Thứ tự ưu tiên provider khi chọn model (vd
+            ``("groq", "gemini")`` ⇒ ưu tiên Groq trước Gemini).
 
     Returns:
         `PooledLLM` hoặc `LLMClient`.
@@ -972,12 +1032,14 @@ def _build_pool_or_single(
             label,
             [f"{p}:{','.join(ms)}" for p, ms in groups],
         )
-        return PooledLLM(
+        pool = PooledLLM(
             clients,
             quota_cooldown_s=quota_cooldown_s,
             max_quota_wait_s=max_quota_wait_s,
             max_cooldown_s=max_cooldown_s,
         )
+        pool.provider_priority = provider_priority
+        return pool
     if models:
         clients = build_client_pool(
             provider, models, requests_per_day=requests_per_day
@@ -1729,6 +1791,9 @@ def main() -> int:
         label="sinh câu trả lời",
         max_quota_wait_s=args.max_quota_wait_s,
         max_cooldown_s=args.max_cooldown_s,
+        # Sinh câu trả lời **nặng token** ⇒ ưu tiên provider giới hạn theo
+        # token/ngày (Groq) để **giữ** quota request/ngày (Gemini) cho judge.
+        provider_priority=("groq", "gemini"),
     )
     rag_answerer = RagAnswerer(retriever, config=config, client=gen_client)
     hybrid_answerer = HybridAnswerer(retriever, config=config, client=gen_client)
@@ -1752,6 +1817,10 @@ def main() -> int:
         label="LLM-judge",
         max_quota_wait_s=args.max_quota_wait_s,
         max_cooldown_s=args.max_cooldown_s,
+        # Judge **gọn** (1 request/câu, prompt ~2.8k token) ⇒ ưu tiên
+        # provider giới hạn theo request/ngày (Gemini) vì token/ngày của
+        # Groq cần dành cho sinh câu trả lời.
+        provider_priority=("gemini", "groq"),
     )
     judge = Judge(judge_client)
 
@@ -1764,14 +1833,20 @@ def main() -> int:
     # sau không probe lại model đã biết chết (Gemini chỉ 500 RPD/model ⇒
     # probe lặp lại 40 vòng sẽ ăn hơn nửa hạn mức!).
     checkpoint_path = resolve_path(args.checkpoint)
-    pool_state_path = checkpoint_path.with_name(
-        checkpoint_path.stem + ".pool_state.json"
+    # **File trạng thái riêng** cho gen pool và judge pool (2 pool dùng
+    # chung 1 file ⇒ pool này đè mất trạng thái pool kia ⇒ mất thông tin
+    # "model nào đã chết" ⇒ probe lại ⇒ lãng phí lời gọi).
+    gen_state_path = checkpoint_path.with_name(
+        checkpoint_path.stem + ".gen_state.json"
+    )
+    judge_state_path = checkpoint_path.with_name(
+        checkpoint_path.stem + ".judge_state.json"
     )
     if isinstance(gen_client, PooledLLM):
-        gen_client.load_state(pool_state_path)
+        gen_client.load_state(gen_state_path)
         gen_client.probe_all(skip_cooling=True)
     if isinstance(judge_client, PooledLLM):
-        judge_client.load_state(pool_state_path)
+        judge_client.load_state(judge_state_path)
         judge_client.probe_all(skip_cooling=True)
 
     arms = [a.strip() for a in args.arms.split(",") if a.strip()]
@@ -1897,7 +1972,7 @@ def main() -> int:
                 # thứ tự **cố định** (theo tên model) rồi chọn theo seed
                 # ⇒ cùng `qid` ⇒ cùng model (nếu model đó còn quota) ⇒
                 # cache hit ⇒ **miễn phí**.
-                ordered = sorted(available)
+                ordered = gen_client.preferred_group(available)
                 pinned_model = ordered[
                     random.Random(f"{SEED}:model:{qid}").randrange(len(ordered))
                 ]
@@ -1994,7 +2069,7 @@ def main() -> int:
                         if key not in set(gen_client.cooldown_keys())
                     ]
                 if retry_available:
-                    ordered = sorted(retry_available)
+                    ordered = gen_client.preferred_group(retry_available)
                     pinned_model = ordered[
                         random.Random(f"{SEED}:model:{qid}").randrange(len(ordered))
                     ]
@@ -2143,9 +2218,9 @@ def main() -> int:
     checkpoint_handle.close()
     # Lưu trạng thái cooldown để vòng sau bỏ qua model đã biết chết.
     if isinstance(gen_client, PooledLLM):
-        gen_client.save_state(pool_state_path)
+        gen_client.save_state(gen_state_path)
     if isinstance(judge_client, PooledLLM):
-        judge_client.save_state(pool_state_path)
+        judge_client.save_state(judge_state_path)
     if deferred_qids:
         # Ghi mốc quota hồi sớm nhất ⇒ supervisor ngủ đúng tới lúc đó
         # thay vì poll mỗi 60s (mỗi vòng nạp lại 65K chunk + embedding).

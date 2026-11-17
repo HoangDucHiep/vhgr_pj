@@ -2,10 +2,13 @@
 
 import type {
   AskResponse,
+  AskArm,
   EntityDetail,
   GraphPayload,
   HealthResponse,
+  RagAskResponse,
   SearchResponse,
+  SessionResponse,
   StatsResponse,
 } from '../types';
 
@@ -78,4 +81,36 @@ export function fetchGraph(entityId: string, depth = 1): Promise<GraphPayload> {
 /** Lấy chi tiết một entity. */
 export function fetchEntity(entityId: string): Promise<EntityDetail> {
   return getJson<EntityDetail>(`/api/entity/${encodeURIComponent(entityId)}`);
+}
+
+/**
+ * Hỏi đáp theo arm đã chọn.
+ *
+ * - `A` → `POST /api/ask/rag` (Vanilla RAG, chỉ văn bản).
+ * - `B` → `POST /api/ask/hybrid` với `use_graph=true` (Hybrid GraphRAG).
+ * - `B-` → `POST /api/ask/hybrid` với `use_graph=false` (ablation).
+ *
+ * @param question Câu hỏi.
+ * @param arm Arm cần chạy.
+ * @param sessionId Id phiên hội thoại (chỉ dùng cho arm B/B−).
+ * @returns Promise chứa kết quả trả lời.
+ */
+export function askByArm(
+  question: string,
+  arm: AskArm,
+  sessionId?: string,
+): Promise<RagAskResponse> {
+  if (arm === 'A') {
+    return postJson<RagAskResponse>('/api/ask/rag', { question });
+  }
+  return postJson<RagAskResponse>('/api/ask/hybrid', {
+    question,
+    session_id: sessionId ?? null,
+    use_graph: arm === 'B',
+  });
+}
+
+/** Lấy lịch sử phiên hội thoại. */
+export function fetchSession(sessionId: string): Promise<SessionResponse> {
+  return getJson<SessionResponse>(`/api/session/${encodeURIComponent(sessionId)}`);
 }

@@ -905,105 +905,193 @@ npm run dev
 
 ---
 
-## Phase 13 — Đánh giá (I3, I4) — **không cần gán tay đầy đủ**
+## Phase 13 — Sửa chất lượng nền tảng: entity linking, chiều đảo quan hệ, lọc cạnh nhiễu KG
 
-**Mục tiêu:** có số liệu thật cho NER F1, RE F1, linking accuracy, Text-to-Cypher execution accuracy; tạo `reports/`.
+> **Ghi chú đánh số lại (17/11/2026).** Đề tài được định hướng lại thành **so sánh Vanilla RAG vs Hybrid GraphRAG**.
+> Phase 13 cũ (đánh giá NER/RE) đã được **chuyển thành** phase 16 (đánh giá RAG) và
+> phase 14 cũ (mở rộng) thành phase 17 (đóng gói). Phase 13 mới = **tiền điều kiện chất lượng**
+> cho RAG: entity linking phải đúng, quan hệ phải đúng chiều, KG phải sạch nhiễu.
+
+**Mục tiêu:** loại triệt để 3 nhóm lỗi người dùng báo (linking sai case, alias rác, chiều quan hệ ngược) mà **không thay đổi** KG trong Neo4j (19.548 node / 13.379 cạnh).
 
 **Input contract**
-- Mô hình `models/ner`, `models/re`.
-- `wikidata_pairs.jsonl` (Phase 7) — nguồn **auto-gold** độc lập với mô hình.
-- `entities.jsonl` + `pageid_to_qid.json` — auto-gold cho linking.
-- Bộ câu hỏi `data/eval/qa_gold.jsonl` (sinh tự động, xem bước 2).
-- Tối đa 100 câu gán tay (nếu làm được) — `data/eval/manual_ner.jsonl`.
+- `data/interim/triples_merged.jsonl` (13.379 triple), `data/knowledge_base/entities.jsonl`.
+- `backend/app/services/entity_linker.py`, `backend/app/prompts/text_to_cypher.txt`.
 
 **Output contract**
-- `reports/eval_<timestamp>.md` + `.json`: bảng chỉ số.
-- `data/eval/{auto_gold_ner.jsonl,auto_gold_re.jsonl,auto_gold_link.jsonl,qa_gold.jsonl}`.
+- `src/graph/noise_filter.py` — `filter_noisy_edges()`, `filter_noisy_records()`, `noisy_edge_cypher_filter()`.
+- `backend/app/services/cypher_validator.py` — `has_filtering_predicate()`.
+- `tests/test_phase13_regression.py` — ≥ 12 test.
 
 **Việc phải làm**
-1. **Auto-gold NER** (`src/evaluation/build_auto_gold.py`):
-   - Nguồn: hyperlink có đích **có QID** + `P31` khớp nhãn (đã tra ở Phase 4) + anchor trùng đích.
-   - Bỏ mọi mention không có QID (tránh nhãn sai).
-   - Kết quả là nhãn **độc lập với mô hình** → dùng làm gold.
-   - Báo cáo độ lớn tập; nếu < 200 câu → lấy thêm từ câu chứa entity Wikidata đã xác nhận.
-2. **Auto-gold RE** (`src/evaluation/build_auto_gold.py`): từ `wikidata_pairs.jsonl` → cặp (subject, relation, object) là đáp án đúng; cặp có mặt trong câu nhưng không có trong Wikidata → NEGATIVE.
-   - **Quan trọng**: đáp án đến từ Wikidata, **không** từ KG của mình → không vòng tròn.
-3. **Auto-gold linking**: mention → QID; đúng khi entity dự đoán có cùng QID.
-4. **Bộ câu hỏi QA tự sinh** (`src/evaluation/build_qa_set.py`):
-   - Sinh từ facts Wikidata bằng khuôn câu hỏi:
-     `cha_cua` → "Cha của X là ai?" · `me_cua` → "Mẹ của X là ai?" · `sinh_nam` → "X sinh năm nào?" · `mat_nam` → "X mất năm nào?" · `thuoc_trieu_dai` → "X thuộc triều đại nào?" · `vo_cua` → "Vợ của X là ai?" · `ke_vi` → "Ai kế vị X?" · `sinh_tai` → "X sinh ở đâu?" · `dien_ra_tai` → "Sự kiện X diễn ra ở đâu?" · `than_gia_tran` → "X tham gia trận đánh nào?"
-   - `expected_result` lấy từ **Wikidata**, không từ KG → không vòng tròn.
-   - Sinh thêm câu **đa bước** bằng cách nối 2 facts: "Vợ của X là con của ai?" (cha của vợ) — kỳ vọng suy ra từ Wikidata.
-   - Phân dạng tự động: `one_hop`, `two_hop`, `count`, `list`, `filter`, `no_data`.
-   - Sinh câu `no_data`: hỏi về năm ngoài phạm vi (vd "Ai là vua năm 1855?") → `expected_result = []`.
-   - Mục tiêu 200–400 câu, mỗi dạng ≥ 20 câu.
-5. **Gán tay tối thiểu (nếu làm được)** (`src/evaluation/import_labelstudio.py`):
-   - Xuất 100 câu (có entity rõ nhất) ra JSONL cho Label Studio (`data/eval/to_annotate_ner.jsonl`).
-   - Import kết quả → `data/eval/manual_ner.jsonl` (Label Studio export → JSONL).
-   - Nếu có 2 người gán trên ≥ 30 câu chung → tính **agreement rate** (và Cohen's kappa nếu đủ); nếu chỉ 1 người → báo cáo **agreement rate** với auto-gold, nêu rõ đây là đối chiếu người–máy chứ không phải inter-annotator.
-6. **Script đánh giá** (`src/evaluation/evaluate.py`):
-   - `ner_f1(pred, gold)` — token-level IOB2, micro + macro + per-label.
-   - `re_f1(pred, gold)` — micro theo quan hệ + macro + per-relation; báo cáo riêng tỉ lệ false-positive trên nhãn `NA`.
-   - `linking_accuracy(pred, gold)`.
-   - `qa_execution_accuracy(pred_cypher_results, expected_results)` — so sánh tập dòng, không phân biệt thứ tự (trừ câu yêu cầu `ORDER BY`).
-   - `faithfulness_rate` — LLM-judge (Gemini/Groq) trên 30 câu: câu trả lời có chứa thông tin ngoài `records` không? Đo tỉ lệ "không bịa".
-   - So sánh cấu hình: chạy lại eval với `pipeline.skip_coref=true` và `pipeline.skip_linking=true` → bảng so sánh (I5).
-   - Đầu ra Markdown + JSON vào `reports/`.
-7. `scripts/evaluate.py` wrapper: `python scripts/evaluate.py --all`.
+1. `entity_linker._match(keep_accents=True)` ⇒ **case-sensitive** trên `text` gốc; thêm `_case_pattern_ok()`; loại 176 alias toàn-chữ-thường ≥ 2 từ; `PRONOUN_ALIASES` (42 bề mặt đại từ).
+2. `text_to_cypher.txt` — bảng chiều đảo 19 dòng + 6 few-shot ngược.
+3. `src/graph/noise_filter.py` — 2 tiêu chí nhiễu (F1 nhãn `Entity` trong quan hệ địa danh · F2 hạ tầng/cơ quan trong quan hệ sinh/mất).
+4. `has_filtering_predicate()` — Cypher phải lọc theo giá trị cụ thể, nếu không ⇒ `not_in_data`, không retry.
+5. Test regression + `pytest -q tests/`.
 
 **Lệnh kiểm thử**
 ```bash
-python -m src.evaluation.build_auto_gold --config configs/default.yaml
-python -m src.evaluation.build_qa_set --config configs/default.yaml
-python scripts/evaluate.py --all --out reports/
-pytest -q tests/test_metrics.py tests/test_eval_sets.py
-python - <<'PY'
-import json
-m=json.load(open(sorted(__import__('glob').glob('reports/eval_*.json'))[-1]))
-for k in ("ner_f1_micro","re_f1_micro","linking_accuracy","qa_execution_accuracy"):
-    print(k, m["metrics"][k])
-assert m["metrics"]["ner_f1_micro"]>=0.85
-assert m["metrics"]["re_f1_micro"]>=0.70
-assert m["metrics"]["linking_accuracy"]>=0.85
-assert m["metrics"]["qa_execution_accuracy"]>=0.70
-PY
+./.venv/bin/python -m pytest tests/test_phase13_regression.py -q
+./.venv/bin/python scripts/validate_graph.py
 ```
 
 **Gate**
-- [ ] Auto-gold NER ≥ 200 câu; auto-gold RE ≥ 500 cặp; QA set ≥ 200 câu phân bố ≥ 5 dạng
-- [ ] NER F1 ≥ 0.85, RE F1 ≥ 0.70, linking acc ≥ 0.85, QA exec acc ≥ 0.70 — **hoặc** báo cáo minh bạch số thực tế kèm phân tích lỗi
-- [ ] Có bảng so sánh ≥ 3 cấu hình (đầy đủ / không coref / không linking)
-- [ ] `faithfulness_rate` ≥ 0.90 (không bịa)
-- [ ] `tests/test_metrics.py` xanh (F1 tính đúng với dữ liệu mẫu biết trước)
-- [ ] `reports/eval_*.md` ghi rõ kích thước tập đánh giá
+- [x] 12/12 ca lỗi người dùng báo → hết (0 false positive linking)
+- [x] 0 regression — `pytest -q tests/` xanh
+- [x] KG **không đổi** (19.548 node / 13.379 cạnh) — `validate_graph.py` 13/13 PASS
 
-**Lùi:** nếu một chỉ số không đạt → **không sửa số liệu**, ghi rõ số thực tế + phân tích lỗi top 20 + hướng khắc phục trong báo cáo. Đây là hành vi bắt buộc.
+**Lùi:** nếu lọc nhiễu làm mất cạnh hợp lệ ⇒ **hạ tiêu chí F2** (bỏ từ khoá hạ tầng), ghi `reports/deviations.md`.
 
 ---
 
-## Phase 14 — Mở rộng (tùy thời gian) + đóng gói
+## Phase 14 — Vanilla RAG (nhánh A): chunking + embedding + truy xuất + sinh câu trả lời
 
-**Mục tiêu:** hoàn thiện các mục "mở rộng" và đóng gói bàn giao.
+**Mục tiêu:** có tầng truy xuất văn bản trả lời được câu hỏi **tự sự** ("diễn biến trận Bạch Đằng") mà KG thuần không trả lời được.
 
-**Việc phải làm** (làm theo thứ tự, dừng ngay khi hết thời gian):
-1. **B3** — `src/preprocess/time_normalize.py`: chuẩn hóa "năm Canh Thân 1380", "thế kỷ XV", "tháng 5 năm 1284" → năm dương; gắn vào `TIME` và làm đối tượng của `sinh_nam`/`mat_nam`.
-2. **D5** — cạnh `ke_vi`/`giu_chuc_vu` có `start_year`/`end_year` (từ Wikidata `P580`/`P582`); API hỗ trợ lọc theo khoảng năm.
-3. **G5** — vòng lặp tự sửa lỗi (đã có sẵn trong Phase 11, cần **log đầy đủ** các lần retry + báo cáo tỉ lệ lỗi cú pháp).
-4. **G7** — sinh câu trả lời tự nhiên (đã có ở Phase 11, cần đo `faithfulness_rate` ở Phase 13).
-5. **E5** — node NIL có badge "chưa xác minh" trên UI.
-6. **H5** — bộ lọc triều đại / loại quan hệ / khoảng thời gian (server-side trong Cypher).
-7. **H7** — chế độ timeline (dùng `reign_start`, `year` của event).
-8. **I1** — trang `/stats`: số node/cạnh theo label/quan hệ, phân bố confidence (Recharts).
-9. **H6** — cây gia phả (cytoscape-dagre, layout dọc, giới hạn độ sâu 3).
-10. **I5** — chạy và lưu bảng so sánh cấu hình.
-11. **B4** — baseline NER bằng LLM few-shot trên 200 câu dev; bảng so sánh.
-12. **F5** — `scripts/export_graph.sh` (dump + CSV), `scripts/import_graph.sh`.
-13. **Đóng gói**: `README.md` với lệnh chạy thật đã test, `docs/` hoàn chỉnh, `reports/` đầy đủ, `.env.example`, `docker-compose.yml` chạy được từ máy sạch.
+**Input contract**
+- `data/interim/documents_clean.jsonl` (2.441 bài · 101.628 đoạn · 186.960 câu).
+- `data/interim/coref_resolved.jsonl` (186.960 câu → `canonical_id`; 41,3% câu có entity; 15.559 entity_id).
+
+**Output contract**
+- `data/interim/chunks.jsonl` — 1 record/chunk, 11 trường, `chunk_id = chunk_<doc_id>_<paragraph_idx>`.
+- `data/interim/chunk_embeddings.npy` — float16 `[N, 384]`, thứ tự khớp `chunks.jsonl`.
+- `data/interim/bm25_index.npz` — chỉ mục BM25 (CSR sparse).
+- `POST /api/ask/rag` → `{status, answer, citations[], context_used[], context_chars, faithfulness_ok, retries, elapsed_ms}`.
+
+**Việc phải làm**
+1. `src/qa/chunking.py` — đơn vị chunk = **1 đoạn văn** (giữ ranh giới `section`).
+2. `src/qa/embed_chunks.py` — `paraphrase-multilingual-MiniLM-L12-v2`, mean-pool + L2-norm, float16, offline 1 lần.
+3. `src/qa/retriever.py` — BM25 (title×3 + section×2 + body×1) + dense (cosine) + **RRF (k=60)**; `rrf_score < min_rrf_score` ⇒ `"Không có trong dữ liệu."`.
+4. `src/qa/rag_answer.py` + `backend/app/prompts/rag_answer.txt` — bắt buộc trích dẫn `[n]`, faithfulness check + retry 1 lần.
+5. `configs/retrieval.yaml` — nguồn sự thật cho cấu hình.
+
+**Lệnh kiểm thử**
+```bash
+./.venv/bin/python -m src.qa.chunking
+./.venv/bin/python -m src.qa.embed_chunks --batch-size 64 --threads 8
+./.venv/bin/python -m src.qa.retriever --build-index
+./.venv/bin/python -m src.qa.retriever --query "diễn biến trận Bạch Đằng"
+./.venv/bin/python -m src.qa.rag_answer --question "diễn biến trận Bạch Đằng"
+```
 
 **Gate**
-- [ ] Mỗi mục đã bật → có test tương ứng hoặc kiểm thử tay có ghi kết quả vào `reports/`
-- [ ] `docker compose up` từ máy sạch → Neo4j + backend + frontend hoạt động
-- [ ] README có: yêu cầu, cài đặt, lệnh chạy từng phase, lệnh đánh giá, ảnh chụp màn hình demo
+- [x] top-1 đúng bài trên 6 câu thật
+- [x] index 250 chunk chạy được
+- [x] latency p95 < 6 s
+
+**Lùi:** embed 101.628 chunk > 30 phút ⇒ giảm còn 60.000 chunk ưu tiên `prose` + section quan trọng, hoặc chạy MiniLM trên Kaggle GPU.
+
+---
+
+## Phase 15 — Hybrid GraphRAG (nhánh B): kênh KG + ý định + fusion + hội thoại nhiều lượt
+
+**Mục tiêu:** hợp nhất văn bản (RAG) với Knowledge Graph để trả lời được **cả** câu tự sự **và** câu quan hệ, kèm hội thoại nhiều lượt.
+
+**Input contract**
+- Artifact của Phase 14 + `data/interim/triples_merged.jsonl` + Neo4j (19.548 node / 13.379 cạnh).
+- **Cùng `Retriever`** với arm A (D-100) ⇒ so sánh công bằng.
+
+**Output contract**
+- `data/interim/sessions/<session_id>.json` — `{turns[], last_subject_entity_id, recent_entity_ids[]}`.
+- `POST /api/ask/hybrid` (body `{question, session_id?, top_k?, use_graph?}`) → `{status, answer, citations[], context_used[], kg_used[], context_text, intent, fusion_strategy, rewritten_question, session_id, entities[], graph, faithfulness_ok, retries, elapsed_ms}`.
+- `GET /api/session/{session_id}` → `{session_id, turns[], last_subject_*, recent_entity_ids[]}`.
+
+**Việc phải làm**
+1. `src/qa/graph_context.py` — **template Cypher tất định** theo ý định (đảo chiều chính xác 100%) + mở rộng **1-hop** từ `entity_ids` của chunk; lọc nhiễu KG.
+2. `src/qa/intent.py` — 6 ý định (`narrative`, `relational`, `multi_hop`, `count`, `multi_turn`, `no_data`), rule + LLM fallback.
+3. `src/qa/fusion.py` — `FusedContext` đánh số `[n]` **liên tục** cho text + KG; `text_first` / `kg_first` theo ý định; `to_text()` sắp xếp theo `block["n"]`.
+4. `src/qa/conversation.py` — `SessionStore` (file JSON), query rewriting (thay đại từ bằng `last_subject_name`), kế thừa entity.
+5. `backend/app/api/ask_hybrid.py` — endpoint + `/api/session/{id}`.
+
+**Lệnh kiểm thử**
+```bash
+./.venv/bin/python -m src.qa.hybrid --question "diễn biến trận Bạch Đằng"
+./.venv/bin/python -m src.qa.hybrid --question "Ai là con của Trần Nhân Tông?"
+./.venv/bin/python -m pytest tests/test_phase15_hybrid.py -q
+```
+
+**Gate**
+- [x] "diễn biến trận Bạch Đằng" có **cả** narrative **và** ≥ 3 quan hệ KG có trích dẫn
+- [x] hội thoại 3 lượt giữ chủ thề
+- [x] 2 nhánh dùng **cùng** retriever
+
+**Lùi:** nếu KG context làm loãng context văn bản ⇒ giảm `kg_budget` trong `configs/retrieval.yaml`, chỉ giữ top-10 cạnh có `confidence` cao nhất.
+
+---
+
+## Phase 16 — Đánh giá so sánh A vs B vs B− (LLM-judge)
+
+**Mục tiêu:** có **số liệu đo được** chứng minh KG bổ sung cho RAG, không phải chỉ định tính.
+
+**Input contract**
+- `data/interim/wikidata_pairs.jsonl` (nguồn đáp án **độc lập** KG nội bộ).
+- `kg_scope` — QID có bài Wikipedia trong `data/interim/documents_clean.jsonl` **và** tham gia KG.
+
+**Output contract**
+- `data/eval/qa_rag_250.jsonl` — `{qid, question, type, expected_answer, expected_entities[], evidence_doc_id[], session_id?, prev_turns[], turn_index, relation, subject_name, object_name, evidence_section, _meta}`; 5 dạng: `narrative` · `relational` · `multi_hop` · `no_data` · `multi_turn`.
+- `reports/eval_rag_<ts>.md` + `.json`.
+- `data/eval/eval_rag_<arm>.jsonl` — kết quả thô từng câu.
+- `docs/10-nhat-ky/so-lieu/phase-16-*.json`.
+
+**Việc phải làm**
+1. `src/evaluation/build_qa_set.py` — sinh câu từ Wikidata, 5 dạng, có `expected_answer` + `evidence_doc_id`.
+2. `src/evaluation/evaluate_rag.py` — chạy 3 arm × 250 câu; LLM-judge chấm `correctness` (0–2), `faithfulness` (0–2), `citation_precision` (0–1), `no_data_accuracy`, `latency` p50/p95, `context_tokens`.
+3. **Ablation 3 nhánh**: A = RAG thuần · B = Hybrid đầy đủ · B− = Hybrid không KG (chứng minh đóng góp đến từ *đồ thị* chứ không từ *prompt*).
+4. **Tối ưu quota** (D-103): sinh qua Groq (750 lời gọi), judge gộp 3 arm/câu qua Gemini (250 lời gọi), thứ tự arm hoán vị theo `qid` (seed 42).
+
+**Lệnh kiểm thử**
+```bash
+./.venv/bin/python -m src.evaluation.build_qa_set
+./.venv/bin/python -m src.evaluation.evaluate_rag \
+  --qa-set data/eval/qa_rag_250.jsonl --arms A,B,B- --reset-sessions \
+  --gen-provider groq --judge-provider gemini
+```
+
+**Gate**
+- [x] `correctness(B) > correctness(A)` — **hoặc** báo cáo minh bạch số thực tế + phân tích lỗi top-20
+- [x] B− nằm giữa/sát A ⇒ chứng minh đóng góp đến từ kênh KG
+- [x] `reports/eval_rag_*.md` + `.json` + `docs/10-nhat-ky/so-lieu/phase-16-*.json`
+
+**Lùi:** nếu quota LLM không đủ ⇒ giảm tập con LLM (giữ nguyên tỉ lệ 5 dạng), ghi rõ phạm vi trong báo cáo. Không sửa số liệu để "cho xanh".
+
+---
+
+## Phase 17 — Giao diện so sánh, demo, đóng gói
+
+**Mục tiêu:** giao diện demo được luận điểm (toggle A/B, trích dẫn click-to-source, đồ thị 1-hop) + dự án chạy được từ máy sạch + tài liệu đầy đủ.
+
+**Input contract**
+- API của Phase 14/15/16.
+- `data/interim/chunks.jsonl`, `chunk_embeddings.npy`, `bm25_index.npz` (mount vào container).
+
+**Output contract**
+- Frontend: toggle A/B/B−, panel trích dẫn, đồ thị 1-hop, lịch sử nhiều lượt.
+- `README.md` — yêu cầu, cài đặt, lệnh chạy, số liệu benchmark, sơ đồ kiến trúc, ảnh chụp demo.
+- `docs/DECISIONS.md` (D-099..D-103) · `docs/PROGRESS.md` · `docs/CONTEXT.md` §1/§3 · `reports/deviations.md`.
+
+**Việc phải làm**
+1. `frontend/src/components/ChatPanel.tsx` — toolbar chọn arm A/B/B− + nút "Lượt chat mới" (reset session).
+2. `frontend/src/components/CitationPanel.tsx` — trích dẫn `[n]` click-to-source, phân biệt `KG` / `Văn bản`.
+3. Đồ thị 1-hop của entity trong context (Cytoscape), `frontend/src/types/index.ts` shape `KgGraph`.
+4. `docker-compose.yml` — backend cài `torch` CPU, mount `data/` + `configs/`.
+5. `README.md` + ảnh chụp demo; `docs/09` đánh số lại; `DECISIONS` D-099..D-103; `PROGRESS`; `CONTEXT` §1/§3; `reports/deviations.md`.
+
+**Lệnh kiểm thử**
+```bash
+cd frontend && npm run typecheck && npm run build
+docker compose build && docker compose up -d
+curl -s localhost:8000/api/health
+```
+
+**Gate**
+- [x] Toggle A/B/B− hoạt động, đổi arm giữa các lượt
+- [x] Trích dẫn click-to-source mở đúng URL Wikipedia
+- [x] Đồ thị 1-hop hiển thị node + cạnh có bằng chứng
+- [x] `docker compose up` từ máy sạch → 3 service hoạt động
+- [x] README có yêu cầu, cài đặt, lệnh chạy, lệnh đánh giá, số liệu benchmark, ảnh chụp demo
+
+**Lùi:** nếu thiếu thời gian ⇒ ưu tiên toggle A/B + citations + nút đổi nhánh; bỏ Cytoscape mở rộng.
 
 ---
 

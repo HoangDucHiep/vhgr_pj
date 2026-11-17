@@ -41,6 +41,37 @@ Mọi cạnh có: `confidence` (0–1), `method` (`infobox` | `rule` | `wikidata
 
 ## QUY TẮC BẮT BUỘC
 
+0. **CHIỀU QUAN HỆ — bảng tra cứu bắt buộc.** Trong KG, quan hệ **gia đình** được
+   lưu theo **một chiều**: `cha_cua` nghĩa là subject **là cha của** object.
+   Khi người dùng hỏi theo **chiều ngược** ("con của", "vợ của"…) phải **đảo
+   mũi tên** trong Cypher:
+
+   | Câu hỏi theo chiều ngược | Quan hệ cần dùng | Cách viết Cypher |
+   |---|---|---|
+   | "Ai là **con** của X" | `cha_cua` \| `me_cua` | `MATCH (x)<-[:cha_cua\|me_cua]-(c)` |
+   | "Ai là **cha** của X" | `cha_cua` | `MATCH (x)<-[:cha_cua]-(c)` |
+   | "Ai là **mẹ** của X" | `me_cua` | `MATCH (x)<-[:me_cua]-(c)` |
+   | "**Vợ** của X là ai" | `vo_cua` | `MATCH (x)<-[:vo_cua]-(c)` |
+   | "**Chồng** của X là ai" | `chong_cua` | `MATCH (x)<-[:chong_cua]-(c)` |
+   | "**Anh/em** của X là ai" | `anh_em_cua` | `MATCH (x)<-[:anh_em_cua]-(c)` |
+   | "X **thuộc** nhà nào" | `thuoc_trieu_dai` | `MATCH (x)-[:thuoc_trieu_dai]->(d)` |
+   | "X **kế vị** ai" | `ke_vi` | `MATCH (x)-[:ke_vi]->(d)` |
+   | "X **chỉ huy** trận nào" | `chi_huy_tran` | `MATCH (x)-[:chi_huy_tran]->(e)` |
+   | "X **tham gia** trận nào" | `tham_gia_tran` | `MATCH (x)-[:tham_gia_tran]->(e)` |
+   | "X **lập ra** sự kiện nào" | `lap_ra` | `MATCH (x)-[:lap_ra]->(e)` |
+   | "X **đánh bại** ai" | `danh_bai` | `MATCH (x)-[:danh_bai]->(d)` |
+   | "X **giữ chức vụ** gì" | `giu_chuc_vu` | `MATCH (x)-[:giu_chuc_vu]->(t)` |
+   | "X **sinh** năm nào" | `sinh_nam` | `MATCH (x)-[:sinh_nam]->(y:Year)` |
+   | "X **mất** năm nào" | `mat_nam` | `MATCH (x)-[:mat_nam]->(y:Year)` |
+   | "X **sinh tại** đâu" | `sinh_tai` | `MATCH (x)-[:sinh_tai]->(p:Place)` |
+   | "X **mất tại** đâu" | `mat_tai` | `MATCH (x)-[:mat_tai]->(p:Place)` |
+   | "X **đóng đôi** ở đâu" | `dong_doi_tai` | `MATCH (x)-[:dong_doi_tai]->(p:Place)` |
+   | "Sự kiện **diễn ra tại** đâu" | `dien_ra_tai` | `MATCH (e)-[:dien_ra_tai]->(p:Place)` |
+
+   **Quy tắc vàng:** hỏi *"chủ thể trong câu hỏi là người BỊ tác động"* (con,
+   vợ, chồng, anh/em) ⇒ **đảo mũi tên** (`<-[:quan_hệ]-`). Hỏi *"người THỰC
+   HIỆN"* (cha, mẹ, chỉ huy, kế vị) ⇒ giữ chiều `->`.
+
 1. Câu Cypher phải **chỉ đọc**. Tuyệt đối KHÔNG dùng: `CREATE`, `MERGE`, `DELETE`, `DETACH`, `SET`, `REMOVE`, `DROP`, `FOREACH`, `LOAD CSV`, `CALL`, `ALTER`, `GRANT`.
 2. Chỉ dùng các từ khóa: `MATCH`, `OPTIONAL MATCH`, `WITH`, `WHERE`, `RETURN`, `ORDER BY`, `SKIP`, `LIMIT`, `UNWIND`, `AS`, `DISTINCT`, `COUNT`, `COLLECT`, `AND`, `OR`, `NOT`, `IN`.
 3. **Luôn kết thúc bằng `LIMIT`** — tối đa 100, mặc định dùng 50 cho câu trả về danh sách, `LIMIT 1` cho câu hỏi về một giá trị.
@@ -116,6 +147,26 @@ Mọi cạnh có: `confidence` (0–1), `method` (`infobox` | `rule` | `wikidata
 
 **Câu hỏi**: Nguyễn Huệ sinh ở đâu?
 **Cypher**: MATCH (p:Person {entity_id: 'ent_quang_trung_242ef52d'})-[:sinh_tai]->(pl:Place) RETURN pl.name AS birthplace LIMIT 1
+
+### VÍ DỤ CHIỀU NGƯỢC (quan hệ gia đình lưu MỘT CHIỀU ⇒ phải đảo mũi tên)
+
+**Câu hỏi**: Ai là con của Trần Nhân Tông?
+**Cypher**: MATCH (p:Person {entity_id: 'ent_tran_nhan_tong_cc430bcd'})<-[:cha_cua|me_cua]-(c:Person) RETURN c.name AS child ORDER BY c.birth_year LIMIT 50
+
+**Câu hỏi**: Ai là vợ của Trần Nhân Tông?
+**Cypher**: MATCH (p:Person {entity_id: 'ent_tran_nhan_tong_cc430bcd'})<-[:vo_cua]-(c:Person) RETURN c.name AS wife LIMIT 10
+
+**Câu hỏi**: Con của Nguyễn Huệ là ai?
+**Cypher**: MATCH (p:Person {entity_id: 'ent_quang_trung_242ef52d'})<-[:cha_cua|me_cua]-(c:Person) RETURN c.name AS child LIMIT 50
+
+**Câu hỏi**: Ai là cha của Trần Nhân Tông?
+**Cypher**: MATCH (p:Person {entity_id: 'ent_tran_nhan_tong_cc430bcd'})<-[:cha_cua]-(f:Person) RETURN f.name AS father LIMIT 1
+
+**Câu hỏi**: Ai là mẹ của Trần Nhân Tông?
+**Cypher**: MATCH (p:Person {entity_id: 'ent_tran_nhan_tong_cc430bcd'})<-[:me_cua]-(m:Person) RETURN m.name AS mother LIMIT 1
+
+**Câu hỏi**: Trần Nhân Tông kế vị ai?
+**Cypher**: MATCH (p:Person {entity_id: 'ent_tran_nhan_tong_cc430bcd'})-[:ke_vi]->(f:Person) RETURN f.name AS predecessor LIMIT 1
 
 ## ĐỊNH DẠNG ĐẦU RA
 

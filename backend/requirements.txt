@@ -1,3 +1,13 @@
+# Backend FastAPI — dịch vụ hỏi đáp.
+#
+# Lưu ý: các dependency nặng (torch/transformers) chỉ dùng cho **truy xuất
+# dense** (Phase 14/15). Image `python:3.12-slim` + CPU ⇒ cài `torch` bản
+# **CPU** (extra index `download.pytorch.org/whl/cpu`) trong `backend/Dockerfile`
+# để giữ image nhẹ.
+#
+# Nếu không cần nhánh dense, đặt `retrieval.dense.enabled = false` trong
+# `configs/retrieval.yaml` và bỏ 3 dòng cuối (numpy, torch, transformers).
+
 fastapi>=0.115
 uvicorn[standard]>=0.32
 pydantic>=2.9
@@ -6,3 +16,12 @@ neo4j>=5.26
 pyyaml>=6.0
 python-dotenv>=1.0
 python-multipart>=0.0.9
+
+# SDK LLM API — Gemini (judge) + Groq (sinh câu trả lời).
+google-generativeai>=0.8.6
+groq>=0.13
+
+# Truy xuất dense (embedding MiniLM) — Phase 14.
+numpy>=1.26
+torch>=2.4
+transformers>=4.44

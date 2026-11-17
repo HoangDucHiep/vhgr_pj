@@ -11,7 +11,13 @@ RUN apt-get update \
     && rm -rf /var/lib/apt/lists/*
 
 COPY requirements.txt backend/requirements.txt ./
-RUN pip install --upgrade pip && pip install -r requirements.txt
+# `torch` bản CPU: extra index chính thức PyTorch (image slim, không CUDA).
+# `--extra-index-url` chỉ **thêm** index — PyPI vẫn được ưu tiên cho package
+# không có trên index torch (tránh kéo bản CUDA mặc định).
+RUN pip install --upgrade pip \
+    && pip install --extra-index-url https://download.pytorch.org/whl/cpu \
+        "torch>=2.4" \
+    && pip install -r requirements.txt
 
 COPY src/ ./src/
 COPY backend/ ./backend/

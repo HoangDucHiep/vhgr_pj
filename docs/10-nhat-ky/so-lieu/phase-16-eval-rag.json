@@ -1,0 +1,152 @@
+{
+  "_meta": {
+    "phase": 16,
+    "ten_phase": "Đánh giá so sánh A vs B vs B− (LLM-judge)",
+    "ngay": "2026-11-17",
+    "nguon": "Đo trực tiếp bằng `src.evaluation.evaluate_rag` trên tập data/eval/qa_rag_250.jsonl — 76 câu × 3 arm; judge = pool đa provider (Gemini + Groq).",
+    "lich": "2026-11-17"
+  },
+  "thiet_ke_thu_nghiem": {
+    "so_cau": 76,
+    "so_cau_tong": 88,
+    "so_cau_loai_confound": 12,
+    "n_model_mismatch": 12,
+    "qid_model_mismatch": [
+      "q0077",
+      "q0078",
+      "q0079",
+      "q0080",
+      "q0081",
+      "q0082",
+      "q0083",
+      "q0084",
+      "q0085",
+      "q0086",
+      "q0087",
+      "q0088"
+    ],
+    "arms": [
+      "A",
+      "B",
+      "B-"
+    ],
+    "nhan_arm": {
+      "A": "Vanilla RAG",
+      "B": "Hybrid GraphRAG",
+      "B-": "Hybrid không KG"
+    },
+    "thu_tu_hoan_vi_theo_qid": "Random('42:{qid}').shuffle(order)",
+    "ghim_model_theo_cau": "Random('42:model:{qid}') chọn 1 model cho cả 3 arm",
+    "tach_session_theo_arm": "<session_id>__<arm>",
+    "judge_model": "pool đa provider (Gemini + Groq)",
+    "gen_pool": {
+      "models": [
+        "gemini/gemini-3-flash-preview",
+        "gemini/gemini-3.1-flash-lite",
+        "gemini/gemini-3.1-flash-lite-preview",
+        "groq/openai/gpt-oss-120b",
+        "groq/openai/gpt-oss-20b",
+        "groq/qwen/qwen3.8-27b"
+      ],
+      "spec": "gemini:gemini-3.1-flash-lite,gemini-3.1-flash-lite-preview,gemini-3-flash-preview;groq:openai/gpt-oss-120b,qwen/qwen3.8-27b,openai/gpt-oss-20b"
+    },
+    "judge_pool": {
+      "spec": "gemini:gemini-3.1-flash-lite,gemini-3.1-flash-lite-preview,gemini-3-flash-preview;groq:openai/gpt-oss-120b,qwen/qwen3.8-27b"
+    },
+    "elapsed_s": null
+  },
+  "chi_so_tong_hop": {
+    "A": {
+      "n": 76,
+      "n_total": 76,
+      "n_infra_errors": 0,
+      "n_judge_missing": 1,
+      "correctness_mean": 1.1316,
+      "correctness_rate": 0.5,
+      "faithfulness_mean": 1.75,
+      "faithfulness_rate": 0.8684,
+      "citation_precision": 0.6776,
+      "no_data_accuracy": null,
+      "latency_p50": 1593,
+      "latency_p95": 12161,
+      "context_tokens_mean": 668
+    },
+    "B": {
+      "n": 76,
+      "n_total": 76,
+      "n_infra_errors": 0,
+      "n_judge_missing": 3,
+      "correctness_mean": 1.4342,
+      "correctness_rate": 0.6316,
+      "faithfulness_mean": 1.6316,
+      "faithfulness_rate": 0.7895,
+      "citation_precision": 0.7868,
+      "no_data_accuracy": null,
+      "latency_p50": 1998,
+      "latency_p95": 27272,
+      "context_tokens_mean": 1813
+    },
+    "B-": {
+      "n": 76,
+      "n_total": 76,
+      "n_infra_errors": 0,
+      "n_judge_missing": 1,
+      "correctness_mean": 1.1053,
+      "correctness_rate": 0.4868,
+      "faithfulness_mean": 1.7105,
+      "faithfulness_rate": 0.8553,
+      "citation_precision": 0.6842,
+      "no_data_accuracy": null,
+      "latency_p50": 1835,
+      "latency_p95": 14006,
+      "context_tokens_mean": 690
+    }
+  },
+  "chung_luc_dong_gop": {
+    "delta_correctness_B_vs_A": 0.3026,
+    "delta_correctness_B_vs_Bminus": 0.3289,
+    "delta_correctness_Bminus_vs_A": -0.0263,
+    "delta_faithfulness_B_vs_A": -0.1184,
+    "delta_citation_precision_B_vs_A": 0.1092,
+    "delta_latency_p95_B_vs_A_ms": 15111,
+    "delta_context_tokens_B_vs_A": 1145
+  },
+  "theo_dang_cau_hoi": {
+    "A": {
+      "relational": {
+        "n": 58,
+        "correctness": 0.9483,
+        "faithfulness": 1.6724
+      },
+      "narrative": {
+        "n": 18,
+        "correctness": 1.7222,
+        "faithfulness": 2.0
+      }
+    },
+    "B": {
+      "relational": {
+        "n": 58,
+        "correctness": 1.3966,
+        "faithfulness": 1.5517
+      },
+      "narrative": {
+        "n": 18,
+        "correctness": 1.5556,
+        "faithfulness": 1.8889
+      }
+    },
+    "B-": {
+      "relational": {
+        "n": 58,
+        "correctness": 0.9138,
+        "faithfulness": 1.6207
+      },
+      "narrative": {
+        "n": 18,
+        "correctness": 1.7222,
+        "faithfulness": 2.0
+      }
+    }
+  }
+}

@@ -1,0 +1,123 @@
+{
+  "_meta": {
+    "phase": 13,
+    "ten_phase": "Sửa chất lượng: entity linking exact-case, chiều đảo quan hệ, lọc cạnh nhiễu KG",
+    "ngay": "2026-11-17",
+    "nguon": "Đo trực tiếp trên artifact thật: data/knowledge_base/entities.jsonl (15.925 entity), data/interim/triples_merged.jsonl (13.379 triple), Neo4j (19.548 node / 13.379 cạnh).",
+    "lich": "2026-11-17"
+  },
+  "van_de_duoc_bao_cao": {
+    "nguon": "Demo ngày 16/11/2026 — người dùng báo 3 triệu chứng",
+    "trieu_chung": [
+      "Câu hỏi phải đúng tên quan hệ mới được nhận: 'Ai là con của Trần Nhân Tông' không được, chỉ 'ai là cha' mới được.",
+      "Map entity sai theo từ không dấu: 'tiết' → Tiết, 'đời' → Đổi, 'bao' → Bảo.",
+      "Nhiều lần trả 'không có dữ liệu'."
+    ]
+  },
+  "so_luong_entity_linking": {
+    "truoc_phase_13": {
+      "alias_trong_chi_muc": 13760,
+      "alias_toan_chu_thuong_multi_tu": 211,
+      "alias_dai_tu": 2,
+      "false_positive_da_biet": [
+        "Đổi mới đất nước → ent_doi_moi_1b2ad4f7 (Đổi Mới)",
+        "Ông ấy → ent_george_h_5df82ed5 (ông ấy / George H. W. Bush)"
+      ]
+    },
+    "sau_phase_13": {
+      "alias_trong_chi_muc": 13582,
+      "alias_toan_chu_thuong_multi_tu": 0,
+      "alias_dai_tu": 0,
+      "false_positive_da_biet": []
+    },
+    "che_do_bien": {
+      "loai_alias_mo_ho": 23,
+      "loai_alias_1_tu": 997,
+      "loai_alias_toan_chu_thuong": 176,
+      "loai_alias_dai_tu": 2
+    }
+  },
+  "chieu_dao_quan_he": {
+    "phat_hien": "Quan hệ gia đình lưu MỘT CHIỀU: cha_cua nghĩa là subject LÀ CHA của object.",
+    "sai_lech_truoc": "Prompt chỉ có few-shot chiều thuận ⇒ 'Ai là con của X' không được.",
+    "sua": "Bảng tra cứu chiều đảo 19 dòng + 6 few-shot ngược trong backend/app/prompts/text_to_cypher.txt.",
+    "kiem_chung_neo4j": {
+      "cypher": "MATCH (p:Person {entity_id: 'ent_tran_nhan_tong_cc430bcd'})<-[:cha_cua|me_cua]-(c:Person) RETURN c.name",
+      "so_con": 5,
+      "danh_sach": [
+        "Trần Anh Tông",
+        "Huyền Trân Công chúa",
+        "Thiên Trân Công chúa",
+        "Thượng Trân Công chúa",
+        "Trần Quốc Chẩn"
+      ]
+    }
+  },
+  "loc_canh_nhieu_kg": {
+    "quyet_dinh": "Không xoá cạnh khỏi Neo4j (giữ 13.379 cạnh) — lọc Ở TẦNG ĐỌC.",
+    "tieu_chi": {
+      "F1": "object có nhãn 'Entity' (tên rác do LLM sinh) trong quan hệ địa danh → loại",
+      "F2": "object là hạ tầng/cơ quan (Quốc lộ 14, Bệnh viện …) trong quan hệ sinh/mất → loại"
+    },
+    "do_duoc": {
+      "tong_canh_dia_danh_trong_db": 3518,
+      "con_lai_sau_khi_loc": 3495,
+      "so_bi_lo": 23,
+      "ty_le_lo": 0.65
+    },
+    "chi_tiet_bi_lo": {
+      "Quoc_lo_14": 11,
+      "benh_vien": 2,
+      "ten_rac_Entity_llm": 10
+    },
+    "khong_bi_lo": [
+      "Vạn Kiếp (Trần Hưng Đạo mất tại đó)",
+      "Trường An",
+      "Đường Lâm",
+      "Nghi Lộc (huyện)",
+      "Đại Việt (sinh tại — object nhãn Event nhưng ngữ nghĩa hợp lệ)"
+    ],
+    "phuong_an_da_can_nhac": [
+      {
+        "phuong_an": "Lọc theo object không có QID",
+        "so_canh_bi_lo": 1405,
+        "ly_do_lo": "Quá rộng — loại cả 'Nghi Lộc (huyện)', 'Thái Bình', 'Phú Xuân' là địa danh hợp lệ."
+      },
+      {
+        "phuong_an": "Lọc theo object có nhãn khác Place",
+        "so_canh_bi_lo": 126,
+        "ly_do_lo": "Loại nhầm 'Đại Việt' (nhãn Event) — là nơi sinh hợp lệ của nhiều vua."
+      },
+      {
+        "phuong_an": "Lọc theo tên hạ tầng (được chọn)",
+        "so_canh_bi_lo": 23,
+        "ly_do_lo": "Chính xác theo ngữ nghĩa — chỉ loại nơi sinh/mất không phải địa danh."
+      }
+    ]
+  },
+  "guard_cypher_khong_loc": {
+    "phat_hien": "Khi câu hỏi không có entity nào link được (đại từ), LLM sinh Cypher quét toàn đồ thị: 'MATCH (p:Person) WHERE p.death_year IS NOT NULL RETURN ... LIMIT 10' ⇒ trả 10 người NGẪU NHIÊN, tạo cảm giác 'có dữ liệu' nhưng hoàn toàn không liên quan.",
+    "sua": "has_filtering_predicate() — Cypher phải lọc theo GIÁ TRỊ CỤ THỂ (entity_id, so sánh số, so sánh chuỗi, CONTAINS, IN, COUNT). 'IS NOT NULL' KHÔNG đủ.",
+    "hanh_vi_sau_sua": {
+      "cau_hon": "Ông ấy mất năm nào?",
+      "status_truoc": "found (10 người ngẫu nhiên)",
+      "status_sau": "not_in_data",
+      "cau_hon_2": "Vị vua đó mất năm nào?",
+      "status_sau_2": "not_in_data"
+    }
+  },
+  "gate": {
+    "12_ca_loi_user_bao_het": true,
+    "so_test_regression": 19,
+    "regression_0": true,
+    "kg_khong_doi": {
+      "node": 19548,
+      "canh": 13379,
+      "khop": true
+    },
+    "pytest_toan_bo": {
+      "so_test": 644,
+      "fail": 0
+    }
+  }
+}

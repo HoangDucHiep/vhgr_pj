@@ -541,3 +541,57 @@ class TestPooledLLMPinning:
 
         delta = pool._cooldown_until["gemini/m1"] - _time.time()
         assert 0 < delta <= 900.0 + 5
+
+
+class TestProviderPriority:
+    """Ưu tiên provider theo **thang đo quota** khác nhau.
+
+    Vì sao: Groq giới hạn theo **token/ngày**, Gemini giới hạn theo
+    **request/ngày**. Sinh câu trả lời nặng token ⇒ nên đi qua Groq; judge
+    gọn (1 request/câu) ⇒ nên đi qua Gemini. Nếu sắp xếp theo tên thuần
+    ⇒ ``gemini/...`` luôn đứng trước ``groq/...`` ⇒ đốt nhanh quota RPD.
+    """
+
+    def test_preferred_group_picks_highest_priority_provider(self) -> None:
+        """Chỉ chọn model trong provider ưu tiên cao nhất."""
+        from src.evaluation.evaluate_rag import PooledLLM
+
+        pool = PooledLLM(
+            [
+                _FakeLLMClient("gemini/g1"),
+                _FakeLLMClient("groq/q1"),
+            ],
+            quota_cooldown_s=900.0,
+        )
+        pool.provider_priority = ("groq", "gemini")
+        group = pool.preferred_group(["gemini/g1", "groq/q1"])
+        assert group == ["groq/q1"]
+
+    def test_preferred_group_falls_back_when_priority_empty(self) -> None:
+        """Provider ưu tiên hết quota ⇒ lùi xuống provider kế tiếp."""
+        from src.evaluation.evaluate_rag import PooledLLM
+
+        pool = PooledLLM(
+            [
+                _FakeLLMClient("gemini/g1"),
+                _FakeLLMClient("groq/q1"),
+            ],
+            quota_cooldown_s=900.0,
+        )
+        pool.provider_priority = ("groq", "gemini")
+        group = pool.preferred_group(["gemini/g1"])
+        assert group == ["gemini/g1"]
+
+    def test_healthy_keys_sorted_by_provider_priority(self) -> None:
+        """`healthy_keys` sắp theo ưu tiên provider, rồi theo tên model."""
+        from src.evaluation.evaluate_rag import PooledLLM
+
+        pool = PooledLLM(
+            [
+                _FakeLLMClient("gemini/g1"),
+                _FakeLLMClient("groq/q1"),
+            ],
+            quota_cooldown_s=900.0,
+        )
+        pool.provider_priority = ("groq", "gemini")
+        assert pool.healthy_keys() == ["groq/q1", "gemini/g1"]

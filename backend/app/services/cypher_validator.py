@@ -146,6 +146,69 @@ def extract_limit(cypher: str) -> int | None:
     return int(match.group(1))
 
 
+def has_filtering_predicate(cypher: str) -> bool:
+    """Kiểm tra câu Cypher có **điều kiện lọc có giá trị cụ thể** hay không.
+
+    Vì sao cần (Phase 13, lỗi demo 17/11/2026): khi câu hỏi **không chứa
+    entity nào** link được (vd "Ông ấy mất năm nào?" — đại từ đã bị chặn),
+    LLM có thể sinh:
+
+        ``MATCH (p:Person) RETURN p.name AS name, p.death_year AS death_year LIMIT 10``
+        ``MATCH (p:Person) WHERE p.death_year IS NOT NULL RETURN … LIMIT 10``
+
+    ⇒ trả về **ngẫu nhiên N người** trong KG, tạo cảm giác "có dữ liệu" nhưng
+    hoàn toàn không liên quan. Câu trả lời đúng phải là *"Không có trong dữ
+    liệu."*.
+
+    Điều kiện lọc được chấp nhận:
+    - lọc theo ``entity_id``;
+    - ``WHERE`` có **so sánh với giá trị cụ thể** (số hoặc chuỗi literal):
+      ``= 1900``, ``= 'nha tran'``, ``CONTAINS 'tuong'``, ``IN ['a','b']``;
+    - hàm tổng hợp ``COUNT(...)`` (câu hỏi đếm — vd "Có bao nhiêu người?").
+
+    Điều kiện ``IS NOT NULL`` **không** được chấp nhận — nó chỉ lọc "có giá
+    trị" chứ không định danh được đối tượng cụ thể.
+
+    Args:
+        cypher: Câu Cypher.
+
+    Returns:
+        ``True`` nếu câu có điều kiện lọc định danh được đối tượng.
+    """
+    without_literals = strip_string_literals(_strip_comments(cypher))
+    if "entity_id" in without_literals:
+        return True
+    if re.search(r"\bCOUNT\s*\(", without_literals, flags=re.IGNORECASE):
+        return True
+    where_match = re.search(
+        r"\bWHERE\b(?P<body>.*?)(?:\bRETURN\b|\bORDER\b|\bSKIP\b|\bLIMIT\b|$)",
+        without_literals,
+        flags=re.IGNORECASE | re.DOTALL,
+    )
+    if not where_match:
+        return False
+    body = where_match.group("body")
+    # So sánh với số: `= 1900`, `> 1900`, `<= 1900`…
+    if re.search(r"[<>!=]=?\s*-?\d+", body):
+        return True
+    # So sánh với chuỗi literal — phải khôi phục string literal đã bị bỏ.
+    raw_where = _strip_comments(cypher)
+    raw_match = re.search(
+        r"\bWHERE\b(?P<body>.*?)(?:\bRETURN\b|\bORDER\b|\bSKIP\b|\bLIMIT\b|$)",
+        raw_where,
+        flags=re.IGNORECASE | re.DOTALL,
+    )
+    if raw_match:
+        raw_body = raw_match.group("body")
+        if re.search(r"=\s*'[^']+'", raw_body):
+            return True
+        if re.search(r"\bCONTAINS\b\s*'[^']+'", raw_body, flags=re.IGNORECASE):
+            return True
+        if re.search(r"\bIN\s*\(\s*\[?[^\]]*'[^']+'", raw_body, flags=re.IGNORECASE):
+            return True
+    return False
+
+
 def validate_cypher(cypher: str) -> tuple[bool, str, str]:
     """Kiểm định một câu Cypher chỉ đọc.
 
@@ -203,7 +266,6 @@ def validate_cypher(cypher: str) -> tuple[bool, str, str]:
     if limit <= 0:
         return False, "LIMIT phải lớn hơn 0.", cleaned
     return True, "", cleaned
-
 
 def sanitize_records(records: list[dict[str, Any]]) -> list[dict[str, Any]]:
     """Chuyển record Neo4j sang JSON-safe (loại bỏ object neo4j).

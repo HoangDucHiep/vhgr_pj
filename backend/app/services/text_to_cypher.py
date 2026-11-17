@@ -20,8 +20,10 @@ from typing import Any
 from src.common.config import REPO_ROOT, load_config
 from src.common.llm_client import LLMClient
 from src.common.logger import get_logger
+from src.graph.noise_filter import filter_noisy_edges, filter_noisy_records
 
 from backend.app.services.cypher_validator import (
+    has_filtering_predicate,
     sanitize_records,
     validate_cypher,
 )
@@ -193,6 +195,32 @@ def ask(
             logger.warning("Lần %d bị validator chặn: %s", attempt, reason)
             continue
 
+        # Phase 13: nếu câu hỏi **không có entity nào** link được (vd đại từ
+        # "Ông ấy" đã bị chặn) mà LLM sinh Cypher **không lọc theo giá trị cụ
+        # thể** ⇒ câu đó sẽ quét toàn đồ thị và trả về các bản ghi ngẫu nhiên.
+        # ⇒ chặn ngay, không retry (LLM lặp lại cùng dạng câu), trả "Không có
+        # trong dữ liệu." đúng nguyên tắc #3.
+        if not entities and not has_filtering_predicate(fixed):
+            logger.warning(
+                "Câu hỏi không có entity cụ thể và Cypher không lọc theo giá trị "
+                "cụ thể — trả 'không có trong dữ liệu' (không retry).",
+            )
+            return {
+                "status": "not_in_data",
+                "answer": (
+                    "Không có trong dữ liệu. Câu hỏi không nêu tên cụ thể nào "
+                    "(ví dụ dùng đại từ như \"ông ấy\", \"vị vua đó\") nên hệ "
+                    "thống không xác định được đối tượng cần tra cứu. Vui lòng "
+                    "nêu rõ tên người, nhà, hoặc sự kiện."
+                ),
+                "cypher": fixed,
+                "entities": [],
+                "records": [],
+                "graph": {"nodes": [], "edges": []},
+                "retries": retries,
+                "elapsed_ms": int((time.time() - started) * 1000),
+            }
+
         from backend.app.services import neo4j_client
 
         try:
@@ -204,6 +232,8 @@ def ask(
             continue
 
         safe_records = sanitize_records(records)
+        # Phase 13: loại record nhiễu (vd `mat_tai → Quốc lộ 14`).
+        safe_records = filter_noisy_records(safe_records)
         if not safe_records:
             # Thử lần cuối: lấy **node đầy đủ** cho các entity đã link. Nhiều
             # câu hỏi hỏi về thuộc tính null (`start_year` của sự kiện, `reign_end`
@@ -314,6 +344,7 @@ def _run_direct(cypher: str, started: float) -> dict[str, Any]:
             "elapsed_ms": int((time.time() - started) * 1000),
         }
     safe_records = sanitize_records(records)
+    safe_records = filter_noisy_records(safe_records)
     if not safe_records:
         return {
             "status": "not_in_data",
@@ -580,6 +611,7 @@ def _enrich_graph_from_db(
             RETURN a.entity_id AS source,
                    b.entity_id AS target,
                    type(r) AS relation,
+                   b.name AS target_name,
                    r.confidence AS confidence,
                    r.evidence_sentence AS evidence_sentence,
                    r.source_url AS source_url,
@@ -655,6 +687,7 @@ def _enrich_graph_from_db(
             "source": source,
             "target": target,
             "relation": str(row.get("relation") or ""),
+            "target_name": str(row.get("target_name") or ""),
             "confidence": row.get("confidence"),
             "evidence_sentence": row.get("evidence_sentence"),
             "source_url": row.get("source_url"),
@@ -669,6 +702,10 @@ def _enrich_graph_from_db(
                     "name": endpoint,
                     "verified": True,
                 }
+
+    # Phase 13: loại cạnh nhiễu ("sinh_tai → Quốc lộ 14"). KG **không** đổi
+    # (13.379 cạnh vẫn trong DB); chỉ lọc ở tầng đọc.
+    edges = filter_noisy_edges(edges)
 
     # Lấy tên thật cho node lân cận mới thêm.
     missing = [eid for eid in nodes if nodes[eid]["label"] == "Entity"

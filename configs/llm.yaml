@@ -1,7 +1,29 @@
 # Cấu hình LLM — Gemini (chính) + Groq (dự phòng)
-# Quota free: Gemini 15 RPM / 500 RPD · Groq 30 RPM / 1000 RPD
-# Lưu ý: gemini-2.0-flash, gemini-2.5-* đã bị retire. Groq đã retire llama-3.1-8b-instant,
-# llama-3.3-70b-versatile.
+#
+# Quota free tier — ĐÃ ĐO THỰC TẾ (17/11/2026, scripts/probe_gemini_limits.py
+# + scripts/probe_groq_quota.py + probe thủ công trên header HTTP):
+#
+# | Provider | Model                    | RPM | RPD  | Ghi chú                          |
+# |----------|--------------------------|-----|------|----------------------------------|
+# | Gemini   | gemini-3.5-flash-lite    | 15  | 500  | quota tính **riêng theo model**   |
+# | Gemini   | gemini-3.1-flash-lite    | 15  | 500  | dùng chia tải quota              |
+# | Gemini   | gemini-3.1-flash-lite-preview | 15 | 500 | dùng chia tải quota           |
+# | Gemini   | gemini-3-flash-preview   | 15  | 500  | dùng chia tải quota              |
+# | Gemini   | gemini-3.5-flash         | 15  | 20   | RPD rất thấp (free tier)          |
+# | Gemini   | gemini-3.6-flash         | 15  | 20   | RPD rất thấp (free tier)          |
+# | Gemini   | gemini-3.8-flash         | 15  | 20   | RPD rất thấp (free tier)          |
+# | Groq     | openai/gpt-oss-20b       | 30  | —    | **TPD 200.000 token/ngày**        |
+# | Groq     | openai/gpt-oss-120b      | 30  | —    | TPM 8.000 token/phút             |
+# | Groq     | qwen/qwen3.8-27b         | 30  | —    | ITPM 7.000 token/phút            |
+#
+# ⇒ Quota **KHÔNG** dùng chung giữa các model **và** giữa các provider ⇒
+#   dùng **pool đa provider** (`--gen-pool` / `--judge-pool` của
+#   `src/evaluation/evaluate_rag.py`) để nhân thông lượng: khi Gemini cạn
+#   quota, lời gọi tự chuyển sang Groq (và ngược lại).
+#
+# Lưu ý: gemini-2.0-flash, gemini-2.5-* đã bị retire (404 "no longer
+# available to new users"). Groq đã retire llama-3.1-8b-instant,
+# llama-3.3-70b-versatile, meta-llama/llama-4-scout-17b-16e-instruct.
 
 providers:
   gemini:
@@ -17,7 +39,7 @@ providers:
 
   groq:
     adapter: openai_compatible
-    model: openai/gpt-oss-20b
+    model: openai/gpt-oss-120b
     api_key_env: GROQ_API_KEY
     base_url: "https://api.groq.com/openai/v1"
     rate_limit_per_min: 30
@@ -28,6 +50,35 @@ providers:
 
 primary: gemini
 fallback_order: [groq]
+
+# Pool model dùng cho đánh giá (Phase 16) — chia tải quota theo model.
+#
+# ⚠ Đo thực tế 17/11/2026: chạy 247 câu × 3 arm cần **741 lời gọi sinh** +
+# **247 lời gọi judge**. Với quota free tier, đây là ~988 lời gọi ⇒ **vượt
+# quota của mọi model Gemini đơn lẻ** (500 RPD). ⇒ Bắt buộc dùng pool
+# **đa provider** (Gemini + Groq), mỗi model có một "mức thông lượng" riêng.
+pools:
+  # Sinh câu trả lời (3 arm × 247 câu = 741 lời gọi).
+  generation:
+    # Định dạng: `provider:model1,model2;provider2:model3`
+    spec: >-
+      gemini:gemini-3.1-flash-lite,gemini-3.1-flash-lite-preview,gemini-3-flash-preview;
+      groq:openai/gpt-oss-120b,qwen/qwen3.8-27b,openai/gpt-oss-20b
+    provider: gemini
+    models:
+      - gemini-3.1-flash-lite
+      - gemini-3.1-flash-lite-preview
+      - gemini-3-flash-preview
+  # LLM-judge (247 lời gọi, gộp 3 arm/câu).
+  judge:
+    spec: >-
+      gemini:gemini-3.1-flash-lite,gemini-3.1-flash-lite-preview,gemini-3-flash-preview;
+      groq:openai/gpt-oss-120b,qwen/qwen3.8-27b
+    provider: gemini
+    models:
+      - gemini-3.1-flash-lite
+      - gemini-3.1-flash-lite-preview
+      - gemini-3-flash-preview
 
 # Đường bulk: không tốn quota API, chạy trên Kaggle GPU.
 bulk:

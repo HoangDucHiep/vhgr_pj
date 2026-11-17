@@ -38,6 +38,13 @@ docs/10-nhat-ky/
 | [`phase-04.md`](phase-04.md) | 4 — Nhãn bạc NER từ hyperlink (B2.1) | 14/11/2026 | 186.960 câu · 138.860 mention · độ phủ **100%** · **audit đóng phase**: 4 lỗi thật (thiếu ranh giới từ · "Quan lại nhà X" · siêu dữ liệu sinh tử · số đo lượng) · ablation 5 bước |
 | [`phase-07.md`](phase-07.md) | 7 — Wikidata DS + tập train RE (D1.1) | 15/11/2026 | Vì sao Wikidata thuần không đủ · đường grounding có giá trị nhất (+152%) · ablation đo từng nguồn nhãn |
 | [`phase-08.md`](phase-08.md) | 8 — Mô hình RE đa nhãn + LLM + hợp nhất triple (D1/D2/D3) | 15/11/2026 | Vì sao **đa nhãn sigmoid** không phải softmax · vì sao marker cần **vai trò** (4,62% cặp mơ hồ) · số liệu LLM baseline (evidence substring 97,51%) · 7 lỗi & cách sửa |
+| [`phase-13.md`](phase-13.md) | 13 — Sửa chất lượng: entity linking exact-case, chiều đảo quan hệ, lọc cạnh nhiễu KG | 17/11/2026 | 12 ca lỗi demo → 0 · 3 lớp sửa entity linking (alias 13.760→13.582) · **thang so sánh 3 phương án lọc nhiễu** (1.405 / 126 / **23**) · guard chống trả N người ngẫu nhiên |
+| [`phase-14.md`](phase-14.md) | 14 — Vanilla RAG: chunking đoạn + MiniLM-L12 + BM25/dense/RRF + trích dẫn `[n]` | 17/11/2026 | 65.608 chunk · embedding (65608, 384) float16 · top-1 đúng bài 6/6 · 700 test pass |
+| [`phase-15.md`](phase-15.md) | 15 — Hybrid GraphRAG: template Cypher + ý định + fusion + hội thoại | 17/11/2026 | 6 template · 6 ý định · **không gian trích dẫn `[1..N]` liên tục** · bài Bạch Đằng 30 entity → 60 cạnh / 0,11 s |
+| [`phase-16.md`](phase-16.md) | 16 — Đánh giá A vs B vs B− (LLM-judge) | 17/11/2026 | 247 câu × 3 arm · judge gộp 3 arm/câu + hoán vị thứ tự · **thang so sánh A / B / B−** · top-20 câu sai |
+| [`phase-17.md`](phase-17.md) | 17 — Giao diện so sánh, demo, đóng gói | 17/11/2026 | Toggle A/B/B− · citation click-to-source · đồ thị 1-hop Cytoscape · docker compose 3 service |
+| [`so-lieu/phase-13-chat-luong-kien-thuc.json`](so-lieu/phase-13-chat-luong-kien-thuc.json) | 13 | — | Số liệu Phase 13: chỉ số entity linking trước/sau · **thang so sánh 3 phương án lọc cạnh nhiễu** · số liệu guard chống bịa |
+| [`so-lieu/phase-16-eval-rag.json`](so-lieu/phase-16-eval-rag.json) | 16 | — | Số liệu Phase 16: chỉ số 3 arm · **chênh lệch A/B/B−** · phân rã theo 5 dạng câu hỏi |
 | [`so-lieu/phase-00-mo-truong.json`](so-lieu/phase-00-mo-truong.json) | 0 | — | Phiên bản thư viện, cấu hình hạ tầng, so sánh phương án bảo vệ DB |
 | [`so-lieu/phase-01-bang-do-sanh.json`](so-lieu/phase-01-bang-do-sanh.json) | 1 | — | Thống kê corpus trước/sau T5 theo mọi chiều |
 | [`so-lieu/phase-02-text-stats.json`](so-lieu/phase-02-text-stats.json) | 2 | — | Số liệu văn bản Phase 2: trước/sau theo từng lỗi · so sánh 3 phương án xử lý wikilink |

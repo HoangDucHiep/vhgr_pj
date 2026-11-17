@@ -72,6 +72,28 @@ LOWERCASE_OK_WORDS = {
     "huyen", "quan", "gia", "trieu", "nha", "thanh",
 }
 
+#: **Bề mặt đại từ / danh xưng** — tuyệt đối KHÔNG được dùng để link câu hỏi.
+#:
+#: Vì sao (Phase 13, lỗi demo 16/11/2026): alias `"ông ấy"` trong KG trỏ tới
+#: `ent_george_h_5df82ed5` (George H. W. Bush) vì coref gom bề mặt đại từ làm
+#: tên entity. Người dùng hỏi *"Ông ấy mất năm nào?"* ⇒ hệ thống link nhầm
+#: sang George H. W. Bush ⇒ trả lời sai hoàn toàn.
+#:
+#: Các bề mặt này **không** mang thông tin định danh ⇒ phải xử lý ở tầng hội
+#: thoại (Phase 15 — `conversation.py` thay bằng `last_subject`), không phải
+#: ở tầng entity linking.
+PRONOUN_ALIASES = {
+    "ong ay", "ong ta", "ong no", "ong ky", "ong vua", "vi vua",
+    "vua do", "vua ay", "nguoi do", "nguoi ay", "nguoi no", "nguoi vua",
+    "vi do", "vi ay", "toan bo", "ca bo", "ca nhan", "phan lon",
+    "trieu do", "trieu ay", "trieu dai do", "nha do", "nha ay",
+    "tran do", "tran ay", "cuoc do", "cuoc ay", "su kien do",
+    "nam do", "nam ay", "chuyen do", "chuyen ay", "viec do", "viec ay",
+    "suc do", "suc ay", "diem do", "diem ay", "phien do", "phien ay",
+    "thoi do", "thoi ay", "doi do", "doi ay", "noi do", "noi ay",
+    "dia danh do", "dia danh ay", "tieu biet", "sieu kien",
+}
+
 
 def _find_normalized(text: str, alias: str, from_index: int) -> tuple[int, int] | None:
     """Tìm vị trí của `alias` (đã bỏ dấu) trong `text` gốc.
@@ -198,10 +220,42 @@ class EntityLinker:
                 del self.alias_to_ids[alias]
                 single_word += 1
 
+        # ---- Phase 13 — chặn alias viết **toàn chữ thường** & đại từ ----
+        #
+        # Nguyên nhân gốc lỗi demo (16/11/2026): lớp khớp giữ dấu **không** kiểm
+        # tra chữ hoa ⇒ câu "Đổi mới đất nước" khớp entity "Đổi Mới"; câu
+        # "Ông ấy mất năm nào" khớp entity "ông ấy" (George H. W. Bush).
+        #
+        # Cách sửa (3 bước):
+        #   (a) Loại khỏi chỉ mục mọi alias mà **mọi** bề mặt gốc đều viết
+        #       toàn chữ thường và ≥ 2 từ ("chiến thắng", "triều đại",
+        #       "phong kiến"…) — đây là cụm từ thường, không phải tên riêng.
+        #   (b) Loại alias là **đại từ/danh xưng** ("ông ấy", "vị vua đó"…).
+        #   (c) Lớp khớp giữ dấu chỉ nhận span có **đúng** chữ hoa của bề mặt
+        #       alias (xem `_case_pattern_ok`).
+        lowercase_multi = 0
+        pronoun = 0
+        for alias in list(self.alias_to_ids):
+            if alias in PRONOUN_ALIASES:
+                del self.alias_to_ids[alias]
+                self.alias_display.pop(alias, None)
+                pronoun += 1
+                continue
+            displays = self.alias_display.get(alias) or set()
+            if not displays:
+                del self.alias_to_ids[alias]
+                continue
+            if all(display == display.lower() for display in displays):
+                del self.alias_to_ids[alias]
+                self.alias_display.pop(alias, None)
+                lowercase_multi += 1
+
         logger.info(
             "Entity linker: %d alias → %d entity "
-            "(loại %d alias mơ hồ, %d alias 1 từ)",
+            "(loại %d alias mơ hồ, %d alias 1 từ, %d alias toàn-chữ-thường, "
+            "%d alias đại từ)",
             len(self.alias_to_ids), len(self.name_of), ambiguous, single_word,
+            lowercase_multi, pronoun,
         )
 
     @staticmethod
@@ -263,6 +317,11 @@ class EntityLinker:
     ) -> list[tuple[str, str, str]]:
         """Khớp entity trong text theo một lớp.
 
+        Lớp giữ dấu (``keep_accents=True``) dùng **khớp đúng chữ hoa**
+        (case-sensitive) trên chính `text` gốc — xem `_case_pattern_ok`.
+        Lớp bỏ dấu (``keep_accents=False``) là lớp dự phòng, dùng
+        `_capitalization_ok`.
+
         Args:
             text: Câu hỏi tiếng Việt.
             keep_accents: ``True`` = khớp giữ dấu; ``False`` = bỏ dấu.
@@ -270,15 +329,18 @@ class EntityLinker:
         Returns:
             Danh sách `(span, entity_id, canonical_name)`.
         """
+        if not text.strip():
+            return []
         if keep_accents:
-            haystack = text.casefold()
+            # Lớp 1: khớp **case-sensitive** trên text gốc.
+            haystack = text
         else:
             haystack = strip_accents(text).casefold()
         if not haystack.strip():
             return []
         aliases = sorted(self.alias_to_ids, key=len, reverse=True)
         taken: list[tuple[int, int]] = []
-        results: list[tuple[str, str, str]] = []
+        results: list[tuple[int, str, str, str]] = []
         for alias in aliases:
             if keep_accents:
                 needles = self.alias_display.get(alias) or set()
@@ -288,7 +350,7 @@ class EntityLinker:
                 needles = {alias}
             for raw_alias in needles:
                 needle = (
-                    raw_alias.casefold() if keep_accents else alias.casefold()
+                    raw_alias if keep_accents else alias.casefold()
                 )
                 start = haystack.find(needle)
                 while start != -1:
@@ -301,19 +363,68 @@ class EntityLinker:
                         and after_ok
                         and not any(start < e and s < end for s, e in taken)
                     ):
-                        # Lớp bỏ dấu phải kiểm tra **chữ hoa** — nếu không,
-                        # "Nguyễn Huệ chỉ" (text) khớp "Nguyễn Huệ Chi" (alias).
-                        if keep_accents or self._capitalization_ok(text, start, end):
+                        # Lớp giữ dấu: span phải viết **đúng** chữ hoa của bề
+                        # mặt alias — nếu không, "Đổi mới đất nước" sẽ khớp
+                        # "Đổi Mới" (lỗi demo 16/11/2026).
+                        # Lớp bỏ dấu: kiểm tra chữ hoa tổng quát — nếu không,
+                        # "Nguyễn Huệ chỉ" khớp "Nguyễn Huệ Chi".
+                        ok = (
+                            self._case_pattern_ok(text, start, end, raw_alias)
+                            if keep_accents
+                            else self._capitalization_ok(text, start, end)
+                        )
+                        if ok:
                             entity_id = self.alias_to_ids[alias][0]
                             taken.append((start, end))
                             results.append((
+                                start,
                                 text[start:end],
                                 entity_id,
                                 self.name_of.get(entity_id, alias),
                             ))
                     start = haystack.find(needle, start + 1)
-        results.sort(key=lambda item: haystack.find(item[0].casefold()))
-        return results
+        results.sort(key=lambda item: item[0])
+        return [(span, entity_id, canonical) for _, span, entity_id, canonical in results]
+
+    @staticmethod
+    def _case_pattern_ok(
+        text: str, start: int, end: int, raw_alias: str,
+    ) -> bool:
+        """Kiểm tra span có **đúng** chữ hoa của bề mặt alias hay không.
+
+        Quy tắc (Phase 13): mỗi từ trong span phải viết hoa **đúng như** từ
+        tương ứng trong `raw_alias` — hoặc là từ chức năng được phép viết
+        thường (`LOWERCASE_OK_WORDS`: "ông", "vua"…).
+
+        Vì sao cần (lỗi demo 16/11/2026):
+        - "Đổi mới đất nước" khớp "Đổi Mới" ⇒ sai;
+        - "Ông ấy mất năm nào" khớp "ông ấy" (George H. W. Bush) ⇒ sai;
+        - nhưng "Trần Hưng Đạo", "triều Lê", "Trần Nhân Tông" phải **vẫn** khớp.
+
+        Args:
+            text: Câu hỏi gốc.
+            start: Vị trí bắt đầu span.
+            end: Vị trí kết thúc span.
+            raw_alias: Bề mặt gốc của alias (có dấu, đúng chữ hoa).
+
+        Returns:
+            ``True`` nếu span nhất quán với bề mặt alias.
+        """
+        span_words = text[start:end].split()
+        alias_words = raw_alias.split()
+        if not span_words or len(span_words) != len(alias_words):
+            return False
+        for span_word, alias_word in zip(span_words, alias_words):
+            if not span_word[:1].isalpha():
+                continue
+            if span_word[0].isupper() == alias_word[:1].isupper():
+                continue
+            # Khác nhau ở chữ hoa: chỉ chấp nhận nếu span word là từ chức năng
+            # được phép viết thường ("ông Lê Lợi", "vua Lê Lợi").
+            if not span_word[0].isupper() and normalize_name(span_word) in LOWERCASE_OK_WORDS:
+                continue
+            return False
+        return True
 
     def _capitalization_ok(self, text: str, start: int, end: int) -> bool:
         """Kiểm tra span có viết **hoa** như tên riêng hay không.

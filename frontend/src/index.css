@@ -88,17 +88,169 @@ body {
   color: #86181d;
 }
 
+/* ---------- Thanh công cụ chọn arm ---------- */
+.chat__toolbar {
+  grid-column: 1 / -1;
+  grid-row: 1;
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  flex-wrap: wrap;
+  margin-bottom: 0.25rem;
+}
+
+.chat__arms {
+  display: inline-flex;
+  border: 1px solid #bcccdc;
+  border-radius: 0.4rem;
+  overflow: hidden;
+}
+
+.chat__arm {
+  font: inherit;
+  font-size: 0.82rem;
+  padding: 0.35rem 0.7rem;
+  border: none;
+  border-right: 1px solid #bcccdc;
+  background: #fff;
+  color: #3e4c59;
+  cursor: pointer;
+}
+
+.chat__arm:last-child {
+  border-right: none;
+}
+
+.chat__arm--active {
+  background: #0b3d5c;
+  color: #fff;
+  font-weight: 600;
+}
+
+.chat__arm-hint {
+  margin: 0;
+  font-size: 0.78rem;
+  color: #7b8794;
+  flex: 1 1 14rem;
+}
+
+.chat__reset {
+  font: inherit;
+  font-size: 0.8rem;
+  padding: 0.35rem 0.7rem;
+  border: 1px solid #bcccdc;
+  border-radius: 0.4rem;
+  background: #fff;
+  color: #3e4c59;
+  cursor: pointer;
+}
+
+.chat__arm-tag {
+  display: inline-block;
+  margin-right: 0.45rem;
+  padding: 0.05rem 0.4rem;
+  border-radius: 0.3rem;
+  background: #e4e7eb;
+  color: #3e4c59;
+  font-size: 0.72rem;
+  font-weight: 700;
+}
+
+.chat__meta {
+  margin: 0.4rem 0 0;
+  font-size: 0.78rem;
+  color: #52606d;
+}
+
+/* ---------- Nguồn trích dẫn ---------- */
+.citations {
+  margin-top: 0.5rem;
+}
+
+.citations__toggle {
+  font: inherit;
+  font-size: 0.78rem;
+  padding: 0.15rem 0.5rem;
+  border: 1px solid #d9e2ec;
+  border-radius: 0.3rem;
+  background: #f8fafc;
+  color: #52606d;
+  cursor: pointer;
+}
+
+.citations__list {
+  list-style: none;
+  margin: 0.45rem 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.citations__item {
+  display: flex;
+  align-items: baseline;
+  gap: 0.4rem;
+  font-size: 0.8rem;
+  color: #3e4c59;
+  padding: 0.15rem 0.3rem;
+  border-radius: 0.3rem;
+}
+
+.citations__item--active {
+  background: #fff4e6;
+}
+
+.citations__badge {
+  font: inherit;
+  font-weight: 700;
+  color: #0b3d5c;
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  text-decoration: underline;
+}
+
+.citations__kind {
+  font-size: 0.68rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  padding: 0.05rem 0.35rem;
+  border-radius: 0.25rem;
+  background: #e4e7eb;
+  color: #3e4c59;
+}
+
+.citations__kind--kg {
+  background: #d3f9d8;
+  color: #1b4332;
+}
+
+.citations__label {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.citations__link {
+  font-size: 0.75rem;
+  color: #0b5cad;
+}
+
 /* ---------- Bố cục hội thoại ---------- */
 .chat {
   display: grid;
   grid-template-columns: minmax(320px, 1fr) minmax(420px, 1.2fr);
-  grid-template-rows: 1fr;
+  grid-template-rows: auto 1fr auto;
   gap: 1rem;
   height: calc(100vh - 8rem);
 }
 
 .chat__history {
-  grid-row: 1 / span 2;
+  grid-column: 1;
+  grid-row: 2;
   overflow-y: auto;
   background: #ffffff;
   border: 1px solid #d9e2ec;
@@ -143,6 +295,7 @@ body {
 
 .chat__input {
   grid-column: 1;
+  grid-row: 3;
   display: flex;
   gap: 0.5rem;
   align-items: flex-end;
@@ -174,7 +327,7 @@ body {
 
 .chat__side {
   grid-column: 2;
-  grid-row: 1 / span 2;
+  grid-row: 2 / span 2;
   display: grid;
   grid-template-rows: 1fr auto auto auto;
   gap: 0.75rem;
