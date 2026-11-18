@@ -16,11 +16,7 @@ REPO="${PHASE16_REPO:-/media/hoanghiep/All1/Codes/NPL/vhgr_pj}"
 cd "$REPO" || exit 1
 
 TARGET=247
-# 40 vòng là **không đủ**: quota Gemini reset 1 lần/ngày (~15:00 UTC+7),
-# Groq TPD là cửa sổ **trượt 24h** ⇒ cần đủ số vòng để sống sót qua các lần
-# reset. Mỗi vòng ngủ theo mốc quota hồi (tối đa 4h) nên 120 vòng ≈ 20 ngày
-# — trên mức cần thiết, nhưng rẻ (vòng chỉ tốn 60s nạp index).
-MAX_ROUNDS="${PHASE16_MAX_ROUNDS:-120}"
+MAX_ROUNDS="${PHASE16_MAX_ROUNDS:-40}"
 CHECKPOINT=data/eval/eval_rag_checkpoint.jsonl
 # --- Phân bổ quota theo đặc tính hạn mức từng provider ------------------
 # **Groq**: hạn mức theo **token/ngày** (200.000 token/model) ⇒ dùng cho
@@ -30,19 +26,8 @@ CHECKPOINT=data/eval/eval_rag_checkpoint.jsonl
 #   như không giới hạn ⇒ dùng cho **LLM-judge** (1 lời gọi/câu, ~2.8K token
 #   prompt ⇒ 247 câu chỉ tốn 247 request ⇒ rất thoải mái).
 # ⇒ Tách 2 pool ⇒ không tranh nhau hạn mức ⇒ tận dụng tối đa cả 2 provider.
-#
-# **Quan trọng — không dùng trùng model Gemini ở 2 pool**:
-# hạn mức Gemini là **500 RPD *riêng theo model*** ⇒ nếu cả 2 pool dùng
-# cùng `gemini-3.1-flash-lite` thì 500 request/ngày bị **chia sẻ** ⇒
-# sinh câu trả lời ăn hết quota của judge ⇒ phải chờ tới hôm sau.
-# ⇒ **Không giao model nào cho cả 2 pool** (4 model Gemini × 500 RPD =
-#   2.000 request/ngày ⇒ chia đều 2 pool ⇒ 1.000 request/ngày/pool):
-#   - Sinh: Groq (3 model, chính) + Gemini `gemini-3.5-flash-lite`,
-#           `gemini-3-flash-preview` (dự phòng khi Groq cạn token)
-#   - Judge: Gemini `gemini-3.1-flash-lite`, `gemini-3.1-flash-lite-preview`
-#            + Groq (3 model) **dự phòng** (chỉ khi Gemini cạn RPD)
-GEN_POOL="${PHASE16_GEN_POOL:-groq:openai/gpt-oss-120b,qwen/qwen3.8-27b,openai/gpt-oss-20b;gemini:gemini-3.5-flash-lite,gemini-3-flash-preview}"
-JUDGE_POOL="${PHASE16_JUDGE_POOL:-gemini:gemini-3.1-flash-lite,gemini-3.1-flash-lite-preview;groq:openai/gpt-oss-120b,qwen/qwen3.8-27b,openai/gpt-oss-20b}"
+GEN_POOL="${PHASE16_GEN_POOL:-groq:openai/gpt-oss-120b,qwen/qwen3.8-27b,openai/gpt-oss-20b;gemini:gemini-3.1-flash-lite,gemini-3.1-flash-lite-preview,gemini-3-flash-preview}"
+JUDGE_POOL="${PHASE16_JUDGE_POOL:-gemini:gemini-3.1-flash-lite,gemini-3.1-flash-lite-preview,gemini-3-flash-preview,gemini-3.5-flash-lite;groq:openai/gpt-oss-120b,qwen/qwen3.8-27b,openai/gpt-oss-20b}"
 
 count_done() {
     # Đếm **qid duy nhất** (không tính bản ghi lỗi hạ tầng).
@@ -84,10 +69,7 @@ try:
     with open(sys.argv[1], encoding="utf-8") as handle:
         data = json.load(handle)
     nxt = float(data.get("next_available_epoch") or 0)
-    # Trần 4 giờ: Gemini free tier báo "retry in 3h11m" ⇒ cần ngủ dài hơn
-    # 1 giờ, nếu không sẽ thức dậy hàng chục lần chỉ để nạp lại index
-    # (65K chunk + embedding ~60s/vòng) rồi lại hoãn.
-    print(max(60, min(14400, int(nxt - time.time()) + 30)))
+    print(max(60, min(3600, int(nxt - time.time()) + 30)))
 except Exception:
     print(120)
 PY
@@ -115,7 +97,6 @@ run_eval() {
         --quota-cooldown-s 600 \
         --max-quota-wait-s 300 \
         --max-cooldown-s 900 \
-        --judge-max-cooldown-s 14400 \
         --quota-wait-s 900 \
         > "$log" 2>&1
 }

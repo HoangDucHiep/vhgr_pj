@@ -62,3 +62,13 @@ Thumbs.db
 # `scripts/build_kaggle_*.py`, dung lượng hàng GB.
 data/kaggle/
 dataset-metadata.json
+
+# ---- Checkpoint eval trung gian (tái tạo bằng scripts/run_narrative_eval_loop.sh) ----
+# Giữ lại checkpoint KẾT QUẢI CUỐI (eval_d124_*) để tái lập kết quả báo cáo.
+data/eval/eval_d120_checkpoint.jsonl
+data/eval/eval_d122_checkpoint.jsonl
+data/eval/eval_d122_checkpoint.*.json
+data/eval/eval_d122_narrative_*.jsonl
+data/eval/eval_d123_checkpoint.jsonl
+data/eval/eval_d123_checkpoint.*.json
+data/eval/eval_d123_narrative_*.jsonl

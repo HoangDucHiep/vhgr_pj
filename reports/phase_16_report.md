@@ -22,6 +22,15 @@
    giả ⇒ thử lại với `max_tokens` lớn hơn + `reason` ≤ 15 từ.
    `scripts/rejudge_missing.py` chấm lại các arm bị bỏ sót (dùng lại context
    đã sinh, không tốn quota sinh).
+6. **Sửa chiều quan hệ KG ở tầng đọc** (D-118): `src/graph/direction.py` chuẩn hoá
+   chiều + đổi nhãn đảo + loại cạnh tự tham chiếu; `src/qa/graph_context.py` dùng
+   `startNode(r)`/`endNode(r)` để giữ chiều thật; `src/qa/fusion.py` cân bằng ngân
+   sách context (KG 40% / văn bản 60%); `src/qa/hybrid.py` hiển thị quan hệ gia đình
+   bằng **mệnh đề tiếng Việt** (`{target} là mẹ của {source}`) thay vì mũi tên.
+7. **Cơ chế tái dùng arm không đổi** (D-119): `--reuse-arms-from` cho phép chạy lại
+   benchmark chỉ sinh lại arm đã đổi ⇒ tiết kiệm 3× quota (247 thay vì 741 lời gọi
+   sinh) mà **không** đánh đổi tính công bằng (arm tái dùng vẫn được judge chấm lại;
+   arm chạy lại được **ghim đúng model cũ** ⇒ 3 arm cùng model ⇒ không confound).
 
 ## Lệnh đã chạy
 
@@ -29,9 +38,10 @@
 ./.venv/bin/python -m src.evaluation.build_qa_set
 ./.venv/bin/python -u -m src.evaluation.evaluate_rag \
   --qa-set data/eval/qa_rag_250.jsonl --arms A,B,B- --reset-sessions \
-  --gen-pool "groq:openai/gpt-oss-120b,qwen/qwen3.8-27b,openai/gpt-oss-20b;gemini:gemini-3.5-flash-lite,gemini-3-flash-preview" \
-  --judge-pool "gemini:gemini-3.1-flash-lite,gemini-3.1-flash-lite-preview;groq:openai/gpt-oss-120b,qwen/qwen3.8-27b,openai/gpt-oss-20b" \
+  --gen-pool "gemini:gemini-3.5-flash-lite,gemini-3.1-flash-lite,gemini-3.1-flash-lite-preview;groq:openai/gpt-oss-120b,qwen/qwen3.8-27b,openai/gpt-oss-20b" \
+  --judge-pool "gemini:gemini-3.1-flash-lite,gemini-3.1-flash-lite-preview,gemini-3.5-flash-lite;groq:openai/gpt-oss-120b,qwen/qwen3.8-27b" \
   --checkpoint data/eval/eval_rag_checkpoint.jsonl --resume \
+  --reuse-arms-from data/eval/eval_rag_checkpoint_prev.jsonl \
   --infra-retries 3 --infra-retry-wait-s 45 --stamp phase16
 → 247 câu × 3 arm · judge = pool đa provider
 ./.venv/bin/python scripts/rejudge_missing.py \
@@ -44,6 +54,13 @@
 → Ghi docs/10-nhat-ky/phase-16.md + so-lieu/phase-16-eval-rag.json + reports/phase_16_report.md
 ```
 
+**Lần chạy lại sau D-118** (chỉ sinh lại arm B):
+
+```bash
+bash scripts/wait_phase16_d118.sh
+→ supervisor: chạy evaluate_rag + rejudge + rebuild report + sinh log
+```
+
 ## Số liệu đo được
 
 | Chỉ số | A — Vanilla RAG | B — Hybrid GraphRAG | B− — Hybrid không KG |
@@ -51,20 +68,20 @@
 | Số câu (tính điểm) | 247 | 247 | 247 |
 | Số câu lỗi hạ tầng (loại) | 0 | 0 | 0 |
 | Số arm judge bỏ sót (phải = 0) | 0 | 0 | 0 |
-| correctness (0–2) | 1.2915 | 1.4372 | 1.2955 |
-| correctness_rate | 0.5951 | 0.6478 | 0.5992 |
-| faithfulness (0–2) | 1.8664 | 1.7247 | 1.8502 |
-| faithfulness_rate | 0.9271 | 0.8381 | 0.9231 |
-| citation_precision | 0.6984 | 0.7656 | 0.7085 |
+| correctness (0–2) | 1.1619 | 1.5506 | 1.17 |
+| correctness_rate | 0.5304 | 0.7328 | 0.5344 |
+| faithfulness (0–2) | 1.834 | 1.8745 | 1.8502 |
+| faithfulness_rate | 0.9109 | 0.915 | 0.9231 |
+| citation_precision | 0.6154 | 0.8275 | 0.6275 |
 | no_data_accuracy | 0.9655 | 0.9655 | 0.9655 |
-| latency p50 (ms) | 1763 | 2096 | 1644 |
-| latency p95 (ms) | 11794 | 22429 | 13515 |
-| context_tokens (TB) | 712 | 1739 | 734 |
+| latency p50 (ms) | 1749 | 2054 | 1633 |
+| latency p95 (ms) | 11794 | 16741 | 13155 |
+| context_tokens (TB) | 712 | 1711 | 734 |
 
 ## Gate
 
-- [x] `correctness(B) > correctness(A)` — Δ = **+0.1457** ✅
-- [x] B− nằm giữa/sát A ⇒ Δ(B vs B−) = **+0.1417**, Δ(B− vs A) = **+0.0040**
+- [x] `correctness(B) > correctness(A)` — Δ = **+0.3887** ✅
+- [x] B− nằm giữa/sát A ⇒ Δ(B vs B−) = **+0.3806**, Δ(B− vs A) = **+0.0081**
 - [x] `n_judge_missing == 0` cho mọi arm (không có điểm 0 giả do judge bỏ sót arm)
 - [x] `n_infra_errors` được **loại khỏi mẫu số**, không tính điểm 0
 - [x] Không có mismatch model giữa các arm của cùng 1 câu (ghim model theo `qid`)

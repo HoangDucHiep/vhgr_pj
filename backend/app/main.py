@@ -27,6 +27,15 @@ async def lifespan(_: FastAPI) -> AsyncIterator[None]:
     Yields:
         None — điểm vào của vòng đời.
     """
+    # Cho phép chẩn đoán treo: `docker kill -s SIGUSR1 vhgr_backend` ⇒ in
+    # stack của **mọi** thread ra stdout (D-122).
+    import faulthandler
+    import signal
+
+    faulthandler.enable()
+    if hasattr(signal, "SIGUSR1"):
+        faulthandler.register(signal.SIGUSR1, all_threads=True, chain=False)
+
     yield
     from backend.app.services import neo4j_client
 

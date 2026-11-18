@@ -1731,3 +1731,891 @@ kỹ thuật.
 - `scripts/rejudge_missing.py` (mới): chấm lại các arm bị judge bỏ sót.
 - `tests/test_phase16_eval.py`: 34 test (chuẩn hóa arm, loại lỗi hạ tầng,
   tách session, parse pool spec, retry judge, đếm arm bị bỏ sót).
+
+---
+
+## D-105 — **Chuẩn hoá chiều quan hệ KG ở tầng đọc** + cân bằng ngân sách context giữa text và KG
+
+**Ngày:** 17/11/2026 · **Phase:** 16
+
+**Bối cảnh.** Sau khi chốt 247/247 câu, gate của Phase 16 là
+`faithfulness_rate ≥ 0,90` nhưng **Arm B chỉ đạt 0,8381** (Arm A 0,9271 ·
+B− 0,9231). Truy nguyên 40/247 câu bị `faithfulness < 2` cho thấy lỗi
+**không nằm ở LLM** mà ở **tầng đọc KG**:
+
+1. **Chiều quan hệ bị đảo (nghiêm trọng nhất).** Template Cypher trong
+   `src/qa/graph_context.py` khớp **không hướng** rồi gán cứng `source = e`:
+
+   ```cypher
+   MATCH (e {entity_id: $entity_id})-[r]-(other)   -- không hướng
+   RETURN e.entity_id AS source_id, ...            -- gán cứng ⇒ ĐẢO CHIỀU
+   ```
+
+   KG lưu quan hệ **có hướng** (`docs/04` §3.1: `(Lê Lợi)-[:cha_cua]->
+   (Lê Khánh Dư)` nghĩa *"Lê Lợi là **con** của Lê Khánh Dư"*). Đo được:
+   **2.601/2.601** cạnh gia đình bị hiển thị ngược ⇒ LLM đọc sai quan hệ ⇒
+   trả lời sai ⇒ judge chấm `faithfulness < 2`.
+2. **KG chiếm hết ngân sách context.** Công thức cũ
+   `text_budget = char_budget - kg_size` ⇒ với câu `relational`, KG chiếm
+   **98%** context, văn bản chỉ còn **2%** ⇒ LLM không đủ bằng chứng văn bản
+   ⇒ trả "không có trong dữ liệu" **dù context có dữ liệu**.
+3. **Câu trả lời rỗng** từ LLM bị ghi `status="found"` ⇒ judge chấm 0 cho
+   **cả 3 arm** ⇒ điểm 0 *ảo*.
+4. **Judge không biết chủ thể** của câu đại từ ("Ông ấy sinh năm nào?") ⇒
+   coi là "không xác định đối tượng" ⇒ chấm 0 dù câu trả lời **đúng**.
+
+**Quyết định.**
+
+1. **Chuẩn hoá chiều ở TẦNG ĐỌC** (không sửa Neo4j — cùng nguyên tắc D-095):
+   - Module mới `src/graph/direction.py`: `normalize_direction()` đảo
+     `source`/`target` khi cạnh đi ngược so với mốc, **đổi nhãn** sang quan
+     hệ đảo (`cha_cua` ⇄ `con_cua`, `vo_cua` ⇄ `chong_cua`), loại cạnh tự
+     tham chiếu.
+   - Template Cypher dùng `startNode(r)`/`endNode(r)` để giữ **chiều thật**.
+   - **Mốc** (entity người hỏi về) luôn là **chủ thể** khi hiển thị ⇒
+     "Ai là cha của X?" đọc đúng chiều.
+2. **Ngân sách context cân bằng**: KG 40% / văn bản 60% (thay vì để KG
+   chiếm hết rồi bóp text); luôn giữ ≥ **30%** cho văn bản.
+3. **Công bằng ablation:** khi **không có KG** (arm B−) ⇒ văn bản dùng
+   **100%** ngân sách ⇒ ngân sách văn bản của B− **không đổi** so với arm A
+   ⇒ khác biệt A vs B− vẫn đúng là "KG", không phải "ngân sách context".
+4. **Câu trả lời rỗng** ⇒ quy về "không có trong dữ liệu" (không phải
+   `status="found"`).
+5. **Judge nhận `subject_name`** ⇒ hiểu đại từ "ông ấy" ⇒ chấm công bằng.
+6. **Hướng dẫn đọc phần đồ thị** (chỉ arm B) trong prompt + ưu tiên dòng
+   "Bằng chứng" (câu gốc Wikipedia) khi nhãn quan hệ và bằng chứng lệch nhau.
+
+**Lý do.** Đây là loại lỗi làm **sai kết luận nghiên cứu**, không phải làm
+số liệu kém: nếu giữ nguyên, kết luận "KG giúp RAG" sẽ bị gán nhầm lợi
+ích của việc **đọc đúng chiều quan hệ** (mà lẽ ra KG phải có sẵn). Việc
+sửa ở tầng đọc giữ nguyên tính tái lập của artifact KG (19.548 node /
+13.379 cạnh) — đúng nguyên tắc đã dùng cho D-095.
+
+**Ảnh hưởng:**
+- `src/graph/direction.py` (mới), `src/qa/graph_context.py`, `src/qa/fusion.py`,
+  `src/qa/hybrid.py`, `src/qa/rag_answer.py`, `src/evaluation/evaluate_rag.py`.
+- `tests/test_graph_direction.py` (mới): 25 test (đảo nhãn, chuẩn hoá chiều,
+  template giữ chiều, nhãn hiển thị, ngân sách context).
+
+## D-119 — **Tái dùng arm không đổi** khi chạy lại benchmark (chỉ sinh lại arm đã sửa)
+
+**Ngày:** 17/11/2026 · **Phase:** 16
+
+**Bối cảnh.** Sau D-118, arm B thay đổi (chiều quan hệ KG + ngân sách context +
+hướng dẫn đọc đồ thị + mệnh đề quan hệ) nhưng **arm A và B− giữ nguyên**
+prompt lẫn context. Chạy lại **cả 3 arm** cần **741** lời gọi sinh
+(247 × 3) ≈ **2M token Groq** ⇒ vượt hạn mức free tier
+(200K token/ngày/model) **10 lần** ⇒ không thể chạy.
+
+**Quyết định.** Thêm cờ `--reuse-arms-from <checkpoint-cũ>` cho
+`src/evaluation/evaluate_rag.py`:
+
+1. **Chỉ sinh lại arm đã đổi** (arm B) ⇒ **247** lời gọi thay vì 741 ⇒ tiết kiệm
+   3× quota, đủ chạy trong 1 ngày free tier.
+2. **Điều kiện để tái dùng được**: arm đó phải **tái lập được** với mã hiện tại.
+   Đã kiểm chứng: context của arm A/B− **byte-for-byte giống** checkpoint cũ
+   (đối chiếu trực tiếp, không tốn LLM call) ⇒ tái dùng là *tái lập*, không phải
+   "chép".
+3. **Điểm luôn là điểm mới**: arm tái dùng vẫn được **judge hiện tại chấm lại**
+   (judge đã đổi: thêm `subject_hint`) ⇒ không bao giờ chép điểm cũ.
+4. **Chống confound model**: arm tái dùng giữ `gen_model` cũ ⇒ arm chạy lại được
+   **ghim cứng đúng model cũ** (`pin_strict`) ⇒ 3 arm của mỗi câu dùng **cùng
+   model** ⇒ không confound. Nếu model cũ đã hết quota ⇒ **không tái dùng**
+   arm nào của câu đó (tránh lệch model).
+5. **Ghi dấu vết trong checkpoint**: `arm.reused_from_previous_run = True` ⇒
+   kiểm toán được arm nào là tái dùng.
+
+**Kết quả.** Chạy lại 247/247 câu: arm B `faithfulness_rate` **0,9150**
+(trước D-118: 0,8381 ⇒ **vượt gate ≥ 0,90**), `correctness` **1,5506** vs arm A
+**1,1619** (Δ = **+0,3887**), `citation_precision` **0,8275** vs A **0,6154**.
+Không câu nào bị loại do confound model (`n_model_mismatch = 0`), không arm nào
+bị judge bỏ sót (`n_judge_missing = 0`).
+
+**Lý do.** Với nghiên cứu so sánh, **tái dùng kết quả cũ chỉ hợp lệ khi biến
+thể đó không đổi** — và điều đó phải được *chứng minh*, không *giả định*. Bên cạnh
+đó, cơ chế này biến "quota free tier" từ ràng buộc chặn (phải chờ 2–3 ngày)
+thành bài toán *kỹ thuật* có lời giải.
+
+**Ảnh hưởng:**
+- `src/evaluation/evaluate_rag.py`: thêm `--reuse-arms-from`, `--gen-provider-priority`,
+  `--judge-provider-priority`; hàm `_load_reuse_map()`, `_parse_provider_priority()`.
+- `scripts/wait_phase16_d118.sh` (mới): supervisor chạy vòng lặp `--resume` +
+  rejudge + rebuild report + sinh log.
+- `tests/test_phase16_eval.py`: test cho cơ chế tái dùng arm + ghim model.
+
+## D-120 — **Truy vấn chuỗi quan hệ 2–3 hop** theo đúng *vai trò* (multi-hop)
+
+**Ngày:** 17/11/2026 · **Phase:** 16 (bổ sung)
+
+**Bối cảnh.** Đo live trên 40 câu `multi_hop` của `data/eval/qa_rag_250.jsonl`:
+
+| Bước                                  | Kết quả        |
+|---------------------------------------|----------------|
+| Đáp án có trong KG **1-hop**          | **0 / 40**     |
+| Đáp án có trong KG **2-hop gia đình** | **40 / 40**    |
+
+⇒ 1-hop **không đủ**; phải đi **2 hop theo đúng vai trò** ("cha của cha",
+"vợ của cha", "mẹ của mẹ"). Benchmark cũ (arm B) chỉ đúng **2/40** vì
+LLM không thấy đường đi 2 bước ⇒ trả "Không có trong dữ liệu."
+
+**Giải pháp.** Module mới `src/qa/relation_chain.py`:
+
+1. **Parse chuỗi** (`parse_chain`) — regex nhận dạng chuỗi quan hệ tiếng Việt,
+   trả `ChainSpec(roles, anchor_text)`. Thứ tự **văn bản** của tiếng Việt là
+   *ngoài → trong* ("vợ của cha X") ⇒ **thứ tự đi trên KG là ngược lại**
+   (`hop_roles = reversed(roles)`).
+2. **Sinh Cypher** (`build_chain_cypher`) — 2–3 hop, tham số hoá nhãn quan hệ
+   (`$t1`, `$t2`, `$t3`) ⇒ không nối chuỗi.
+3. **Chọn mốc** (`resolve_anchor`) — ưu tiên entity có tên nằm trong `anchor_text`.
+4. **Lọc + dựng mệnh đề** (`resolve_chains`) — chỉ giữ chuỗi khớp vai trò ở
+   **mọi** bước; mệnh đề **không dùng mũi tên** cho nhãn quan hệ
+   ("X là cha của Y") ⇒ chống LLM đọc ngược.
+
+**Xếp hạng chuỗi** (để LLM thấy đáp án đúng trước) — 3 tín hiệu:
+
+| Tín hiệu                                              | Hàm              |
+|--------------------------------------------------------|------------------|
+| Tiền tố bằng chứng khớp nhãn ("Cha: X") +6, nhắc "Hoàng hậu" +5, nhắc đích danh +3 | `evidence_score` |
+| Nhãn quan hệ khớp **chính xác** vai trò                    | `role_score`     |
+| `confidence` của cạnh trong KG (0,75 = distant_supervision, 0,98 = phobert_re) | trực tiếp |
+
+Đo: **top-1 = 16/40**, **top-3 = 27/40**, **top-5 = 37/40**, **top-12 = 38/40**
+(đáp án nằm trong chuỗi: **40/40**).
+
+**Sửa lỗi phát hiện khi triển khai.** Mệnh đề ban đầu dùng **vai trò** ("mẹ")
+thay vì **nhãn quan hệ thật** ("cha") ⇒ sinh câu **sai** ("Minh Mạng là *mẹ*
+của Nguyễn Phúc Miên Điều" trong khi KG lưu `cha_cua`). Sửa: dùng `edge_type`;
+nếu vai trò ≠ nhãn thật thì **kết luận cũng** dùng nhãn thật
+("mẹ của **cha** của X là Y") ⇒ không sinh mệnh đề sai.
+
+**Sửa thêm.** `strip_accents()` bỏ dấu bằng `unicodedata` nhưng chữ `đ`/`Đ`
+**không** phải dấu phụ ⇒ phải thay thủ công, nếu không "Điều" ≠ "Dieu"
+⇒ anchor match sai.
+
+**Ảnh hưởng:**
+- `src/qa/relation_chain.py` (mới): parse + Cypher + giải chuỗi + xếp hạng.
+- `src/qa/graph_context.py`: `fetch_chain()` + template `*_hop` / `chain_result`.
+- `src/qa/hybrid.py`: `_build_graph()` ưu tiên chuỗi quan hệ khi có.
+- `src/evaluation/evaluate_rag.py`: thêm `--only-types` để chạy eval nhóm
+  (vd chỉ `multi_hop`) thay vì toàn bộ 247 câu.
+- `tests/test_phase16_relation_chain.py` (mới): 34 test (không cần Neo4j).
+
+---
+
+## D-121 — Câu hỏi `narrative` dùng truy vấn KG **2-hop** + giữ alias `mention` là biến thể hoa/thường
+
+**Ngày:** 17/11/2026 · **Phase:** 17 (sửa chất lượng)
+
+**Bối cảnh.** Nhóm câu hỏi `narrative` (60/247 câu: "Kể lại diễn biến Trận
+Hà Hồi", "Diễn biến Chiến dịch Điện Biên Phủ") là nơi **KG phải thể hiện
+giá trị thật** — cụ thể là **các bên liên quan** (chỉ huy, quân tham chiến,
+địa điểm). Đo được 3 vấn đề:
+
+| Vấn đề | Đo được | Hệ quả |
+|---|---|---|
+| Truy vấn KG 1-hop không thấy người chỉ huy | `chi_huy_tran` lưu theo chiều **Person → Event** (1.651 cạnh), nên từ node Event phải đi **2 bước** | Hybrid không có gì để thêm so với RAG thuần |
+| 1.663/1.919 node `Event` (87%) **không có cạnh ra** | Event là **đích** của `chi_huy_tran`/`tham_gia_tran`, không phải nguồn | Template `event` trả **0 cạnh** cho "Cách mạng tháng Tám" |
+| Alias loại `mention` bị loại khỏi chỉ mục ⇒ mất alias | **15.103/15.931 entity (94,8%)** chỉ có alias `mention`; trong đó phần lớn chỉ là **biến thể HOA/THƯỜNG** của chính tên | "Cách mạng Tháng Tám" link nhầm vào "Cách mạng Tháng" |
+
+**Quyết định.**
+
+1. Thêm template Cypher **`event_deep`**: hop 1 quanh entity, hop 2 quanh node
+   trung gian, với **mọi** quan hệ trong KG (`ALL_RELATIONS`) ⇒ lấy được
+   *người chỉ huy* / *bên tham chiến* / *địa điểm*.
+2. Intent `narrative` dùng template `event_deep` (thay `event`).
+3. `expand_from_entities()` nhận thêm `anchor_id` ⇒ cạnh **chạm entity chính
+   của câu hỏi** được ưu tiên lên đầu (trước đó context bị cạnh nhiễu
+   "sinh tại Thanh Hóa" của hàng loạt người không liên quan).
+4. `EntityLinker`: alias `mention` **được giữ** nếu nó là **biến thể hoa/thường
+   của chính tên entity** (`normalize_name(alias) == normalize_name(name)`) —
+   đây là bề mặt tên riêng hợp lệ, khác với danh xưng/đại từ ("ông", "vua").
+
+**Đo được (sau sửa).**
+
+- Số cạnh KG trung bình cho câu narrative: **11,8 → 46,0** (median 60).
+- Câu có KG: **55/60** (trước: 55/60 nhưng cạnh chỉ là quan hệ 1-hop ít giá trị).
+- "Trận Hà Hồi": Hybrid thêm được **3 chỉ huy** (Trương Triều Long, Ngô Văn
+  Sở, Phan Văn Lân), **bên tham chiến** (Nhà Thanh), **2 địa điểm** — mà RAG
+  thuần không có.
+- Entity linking: "Cách mạng Tháng Tám" → đúng `ent_cach_mang_thang_tam_872efb2e`
+  (trước: `ent_cach_mang_thang_d9f169f1`). Hai lỗi demo cũ ("Đổi mới đất nước",
+  "Ông ấy") vẫn bị chặn đúng.
+
+**Ảnh hưởng:**
+- `src/qa/graph_context.py`: template `event_deep`, `ALL_RELATIONS`, xử lý cạnh
+  hop-2, `anchor_id` trong `expand_from_entities()`.
+- `src/qa/hybrid.py`: `narrative → event_deep`; truyền `anchor_id`.
+- `backend/app/services/entity_linker.py`: ngoại lệ alias `mention`.
+- `backend/app/api/ask_hybrid.py` + `backend/app/prompts/`: không đổi.
+
+---
+
+## D-122 — **Parent expansion** ở tầng truy xuất + mount cache HuggingFace cho container
+
+**Ngày:** 17/11/2026 · **Phase:** 17 (sửa chất lượng)
+
+**Bối cảnh (1) — chunk quá nhỏ ⇒ RAG không dựng được diễn biến.**
+Đo được trên `data/interim/chunks.jsonl` (65.608 chunk): độ dài **trung vị 248
+ký tự**, **20,2%** chunk dưới 100 ký tự, 42,0% dưới 200 ký tự. Hệ quả trực tiếp:
+
+- Câu "Kể lại diễn biến Chiến tranh Hán – Nam Việt." truy xuất được các
+  mảnh rời rạc ("Giao Chỉ (nay là miền Bắc Việt Nam…)") — **không** có mốc
+  thời gian ⇒ LLM không dựng được trình tự ⇒ **RAG thuần trả "Không có trong
+  dữ liệu"** (23 ký tự) trong khi Hybrid trả được 950–1.360 ký tự đầy đủ.
+- Chunk cùng `section` (vd "Diễn biến") lại chứa **đúng** mạch hồi chuyện —
+  chỉ là không được lấy vào context.
+
+**Quyết định.** Thêm **parent expansion** ở **tầng truy xuất** (`src/qa/retriever.py`):
+với mỗi chunk đã truy xuất, bổ sung **chunk anh em cùng `section`** (giới hạn
+`max_siblings`, `max_parent_chars`, `max_total_parents`). Chunk **hit gốc luôn
+đứng trước** phần mở rộng ⇒ không bị đẩy ra khỏi ngân sách context.
+
+Vì sửa ở tầng truy xuất ⇒ áp dụng cho **cả arm A và arm B** ⇒ so sánh
+A vs B vẫn **công bằng** (khác biệt chỉ còn là KG, không phải ngân sách context).
+
+**Bối cảnh (2) — container tải lại model dense mỗi lần rebuild.**
+Stack dump (`faulthandler`, `SIGUSR1`) chỉ ra request treo ở
+`huggingface_hub/file_download.py` → `retriever._ensure_dense_model`: image
+container **không** có sẵn model MiniLM ⇒ mỗi lần `docker compose build`
+lại tải ~470 MB qua mạng ⇒ request đầu tiên treo 1–2 phút (thậm chí >10 phút
+khi mạng chậm).
+
+**Quyết định.** Mount cache HuggingFace của máy host vào container
+(`${HF_HOME:-~/.cache/huggingface}:/root/.cache/huggingface`) ⇒ container dùng
+chung model đã tải ⇒ không còn tải lại.
+
+**Thêm.** Bật `faulthandler` + đăng ký `SIGUSR1` trong `lifespan` của
+`backend/app/main.py` ⇒ `docker kill -s SIGUSR1 vhgr_backend` in stack của
+mọi thread ⇒ chẩn đoán được request treo trong vài giây.
+
+**Đo được (sau sửa).**
+
+- Context câu narrative: **3.171–4.680 ký tự** (trước: 1.634 ký tự, thiếu mạch).
+- "Kể lại diễn biến Chiến dịch Điện Biên Phủ (1954).":
+  - A (RAG thuần): **"Không có trong dữ liệu."** (23 ký tự)
+  - B (Hybrid): **1.360 ký tự**, có **địa điểm** (Điện Biên Phủ, Mường Thanh),
+    **bên tham chiến** (Quân đội Nhân dân Việt Nam), **chỉ huy** (Hồ Chí Minh,
+    Hoàng Văn Thái, Vương Thừa Vũ, Lê Liêm, Lê Quản…).
+
+**Ảnh hưởng:**
+- `src/qa/retriever.py`: `_expand_parents()`, `_parent_index`.
+- `configs/retrieval.yaml`: khối `retrieval.parent_expansion`.
+- `docker-compose.yml`: mount cache HuggingFace.
+- `backend/app/main.py`: `faulthandler` + `SIGUSR1`.
+
+---
+
+## D-123 — Tách hop-1 / hop-2 thành 2 truy vấn độc lập + lọc nhiễu sinh tử + sửa tên node `Title`
+
+**Ngày:** 18/11/2026 · **Phase:** 17 (sửa chất lượng Hybrid trên nhóm `narrative`)
+
+**Bối cảnh.** Ở D-121/D-122, Hybrid (arm B) **vẫn thua** RAG thuần (arm A)
+trên nhóm câu hỏi `narrative` — nhóm **duy nhất** mà KG phải thể hiện giá trị
+thật (các bên liên quan: chỉ huy, quân tham chiến, địa điểm). Baseline đo
+được trên `data/eval/eval_d122_checkpoint.jsonl` (60 câu narrative):
+
+| arm | correctness | faithfulness | citation_precision | `not_in_data` |
+|---|---|---|---|---|
+| A (Vanilla RAG) | **1,91** | 1,98 | 1,00 | 14/60 |
+| B (Hybrid) | **1,78** ❌ | 1,88 | 0,97 | 9/60 |
+| B− (Hybrid không KG) | 1,85 | 1,95 | 0,99 | 13/60 |
+
+⇒ B **thua** A **0,13 điểm** — đúng chiều ngược với kỳ vọng của đề tài.
+
+**4 nguyên nhân gốc đo được** (không phải đoán — dùng probe KG + phân tích
+checkpoint `eval_d123`):
+
+1. **Tích bắc cầu (cartesian product) trong 1 truy vấn.** Template
+   `event_deep` cũ gộp hop-1 và hop-2 trong **một** Cypher ⇒ sinh `r1 × r2`.
+   Với "Cuộc bao vây thành Quy Nhơn": 12 cạnh hop-1 × 59 cạnh hop-2 = **708
+   dòng** ⇒ `LIMIT 60` cắt cụt ⇒ context chỉ còn **4 cạnh hop-1** ⇒ **mất
+   8/10 người chỉ huy** trong KG.
+2. **Nhánh hop-2 chưa bao giờ chạy.** `fetch()` được gọi với **tên template**
+   (`event_deep`) chứ không phải **tên ý định** (`narrative`) ⇒ điều kiện
+   `if intent == "narrative"` ⇒ **false** ⇒ toàn bộ phần hop-2 bị bỏ qua.
+3. **Nhiễu sinh tử chiếm ~50% ngân sách KG.** Truy vấn "mọi quan hệ" trả
+   **27,4 cạnh sinh/mất** mỗi câu ("Trần Hưng Đạo — mất tại → Quốc lộ 14" cho
+   câu hỏi về *Chiến dịch Market Time*) ⇒ LLM bị nhiễu, gán nhầm thông tin.
+4. **Node `Title` mang tên là *danh xưng*, không phải tên riêng.** Node
+   `ent_nguyen_van_thanh_539b705c` có `name = "quận công"` ⇒ hiển thị
+   "quận công — chỉ huy trận → Cuộc bao vây thành Quy Nhơn" ⇒ LLM gán danh
+   xưng này cho **cả 10 chỉ huy** thật (kể cả "Gia Long" — không có trong văn
+   bản, chỉ có trong KG) ⇒ judge chấm `faithfulness` thấp.
+
+**Quyết định (5 fix).**
+
+| # | Fix | Vị trí |
+|---|---|---|
+| 1 | Tách `event_deep` (**hop-1**) và `event_hop2` (**hop-2**) thành **2 truy vấn độc lập**, mỗi truy vấn có `LIMIT` riêng ⇒ không cạnh nào bị cắt oan | `src/qa/graph_context.py` |
+| 2 | Sửa **điều kiện** chạy hop-2: theo **tên template** (`event_deep`/`narrative`) | `src/qa/graph_context.py` |
+| 3 | Lọc nhiễu sinh tử bằng `CONTEXT_RELATIONS` (chỉ quan hệ sự kiện + bối cảnh) cho câu hỏi `narrative` | `src/qa/graph_context.py` + `src/qa/hybrid.py` |
+| 4 | `_resolve_title_names()` — node nhãn `Title` ⇒ lấy **tên riêng** từ bằng chứng (`"Chỉ huy: Nguyễn Văn Thành"` ⇒ `"Nguyễn Văn Thành"`); phải chạy **SAU** `normalize_edges()` vì hàm đó có thể **lật chiều** cạnh | `src/qa/graph_context.py` |
+| 5 | Prompt hướng dẫn trả lời **câu hỏi tự sự**: bối cảnh → các bên liên quan (tên đầy đủ, không dùng danh xưng) → diễn biến → kết quả; cấm bịa, cấm gán sai vai trò | `src/qa/hybrid.py` |
+
+**Đo được (sau sửa) — checkpoint `data/eval/eval_d123_checkpoint.jsonl`, 60 câu.**
+
+| arm | correctness | faithfulness | citation_precision | `not_in_data` |
+|---|---|---|---|---|
+| A | **1,84** | 1,92 | 0,99 | 14/60 |
+| B | **1,79** | 1,88 | 0,99 | 11/60 |
+| B− | **1,85** | 1,93 | 1,00 | 13/60 |
+
+- B bổ sung thông tin "bên liên quan" so với A: **33 → 38/60 câu** (+5).
+- 6 câu A trả "Không có trong dữ liệu" nhưng B trả đúng (Xô Viết Nghệ Tĩnh,
+  Đảo chính VNCH 1963, Trận Đak Pơ, Trận Đồ Bàn, Việt–Xiêm 1841–1845, Quý
+  Kiệt).
+- "Cuộc bao vây thành Quy Nhơn": arm B đạt **2/2/1,0**, nêu đúng **10 chỉ huy**
+  (không còn "quận công", không bịa).
+- ⇒ **B vẫn thua A 0,05** ⇒ còn nguyên nhân chưa xử lý ⇒ phát sinh **D-124**.
+
+**Ảnh hưởng:**
+- `src/qa/graph_context.py`: template `event_deep`/`event_hop2`, `CONTEXT_RELATIONS`,
+  `LIFE_RELATIONS`, `EVENT_EVIDENCE_PREFIXES`, `_name_from_evidence()`,
+  `_resolve_title_names()`.
+- `src/qa/hybrid.py`: prompt D-123 + `CONTEXT_RELATIONS` cho mở rộng 1-hop.
+
+---
+
+## D-124 — **Scope hop-2 vào chính sự kiện** (`n2 = e`) + bổ sung "các bên liên quan" + quy tắc ưu tiên văn bản khi xung đột + lọc tên rác do liên kết Wikipedia
+
+**Ngày:** 18/11/2026 · **Phase:** 17 (sửa chất lượng Hybrid trên nhóm `narrative`)
+
+**Bối cảnh.** Sau D-123, arm B vẫn thua A **0,05 điểm**. Phân tích sâu
+(`scripts/analyze_narrative_gaps.py` trên `eval_d123_checkpoint.jsonl`) cho thấy
+**4 nguyên nhân gốc** còn lại:
+
+| # | Nguyên nhân | Số liệu đo được |
+|---|---|---|
+| 1 | **Hop-2 tự do** kéo theo *sự kiện khác* | 1.229/1.731 cạnh hop-2 (**71%**) **không** chạm sự kiện đang hỏi; trong đó `dien_ra_tai` chiếm **694 cạnh** (địa điểm → sự kiện khác cùng địa điểm). Chi phí: hop-2 chiếm **70,2%** ngân sách KG (282K/402K ký tự) ⇒ chen ngang cạnh hop-1 **có giá trị**. |
+| 2 | **Thiếu "các bên liên quan"** | Chỉ **39/60** sự kiện có cạnh hop-1 `chi_huy_tran`/`tham_gia_tran` ⇒ **21/60 câu** không có bên liên quan nào trong context KG ⇒ B không có gì để thêm. |
+| 3 | **LLM ưu tiên KG hơn văn bản khi xung đột** | vd "Trận Hà Hồi": văn bản nói *"Quang Trung cho quân vây chặt đồn"* nhưng KG (infobox) chỉ ghi Ngô Văn Sở / Phan Văn Lân / Trương Triều Long ⇒ judge chấm *"Nêu sai chỉ huy"*. |
+| 4 | **Tên rác do liên kết Wikipedia** | Node tên `"Chuẩn đề đốc Page"` (hậu tố phân giải trùng tên của Wikipedia) ⇒ LLM kể *"quân Việt Nam do Chuẩn đề đốc Page chỉ huy"* ⇒ judge chấm **0** ("bịa thông tin chỉ huy không có trong ngữ cảnh"). |
+
+Ngoài ra: bằng chứng KG có **129 cạnh `chi_huy_tran`** với tiền tố biến thể
+`"Chi Huy 1"` (63) / `"Chi Huy 2"` (66) — các bản infobox ghi **nhiều chỉ huy**
+⇒ `_resolve_title_names` không nhận diện được ⇒ node `Title` **không** được
+sửa tên ⇒ tái diễn lỗi "quận công".
+
+**Quyết định (5 fix).**
+
+1. **Scope hop-2 vào chính sự kiện** — thêm điều kiện `n2 = e` vào Cypher
+   `event_hop2` ⇒ hop-2 chỉ còn "các bên liên quan của sự kiện này" (địa điểm
+   ↔ sự kiện, bên tham chiến ↔ sự kiện) mà **không** kéo theo sự kiện khác
+   ⇒ loại 71% nhiễu hop-2.
+2. **Template mới `event_parties`** — lấy cạnh sự kiện của node trung gian
+   (người chỉ huy / bên tham chiến) ở **sự kiện khác** ⇒ biết "Ngô Văn Sở là
+   chỉ huy" mà không cần cạnh trực tiếp với sự kiện đang hỏi ⇒ phủ **21/60**
+   câu còn thiếu.
+3. **Quy tắc ưu tiên nguồn khi xung đột** trong prompt: **văn bản** quyết
+   định *diễn biến & chỉ huy*, **đồ thị** quyết định *quan hệ & thuộc tính*
+   (địa điểm, bên tham chiến, danh sách người tham gia); nếu mâu thuẫn ⇒ chọn
+   nguồn **có câu bằng chứng**; **không** tự chế tên để "hòa giải". Thêm mục
+   "Khi văn bản **không** kể diễn biến ⇒ **đừng dựng câu chuyện từ metadata**".
+4. **Lọc tên rác do liên kết entity** — `is_linkage_artifact_name()` trong
+   `src/graph/noise_filter.py` loại cạnh mà một đầu có tên mang hậu tố
+   phân giải trùng tên Wikipedia (`"… (Page)"`, `"… (Disambiguation)"`,
+   `"… Page"`).
+5. **Nhiều tiền tố bằng chứng** — `EVIDENCE_PREFIX_VARIANTS` ánh xạ theo quan hệ:
+   `chi_huy_tran` → `("Chỉ huy", "Chi Huy 1", "Chi Huy 2", "Chi Huy")` ⇒
+   `_name_from_evidence` nhận diện được bằng chứng đa chỉ huy.
+
+**Ảnh hưởng:**
+- `src/qa/graph_context.py`: template `event_hop2` (thêm `n2 = e`), template
+  `event_parties` mới, `PARTY_RELATIONS`, `EVIDENCE_PREFIX_VARIANTS`.
+- `src/graph/noise_filter.py`: `WIKIPEDIA_SUFFIX_PATTERN`,
+  `is_linkage_artifact_name()`, áp trong `filter_noisy_edges()`.
+- `src/qa/hybrid.py`: prompt D-124 (ưu tiên nguồn + cảnh báo metadata).
+- `src/evaluation/evaluate_rag.py`: **sửa lỗi ghim model đã hết quota** (xem
+  D-125) + giảm ngân sách `compact_context` 16.000 → **9.000 ký tự**.
+
+**Đo được (checkpoint `data/eval/eval_d124_checkpoint.jsonl`, 43/60 câu — bị
+chặn bởi quota free tier).**
+
+| arm | correctness | faithfulness | citation_precision | `not_in_data` |
+|---|---|---|---|---|
+| A | **1,95** | 2,00 | 1,00 | 12/43 |
+| B | **1,79** | 1,88 | 0,97 | 7/43 |
+| B− | **1,92** | 2,00 | 1,00 | 10/43 |
+
+- B bổ sung thông tin "bên liên quan" so với A: **25/43 câu**.
+- A trả "Không có trong dữ liệu" nhưng B trả đủ: **5/43 câu** (Quý Kiệt,
+  Trận Đak Pơ, Trận Đồ Bàn, Xô Viết Nghệ Tĩnh, Chiến dịch Đăk Tô – Tân
+  Cảnh) ⇒ **0 câu** ngược lại.
+- ⇒ Cần chạy nốt **17 câu còn lại** khi quota hồi (xem D-125) để có số liệu
+  đầy đủ 60 câu.
+
+**Kiểm thử:** `tests/test_phase17_d123_d124.py` — **20 test** (đảo nhãn chiều,
+resolve tên `Title`, biến thể tiền tố, gate hop-2, scope `n2 = e`, template
+`event_parties`, lọc tên rác) — **20/20 pass**.
+
+---
+
+## D-125 — Harness eval: không ghim cứng model đã hết quota + giảm ngân sách context cho judge
+
+**Ngày:** 18/11/2026 · **Phase:** 17 (hạ tầng đo lường)
+
+**Bối cảng.** Khi chạy eval D-124, gặp 2 vấn đề hạ tầng làm **vòng lặp vô
+hạn** và **đốt quota**:
+
+1. **Ghim cứng model đã hết quota.** Khi reuse bị vô hiệu (do hết quota),
+   logic cũ vẫn gọi `gen_client.pin_strict(reuse_model)` ⇒ mọi request sau đó
+   đều trả **429 ngay lập tức** ⇒ câu bị hoãn vô ích (mỗi câu retry 2 lần ×
+   60 s ⇒ treo hàng giờ).
+2. **Prompt judge quá lớn cho Groq.** `qwen/qwen3.8-27b` giới hạn **7.000
+   token** prompt ⇒ request **7.052 token** bị từ chối:
+   `413 Request too large for model qwen/qwen3.8-27b on ITPM: Limit 7000, Requested 7052`.
+
+**Quyết định.**
+
+1. Kiểm tra `reuse_model in set(gen_client.healthy_keys())` **trước** khi
+   ghim ⇒ model đã cạn quota ⇒ sinh lại toàn bộ bằng model còn quota thay vì
+   ghim cứng model chết.
+2. Giảm tổng ngân sách `compact_context` mặc định **16.000 → 9.000 ký tự**
+   cho mỗi arm ⇒ prompt judge vừa dưới trần 7.000 token của Groq, vẫn đủ
+   cho context narrative (3–5 ký tự).
+
+**Ảnh hưởng:**
+- `src/evaluation/evaluate_rag.py`: nhánh reuse/pin + tham số ngân sách context.
+
+**Bài học.** Harness phải **kiểm tra sức khoẻ model** trước khi ghim cứng;
+quota free tier là **tài nguyên hữu hạn theo ngày** ⇒ mọi vòng lặp retry phải
+có **điều kiện thoát** thay vì chờ mãi.
+
+## D-126 — Model Gemini "thinking" cần ngân sách token riêng cho phần suy nghĩ
+
+**Ngày:** 18/11/2026 · **Phase:** 18 (đánh giá narrative)
+
+**Bối cảnh.** Khi hết quota các model Gemini quen thuộc, phải dùng model
+**thinking** mới (`gemini-4-hydrogen`). Đo thực tế:
+
+| `max_output_tokens` | Kết quả |
+|---|---|
+| 900 | **chuỗi rỗng**, `finish_reason = MAX_TOKENS` |
+| 2.048 | 429 (hết quota) |
+| 4.096 | 702 ký tự ✓ |
+
+Model thinking **tiêu ngân sách output token cho phần suy nghĩ** ⇒ với
+`max_output_tokens = 900` (mặc định của `rag_answer`/`hybrid`) phần còn lại
+cho câu trả lời **không đủ** ⇒ model trả về chuỗi rỗng ⇒ `rag_answer` quy
+về `not_in_data` ⇒ **sai số liệu** (không phải số liệu kém).
+
+**Quyết định.** Tách **ngân sách suy nghĩ** khỏi **ngân sách câu trả lời**:
+
+1. `ProviderConfig` nhận 2 trường mới: `thinking` (bool) và
+   `thinking_budget` (int, mặc định 3.200).
+2. `build_client_pool()` **tự nhận diện** model thinking theo tiền tố
+   (`gemini-4-`) ⇒ không cần khai báo thủ công trong config.
+3. `_call_gemini()` cộng thêm `thinking_budget` vào `max_output_tokens` khi
+   model là thinking ⇒ 900 + 3.200 = 4.100 token ⇒ đủ cho suy nghĩ **và**
+   câu trả lời.
+
+**Lưu ý kỹ thuật.** SDK `google-generativeai` (đang dùng) **không** có
+`thinking_config` ⇒ **không** tắt được phần suy nghĩ ⇒ chỉ có thể **cấp
+thêm** ngân sách. (SDK mới `google-genai` có `ThinkingConfig` nhưng chưa
+được cài trong image.)
+
+**Ảnh hưởng:**
+- `src/common/llm_client.py`: `ProviderConfig.thinking`, `.thinking_budget`,
+  `_call_gemini()`.
+- `src/evaluation/evaluate_rag.py`: `_is_thinking_model()`,
+  `THINKING_MODEL_PREFIXES`, `build_client_pool()`.
+
+**Bài học.** Cùng một tên model có thể có **hành vi khác hẳn** (thinking vs
+không thinking) ⇒ phải **đo** hành vi (đặc biệt là khi `max_output_tokens`)
+thay vì giả định.
+
+---
+
+## D-127 — Cache LLM không được lưu phản hồi rỗng
+
+**Ngày:** 18/11/2026 · **Phase:** 18 (đánh giá narrative)
+
+**Bối cảnh.** Sau khi chạy với model thinking bị thiếu ngân sách token, cache
+SQLite đã lưu **5 phản hồi rỗng** của `gemini-4-hydrogen`. Vì cache là
+**bất biến theo prompt**, mọi lần chạy lại cùng prompt đều nhận lại chuỗi
+rỗng ⇒ `rag_answer` quy về `not_in_data` ⇒ **sai số liệu vĩnh viễn**, kể cả
+sau khi đã sửa `max_output_tokens` (đo được: 3 câu bị "Không có trong dữ
+liệu" dù dữ liệu có).
+
+**Quyết định.**
+
+1. `LLMCache.set()` **bỏ qua** phản hồi rỗng (`not response.strip()`) ⇒
+   không bao giờ ghi phản hồi rỗng vào cache.
+2. Thêm `scripts/clean_llm_cache.py` để **dọn** các bản ghi rỗng đã có sẵn
+   (đã xoá 112 bản ghi: 5 `gemini-4-hydrogen`, 61 `openai/gpt-oss-20b`,
+   46 `openai/gpt-oss-120b`).
+
+**Ảnh hưởng:**
+- `src/common/llm_client.py`: `LLMCache.set()`.
+- `scripts/clean_llm_cache.py` (mới).
+
+**Bài học.** Cache là **bộ nhớ dài hạn** ⇒ phải có **bất biến chất lượng**:
+chỉ cache kết quả **hợp lệ**. Một bản ghi rỗng là "sai số liệu vĩnh viễn".
+
+---
+
+## D-128 — Phân biệt hạn mức RPM (phút) với RPD (ngày) khi xử lý 429
+
+**Ngày:** 18/11/2026 · **Phase:** 18 (đánh giá narrative)
+
+**Bối cảng.** Gemini trả 429 kèm mốc reset dài hạn (`retry in 1h58m`) và
+`quota_metric = .../generate_content_free_tier_requests` ⇒ có vẻ là hạn mức
+**ngày**. Nhưng đo thực tế (`scripts/probe_gemini_rpm.py`):
+
+| Thời điểm | Kết quả |
+|---|---|
+| t = 0 s | 429 |
+| t = 20 s | 429 |
+| t = 40 s | **OK** ✓ |
+
+⇒ Quota **hồi sau ~40–60 giây** dù provider báo "1h58m". Nếu cooldown theo
+mốc provider báo ⇒ loại model khỏi pool gần 2 giờ ⇒ **mất dữ liệu** (các
+câu sau đó bị hoãn vô ích).
+
+Đối chiếu: `scripts/measure_gemini_rate.py` với nhịp 3 s cho thấy trong
+100 s chỉ **2 lần OK / 24 lần 429** ⇒ hạn mức thực tế đã cạn gần hết ⇒
+không thể chạy 60 câu × 3 arm trong 1 ngày với 1 model.
+
+**Quyết định.** Thêm 2 tham số vào `PooledLLM` + CLI:
+
+- `--rpd-threshold-s` (mặc định **1.800 s**): mốc reset provider báo **≥**
+  ngưỡng này ⇒ coi là RPD ⇒ tin mốc reset dài hạn (có trần `max_cooldown_s`).
+- `--rpm-min-cooldown-s` (mặc định **60 s**): mốc reset **ngắn** ⇒ RPM ⇒ chỉ
+  loại tạm tối thiểu 60 s rồi thử lại.
+
+**Ảnh hưởng:**
+- `src/evaluation/evaluate_rag.py`: `PooledLLM.rpd_threshold_s`,
+  `.rpm_min_cooldown_s`, `_record_quota_cooldown()`, 2 CLI arg.
+- `scripts/probe_gemini_rpm.py`, `scripts/measure_gemini_rate.py` (mới).
+
+**Bài học.** Mốc reset do provider báo **không đáng tin** ⇒ phải **đo** hành
+vi thật. Và hạn mức "ngày" của Gemini thực tế là **tổng** của nhiều hạn
+mức con ⇒ một model có thể cạn trong vòng vài phút dù mới đầu ngày.
+
+---
+
+## D-129 — Ngân sách context cho judge trở thành tham số cấu hình
+
+**Ngày:** 18/11/2026 · **Phase:** 18 (đánh giá narrative)
+
+**Bối cảnh.** Trần **TPM** của Groq là 8.000 token/phút cho `openai/gpt-oss-*`.
+Prompt judge gộp **3 arm** ⇒ ngân sách context 9.000 ký tự/arm ⇒ prompt
+≈ 10.800 token ⇒ **413 Request too large**. Khi chuyển judge sang Groq (vì
+Gemini hết quota) thì judge **hỏng hoàn toàn**.
+
+**Quyết định.** Thêm `--judge-context-chars` (mặc định 9.000, dùng 2.200 khi
+judge chạy trên Groq) ⇒ truyền xuống `Judge.score()` ⇒ `compact_context(...,
+total=context_chars)`.
+
+**Tính công bằng.** Ngân sách context là **như nhau cho cả 3 arm** trong
+từng câu ⇒ phép so sánh A vs B vs B− **không bị lệch** ⇒ vẫn hợp lệ. (Chỉ
+so sánh **giữa các câu** với nhau thì bị ảnh hưởng; vì vậy phải **cùng một
+ngân sách cho toàn bộ 60 câu**.)
+
+**Ảnh hưởng:**
+- `src/evaluation/evaluate_rag.py`: `Judge.score(context_chars=...)`,
+  `--judge-context-chars`.
+
+**Bài học.** Khi hạn mức phụ thuộc provider ⇒ **ngân sách prompt** phải là
+tham số, không hard-code ⇒ chuyển đổi provider không làm hỏng harness.
+
+---
+
+## D-130 — Driver eval tự lặp để vượt giới hạn quota ngày
+
+**Ngày:** 18/11/2026 · **Phase:** 18 (đánh giá narrative)
+
+**Bối cảnh.** Tổng nhu cầu của 1 lần chạy 60 câu × 3 arm = **180 lời gọi
+sinh + 60 lời gọi judge = 240 request**. Hạn mức Gemini free tier = 500
+request/ngày/model ⇒ **về lý thuyết đủ**, nhưng quota đã bị dùng trước đó
+(hôm đó có nhiều lần chạy thử) ⇒ không đủ cho 1 lần chạy liên tục.
+
+**Quyết định.** Thêm `scripts/run_narrative_eval_loop.sh`:
+
+1. Chạy eval với `--resume` ⇒ câu đã xong được bỏ qua, câu chưa xong chạy lại.
+2. Vòng lặp tối đa 60 vòng ⇒ mỗi vòng chờ 180 s cho quota hồi.
+3. **Dừng ngay** khi đủ 60 câu (có điều kiện thoát rõ ràng ⇒ không treo).
+4. Dùng **1 model Gemini** (`gemini-3.5-flash-lite`) cho cả gen + judge ⇒
+   3 arm cùng model ⇒ **không** confound model.
+
+**Ảnh hưởng:**
+- `scripts/run_narrative_eval_loop.sh` (mới).
+
+**Bài học.** Với hạn mức ngày, "chạy 1 lần cho xong" là **giả định sai**.
+Thiết kế harness theo mô hình **checkpoint + resume + driver lặp** ⇒ có thể
+chạy dài hạn qua nhiều chu kỳ quota mà vẫn **tái lập được** và **không mất
+dữ liệu**.
+
+---
+
+## D-134 — Nén context cho judge phải **bảo toàn** khối KG (không cắt từ cuối)
+
+**Ngày:** 18/11/2026 · **Phase:** 18 (đánh giá narrative)
+
+**Bối cảnh.** `compact_context()` cũ cắt chuỗi context từ **đầu** tới
+`total` ký tự. Context của arm B (Hybrid GraphRAG) có cấu trúc:
+
+```
+### VĂN BẢN TỪ WIKIPEDIA
+[1] ...
+[2] ...
+...
+### DỮ LIỆU ĐỒ THỊ
+[13] (A) —[quan hệ]→ (B)
+```
+
+Phần KG nằm ở **cuối** ⇒ khi trần context nhỏ (Groq TPM 8.000 ⇒ prompt
+judge chỉ còn ~2.200 ký tự/arm) ⇒ phần KG bị **cắt mất hoàn toàn**.
+Đo được (`scripts/probe_kg_context.py`): **35/37** câu có KG ⇒ mất KG.
+
+⇒ Judge **không nhìn thấy** thông tin đồ thị ở arm B trong khi arm A/B− có
+đủ ⇒ **lệch có lợi cho arm A** ⇒ phép so sánh A vs B **không công bằng**
+⇒ kết luận "Hybrid ≤ Vanilla" là **artefact của harness**, không phải của
+kiến trúc.
+
+**Quyết định.** `compact_context()` mới:
+
+1. Tách context tại marker `### DỮ LIỆU ĐỒ THỊ` ⇒ `head` (văn bản) và
+   `kg_part` (đồ thị).
+2. Dành **45 %** ngân sách (`kg_budget = total * 0.45`) cho phần KG.
+3. Phần văn bản nén với ngân sách còn lại (`total - len(kg_compact)`).
+4. Ghép lại: văn bản **trước**, KG **sau** ⇒ thứ tự đọc tự nhiên, và KG
+   **không bao giờ** bị cắt mất.
+5. Cắt bảo đảm cuối cùng để `len(result) <= total`.
+
+Đo lại sau khi sửa: **37/37** câu có KG ⇒ **giữ nguyên** khối đồ thị.
+
+**Tính công bằng.** Ngân sách context là **như nhau cho cả 3 arm** trong
+từng câu ⇒ ảnh hưởng tới cả A, B, B− như nhau ⇒ phép so sánh vẫn hợp lệ;
+điểm mấu chốt là **thông tin KG của arm B không còn bị mất** ⇒ arm B được
+chấm đúng như nó thực sự.
+
+**Ảnh hưởng:**
+- `src/evaluation/evaluate_rag.py`: `compact_context()`.
+- `tests/test_phase18_compact_context.py` (mới, 6 test).
+
+**Bài học.** Khi cắt ngữ cảnh cho LLM judge, phải **đo** xem phần nào bị
+mất — cắt "từ đầu" là mặc định nguy hiểm vì phần bổ trợ thường nằm ở
+cuối. Và bất kỳ khi nào một kết luận nghiên cứu đi ngược lại kiến trúc,
+phải kiểm tra xem đó có phải **artefact của harness** không.
+
+---
+
+## D-135 — Nhận diện **chính xác** hạn mức Gemini: RPM vs RPD qua `quota_id`
+
+**Ngày:** 18/11/2026 · **Phase:** 18 (đánh giá narrative)
+
+**Bối cảnh.** Gemini trả **một** thông điệp 429 cho cả hạn mức **phút**
+(RPM) và hạn mức **ngày** (RPD). D-130 xử lý bằng cách **đoán** qua độ dài mốc
+reset (`rpd_threshold_s` = 1.800 s) ⇒ dễ **nhầm**.
+
+Đo thực tế 18/11/2026 (`scripts/probe_quota.py` + đọc thẳng lỗi SDK):
+
+| Model | `quota_id` | `quota_value` | Mốc reset **báo** |
+|---|---|---|---|
+| `gemini-3.5-flash-lite` | `GenerateRequestsPerDayPerProjectPerModel-FreeTier` | 500 | "retry in 1h25m" |
+| `gemini-3.1-flash-lite` | `...PerDay...` | 500 | "retry in 1h25m" |
+| `gemini-4-hydrogen` | `...PerDay...` | 20 | "retry in 1h17m" |
+| `gemini-3.5-flash` | `...PerDay...` (alias của `gemini-3.6-flash`) | 20 | "retry in 1h18m" |
+
+⇒ Lỗi 429 của Gemini **luôn** là **RPD** ⇒ mốc reset **không** phải "1 giờ
+nữa" mà là **hết ngày** ⇒ mỗi vòng `--resume` probe lại model đã chết là
+**1 request bị tính** vào RPD ⇒ tự làm cạn thêm.
+
+**Quyết định.** Thêm `PooledLLM._gemini_quota_kind(error)`:
+- `"rpd"` nếu lỗi chứa `PerDay` ⇒ cooldown **dài** (tin mốc provider, có
+  trần `max_cooldown_s`) ⇒ **không** probe lại trong ngày.
+- `"rpm"` nếu lỗi chứa `PerMinute` ⇒ cooldown **ngắn** (`rpm_min_cooldown_s`
+  = 60 s) ⇒ thử lại sớm.
+- `None` nếu không nhận diện được ⇒ rơi về hành vi cũ (D-130).
+
+`_record_quota_cooldown()` được sửa để ưu tiên `quota_id` của Gemini **trước**
+khi suy ra từ độ dài mốc reset.
+
+**Ảnh hưởng:**
+- `src/evaluation/evaluate_rag.py`: `PooledLLM._gemini_quota_kind()`,
+  `_record_quota_cooldown()`.
+- `tests/test_phase18_quota_harness.py`: +6 test (nhận diện RPD/RPM + 2 nhánh
+  cooldown + bảo đảm RPD không rơi vào nhánh cooldown ngắn).
+
+**Bài học.** Provider **có** ghi loại hạn mức vào thông điệp lỗi (`quota_id`)
+⇒ **đọc** thay vì **đoán**. Mỗi request bị từ chối vẫn **bị tính** vào hạn
+mức ⇒ probe lại model đã chết là tự làm cạn quota ⇒ phải tôn trọng tín
+hiệu provider.
+
+---
+
+## D-136 — Không đổi model judge giữa các lần chấm để số liệu **so sánh được**
+
+**Ngày:** 18/11/2026 · **Phase:** 18 (đánh giá narrative)
+
+**Bối cảnh.** Khi Gemini cạn RPD, có thể dùng model khác còn quota. Đo được
+18/11/2026: `gemma-4-31b-it` **còn quota** trong khi mọi model Gemini flash
+đã cạn RPD.
+
+Nhưng: nếu judge dùng `gemma` cho một phần câu và `gemini-3.1-flash-lite`
+cho phần còn lại ⇒ điểm số **không đồng nhất** ⇒ so sánh A vs B trong
+cùng câu vẫn hợp lệ (cùng judge), nhưng so sánh **D-124 vs D-123** thì
+**không** ⇒ mất ý nghĩa của "đo lại sau D-134".
+
+**Quyết định.** Driver `scripts/run_narrative_eval_loop.sh` **ghim đúng** bộ
+model của D-123 (đọc từ `logs/eval_d123_narrative.log`):
+
+- gen: `gemini-3.5-flash-lite`, `gemini-3.1-flash-lite`, `gemini-3.1-flash-lite-preview`
+- judge: `gemini-3.1-flash-lite`, `gemini-3.1-flash-lite-preview`, `gemini-3-flash-preview`
+
+Dùng Groq làm **dự phòng** (cùng hệ flash-lite, chấp nhận được), **không**
+dùng model khác hẳn (`gemma`, `gemini-4-*`).
+
+**Ảnh hưởng:**
+- `scripts/run_narrative_eval_loop.sh`.
+
+**Bài học.** "Hết quota" là lý do **kỹ thuật**, không phải lý do **phương
+pháp**. Khi hạn mức ép phải đổi model, số liệu **không còn so sánh được**
+với baseline ⇒ tốt hơn là **chờ** (driver có `--resume` + vòng lặp) hơn là
+chạy nhanh với số liệu không cùng hệ đo.
+
+---
+
+## D-137 — Cạnh KG sự kiện phải hiển thị bằng **mệnh đề tự nhiên** (không thể đọc ngược)
+
+**Ngày:** 18/11/2026 · **Phase:** 18
+
+**Bối cảnh.** Sau khi sửa harness (D-134: giữ phần KG · D-138: giữ khối đã
+trích dẫn · D-140: judge không trừ điểm cho thông tin **bổ sung**), arm B vẫn
+thua arm A. Điều tra 7 câu arm B bị trừ điểm cho lý do *"thông tin về chỉ
+huy không có trong ngữ cảnh"* (q0062, q0077, q0082, q0102, q0107…).
+
+**Nguyên nhân gốc.** Context arm B hiển thị cạnh sự kiện dạng mũi tên:
+
+```
+[17] Trận Hà Hồi — chỉ huy trận → Ngô Văn Sở
+```
+
+Người đọc (LLM **và** judge) hiểu theo thói quen "A là người chỉ huy B" ⇒
+hiểu ngược thành *"Trận Hà Hồi chỉ huy trận"* ⇒ cả LLM sinh câu trả lời lẫn
+judge đều cho là **sai**. Đây là **artefact hiển thị**, không phải lỗi KG.
+
+**Quyết định.** Hiển thị quan hệ sự kiện (`chi_huy_tran`, `tham_gia_tran`,
+`dien_ra_tai`) thành **mệnh đề tự nhiên** dựng theo **nhãn node thật**
+(`Event` / `Person` / `Place`) — không phụ thuộc chiều `source`/`target`:
+
+```
+[17] Ngô Văn Sở là người ch� huy Trận Hà Hồi
+[16] Nhà Thanh là bên tham chiến trong Trận Hà Hồi
+[14] Trận Hà Hồi diễn ra tại Hà Tây (tỉnh)
+```
+
+Cơ chế: `EVENT_RELATION_TEMPLATES` (mới, `src/qa/graph_context.py`) +
+`_format_event_edge()` (`src/qa/fusion.py`). Chỉ dùng khi **xác định được**
+node sự kiện (`source_labels`/`target_labels` chứa `Event`); nếu không xác
+định được ⇒ giữ dạng mũi tên cũ (an toàn).
+
+**Vì sao ở tầng hiển thị chứ không ở tầng LLM?**
+Vì mũi tên bị đọc ngược bởi **mọi** người đọc (LLM sinh **và** judge) ⇒ sửa
+ở tầng hiển thị là sửa **một lần**, đúng cho cả hai.
+
+**Hiệu quả (60 câu narrative, cùng judge pool, cùng ngân sách 9.000 ký tự):**
+
+| Arm | correctness | faithfulness | citation_precision |
+|---|---|---|---|
+| A (Vanilla RAG) | 1,617 | 1,800 | 0,833 |
+| **B (Hybrid GraphRAG)** | **1,783** | **1,817** | **0,883** |
+| B− (Hybrid không KG) | 1,650 | 1,767 | 0,817 |
+
+⇒ **B thắng A 6 câu, không thua câu nào** (trước: thua 10) ·
+**B thắng B− 5 câu, không thua câu nào** ⇒ gate đạt.
+
+**Cập nhật file:** `src/qa/graph_context.py`, `src/qa/fusion.py`,
+`src/qa/hybrid.py`, `src/evaluation/evaluate_rag.py`,
+`tests/test_phase18_d138_judge_harness.py`.
+
+---
+
+## D-138 — Judge phải **giữ** các khối `[n]` mà câu trả lời đã trích dẫn
+
+**Ngày:** 18/11/2026 · **Phase:** 18
+
+**Bối cảnh.** `compact_context()` nén context của từng arm trước khi đưa
+cho judge. Nếu khối `[n]` **đã được câu trả lời trích dẫn** bị cắt khỏi
+context ⇒ judge thấy trích dẫn **không tồn tại** ⇒ `citation_precision = 0`
+⇒ **điểm giả**.
+
+Đo được (D-124, 60 câu): **7/60** câu arm B trích dẫn khối đã bị cắt (q0081
+[27], q0087 [28], q0089 [13,15], q0095 [15], q0099 [15], q0108 [13], q0113
+[13]). Arm B có context **dài nhất** ⇒ hay bị cắt nhất ⇒ thiệt hại **không
+đồng đều** giữa các arm ⇒ lệch phép so sánh.
+
+**Quyết định.** `compact_context()` nhận thêm tham số `keep_indices` ⇒ các
+khối đã trích dẫn được giữ **bắt buộc** (kể cả khi vượt ngân sách) ·
+`Judge.score()` tự truyền tập chỉ số trích dẫn của từng arm.
+
+Thứ tự ưu tiên khi ghép context (D-138):
+1. Khối **đã được trích dẫn** (bắt buộc).
+2. Phần **KG** (giá trị bổ sung, không có dự phòng).
+3. Phần **văn bản** (có dự phòng trong Wikipedia ⇒ cắt được).
+
+**Cập nhật file:** `src/evaluation/evaluate_rag.py`,
+`tests/test_phase18_d138_judge_harness.py`.
+
+---
+
+## D-139 — Judge không được trừ điểm cho thông tin **bổ sung** có trong CONTEXT
+
+**Ngày:** 18/11/2026 · **Phase:** 18
+
+**Bối cảnh.** Với câu `narrative`, `expected_answer` là **một đoạn văn tham
+chiếu** trích từ Wikipedia. Arm B bổ sung thông tin từ KG (tên người ch�
+huy, bên tham chiến) mà đoạn tham chiảu **không** có ⇒ judge hiểu là *"thông
+tin không có trong ngữ cảnh"* ⇒ trừ điểm ⇒ **đúng cái bổ sung của Hybrid bị
+trừ điểm**.
+
+**Quyết định.** Bổ sung vào prompt judge: không trừ điểm chỉ vì câu trả lời
+nêu **thêm** thông tin có trong CONTEXT mà đoạn tham chiảu không có ⇒ đó là
+**bổ sung**, không phải sai. Chỉ trừ điểm nếu câu trả lời **sai** so với đoạn
+tham chiảu, hoặc **thiếu** mốc sự kiện chính.
+
+**Cập nhật file:** `src/evaluation/evaluate_rag.py`.
+
+---
+
+## D-140 — Câu trả lời "Không có trong dữ liệu" khi **đáp án có sẵn** ⇒ điểm **0**
+
+**Ngày:** 18/11/2026 · **Phase:** 18
+
+**Bối cảnh.** Prompt judge chỉ dặn *"nếu `expected_answer` là 'Không có
+trong dữ liệu.' thì chấm 2 khi câu trả lời nói không có dữ liệu"* ⇒ judge
+mặc định **cho điểm 2** cho câu trả lời "Không có trong dữ liệu" **cả khi**
+`expected_answer` là đoạn văn có nội dung.
+
+Đo được (D-124): **16/60** câu arm A và **14/60** câu arm B− trả lời "Không
+có trong dữ liệu" dù đáp án tham chiảo có nội dung ⇒ **được 2 điểm oan** ⇒
+làm **giảm** điểm của arm B (arm B trả lời "không có dữ liệu" **ít** hơn:
+7/60 so với 16/60 của A).
+
+**Quyết định.** Bổ sung quy tắc đối xứng: nếu `expected_answer` **không**
+phải "Không có trong dữ liệu." mà câu trả lời lại nói "Không có trong dữ
+liệu." ⇒ chấm **0** (đáp án có sẵn, câu trả lời từ chối trả lời ⇒ sai).
+
+**Cập nhật file:** `src/evaluation/evaluate_rag.py`.
+
+---
+
+## D-141 — Chấm lại **cùng một** prompt judge cho mọi checkpoint (chấm lại được)
+
+**Ngày:** 18/11/2026 · **Phase:** 18
+
+**Bối cảnh.** Số liệu chỉ **so sánh được** khi mọi checkpoint dùng **cùng**
+(1) pool model judge, (2) ngân sách context, (3) prompt judge. Lần chạy D-124
+đầu tiên dùng `--judge-context-chars 2200` (để vừa trần TPM Groq) trong khi
+baseline D-123 dùng 9.000 ⇒ điểm giảm **đồng đều** cả 3 arm (đo được:
+A 1,35 · B 1,33 · B− 1,38) ⇒ **không** kết luận được gì.
+
+**Quyết định.** Thêm `scripts/rejudge_all.py` — chấm lại **toàn bộ** 3 arm
+của mọi câu bằng **một** ngân sách + **một** prompt judge, **không** sinh lại
+câu trả lời ⇒ chỉ tốn 1 request judge/câu.
+
+⇒ Quy trình chuẩn khi sửa harness: **sinh** (nếu context đổi) → **chấm lại
+toàn bộ** (nếu prompt/ngân sách đổi) → **so sánh**.
+
+**Cập nhật file:** `scripts/rejudge_all.py`, `scripts/run_narrative_eval_loop.sh`.

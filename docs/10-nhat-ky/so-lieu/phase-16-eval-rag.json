@@ -28,7 +28,6 @@
     "judge_model": "pool đa provider (Gemini + Groq)",
     "gen_pool": {
       "models": [
-        "gemini/gemini-3-flash-preview",
         "gemini/gemini-3.1-flash-lite",
         "gemini/gemini-3.1-flash-lite-preview",
         "gemini/gemini-3.5-flash-lite",
@@ -36,10 +35,10 @@
         "groq/openai/gpt-oss-20b",
         "groq/qwen/qwen3.8-27b"
       ],
-      "spec": "groq:openai/gpt-oss-120b,qwen/qwen3.8-27b,openai/gpt-oss-20b;gemini:gemini-3.5-flash-lite,gemini-3-flash-preview"
+      "spec": "gemini:gemini-3.5-flash-lite,gemini-3.1-flash-lite,gemini-3.1-flash-lite-preview;groq:openai/gpt-oss-120b,qwen/qwen3.8-27b,openai/gpt-oss-20b"
     },
     "judge_pool": {
-      "spec": "gemini:gemini-3.1-flash-lite,gemini-3.1-flash-lite-preview;groq:openai/gpt-oss-120b,qwen/qwen3.8-27b,openai/gpt-oss-20b"
+      "spec": "gemini:gemini-3.1-flash-lite,gemini-3.1-flash-lite-preview,gemini-3.5-flash-lite;groq:openai/gpt-oss-120b,qwen/qwen3.8-27b"
     },
     "elapsed_s": null
   },
@@ -49,13 +48,13 @@
       "n_total": 247,
       "n_infra_errors": 0,
       "n_judge_missing": 0,
-      "correctness_mean": 1.2915,
-      "correctness_rate": 0.5951,
-      "faithfulness_mean": 1.8664,
-      "faithfulness_rate": 0.9271,
-      "citation_precision": 0.6984,
+      "correctness_mean": 1.1619,
+      "correctness_rate": 0.5304,
+      "faithfulness_mean": 1.834,
+      "faithfulness_rate": 0.9109,
+      "citation_precision": 0.6154,
       "no_data_accuracy": 0.9655,
-      "latency_p50": 1763,
+      "latency_p50": 1749,
       "latency_p95": 11794,
       "context_tokens_mean": 712
     },
@@ -64,57 +63,57 @@
       "n_total": 247,
       "n_infra_errors": 0,
       "n_judge_missing": 0,
-      "correctness_mean": 1.4372,
-      "correctness_rate": 0.6478,
-      "faithfulness_mean": 1.7247,
-      "faithfulness_rate": 0.8381,
-      "citation_precision": 0.7656,
+      "correctness_mean": 1.5506,
+      "correctness_rate": 0.7328,
+      "faithfulness_mean": 1.8745,
+      "faithfulness_rate": 0.915,
+      "citation_precision": 0.8275,
       "no_data_accuracy": 0.9655,
-      "latency_p50": 2096,
-      "latency_p95": 22429,
-      "context_tokens_mean": 1739
+      "latency_p50": 2054,
+      "latency_p95": 16741,
+      "context_tokens_mean": 1711
     },
     "B-": {
       "n": 247,
       "n_total": 247,
       "n_infra_errors": 0,
       "n_judge_missing": 0,
-      "correctness_mean": 1.2955,
-      "correctness_rate": 0.5992,
+      "correctness_mean": 1.17,
+      "correctness_rate": 0.5344,
       "faithfulness_mean": 1.8502,
       "faithfulness_rate": 0.9231,
-      "citation_precision": 0.7085,
+      "citation_precision": 0.6275,
       "no_data_accuracy": 0.9655,
-      "latency_p50": 1644,
-      "latency_p95": 13515,
+      "latency_p50": 1633,
+      "latency_p95": 13155,
       "context_tokens_mean": 734
     }
   },
   "chung_luc_dong_gop": {
-    "delta_correctness_B_vs_A": 0.1457,
-    "delta_correctness_B_vs_Bminus": 0.1417,
-    "delta_correctness_Bminus_vs_A": 0.004,
-    "delta_faithfulness_B_vs_A": -0.1417,
-    "delta_citation_precision_B_vs_A": 0.0672,
-    "delta_latency_p95_B_vs_A_ms": 10635,
-    "delta_context_tokens_B_vs_A": 1027
+    "delta_correctness_B_vs_A": 0.3887,
+    "delta_correctness_B_vs_Bminus": 0.3806,
+    "delta_correctness_Bminus_vs_A": 0.0081,
+    "delta_faithfulness_B_vs_A": 0.0405,
+    "delta_citation_precision_B_vs_A": 0.2121,
+    "delta_latency_p95_B_vs_A_ms": 4947,
+    "delta_context_tokens_B_vs_A": 999
   },
   "theo_dang_cau_hoi": {
     "A": {
       "relational": {
         "n": 58,
-        "correctness": 0.9483,
-        "faithfulness": 1.7069
+        "correctness": 0.9655,
+        "faithfulness": 1.6897
       },
       "narrative": {
         "n": 60,
-        "correctness": 1.5833,
+        "correctness": 1.4833,
         "faithfulness": 1.8833
       },
       "multi_hop": {
         "n": 40,
-        "correctness": 0.8,
-        "faithfulness": 1.95
+        "correctness": 0.325,
+        "faithfulness": 1.85
       },
       "no_data": {
         "n": 29,
@@ -123,25 +122,25 @@
       },
       "multi_turn": {
         "n": 60,
-        "correctness": 1.3167,
-        "faithfulness": 1.8833
+        "correctness": 1.1833,
+        "faithfulness": 1.8333
       }
     },
     "B": {
       "relational": {
         "n": 58,
-        "correctness": 1.4483,
-        "faithfulness": 1.6207
+        "correctness": 1.7586,
+        "faithfulness": 1.8966
       },
       "narrative": {
         "n": 60,
-        "correctness": 1.4833,
-        "faithfulness": 1.7167
+        "correctness": 1.4667,
+        "faithfulness": 1.8333
       },
       "multi_hop": {
         "n": 40,
-        "correctness": 0.675,
-        "faithfulness": 1.7
+        "correctness": 0.6,
+        "faithfulness": 1.75
       },
       "no_data": {
         "n": 29,
@@ -150,25 +149,25 @@
       },
       "multi_turn": {
         "n": 60,
-        "correctness": 1.6167,
-        "faithfulness": 1.7167
+        "correctness": 1.85,
+        "faithfulness": 1.9167
       }
     },
     "B-": {
       "relational": {
         "n": 58,
-        "correctness": 0.9483,
-        "faithfulness": 1.6552
+        "correctness": 1.0172,
+        "faithfulness": 1.8103
       },
       "narrative": {
         "n": 60,
-        "correctness": 1.6,
-        "faithfulness": 1.8833
+        "correctness": 1.4833,
+        "faithfulness": 1.9333
       },
       "multi_hop": {
         "n": 40,
-        "correctness": 0.85,
-        "faithfulness": 1.95
+        "correctness": 0.35,
+        "faithfulness": 1.8
       },
       "no_data": {
         "n": 29,
@@ -177,8 +176,8 @@
       },
       "multi_turn": {
         "n": 60,
-        "correctness": 1.2833,
-        "faithfulness": 1.8667
+        "correctness": 1.15,
+        "faithfulness": 1.7667
       }
     }
   }

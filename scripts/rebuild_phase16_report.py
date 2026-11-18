@@ -54,15 +54,17 @@ def main() -> int:
     parser.add_argument(
         "--gen-pool",
         default=(
-            "groq:openai/gpt-oss-120b,qwen/qwen3.8-27b,openai/gpt-oss-20b;"
-            "gemini:gemini-3.5-flash-lite,gemini-3-flash-preview"
+            "gemini:gemini-3.5-flash-lite,gemini-3.1-flash-lite,"
+            "gemini-3.1-flash-lite-preview;"
+            "groq:openai/gpt-oss-120b,qwen/qwen3.8-27b,openai/gpt-oss-20b"
         ),
     )
     parser.add_argument(
         "--judge-pool",
         default=(
-            "gemini:gemini-3.1-flash-lite,gemini-3.1-flash-lite-preview;"
-            "groq:openai/gpt-oss-120b,qwen/qwen3.8-27b,openai/gpt-oss-20b"
+            "gemini:gemini-3.1-flash-lite,gemini-3.1-flash-lite-preview,"
+            "gemini-3.5-flash-lite;"
+            "groq:openai/gpt-oss-120b,qwen/qwen3.8-27b"
         ),
     )
     args = parser.parse_args()

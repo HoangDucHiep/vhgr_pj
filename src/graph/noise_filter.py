@@ -116,6 +116,39 @@ def is_garbage_name(place_name: str) -> bool:
     return True
 
 
+#: Dấu hiệu tên **rác do quá trình liên kết entity** (D-124).
+#:
+#: Vì sao cần?
+#: ----------
+#: Đo được trên KG thật: node `ent_...` với tên `"Chuẩn đề đốc Page"` — đây là
+#: **hậu tố** của liên kết Wikipedia bị dính vào tên (Wikipedia dùng hậu tố
+#: "Page" để phân giải trùng tên: "Chuẩn đề đốc (Page)"). Tên này **không phải
+#: người** ⇒ đưa vào context khiến LLM kể "quân Việt Nam do Chuẩn đề đốc Page
+#: chỉ huy" ⇒ judge chấm **0** ("bịa thông tin chỉ huy không có trong ngữ cảnh").
+#:
+#: ⇒ Loại các tên kết thúc bằng hậu tố phân giải trùng tên của Wikipedia.
+WIKIPEDIA_SUFFIX_PATTERN = re.compile(
+    r"\s*\((?:Page|Disambiguation|Thông tin|List of)\)\s*$|"
+    r"\s+Page\s*$",
+    re.IGNORECASE,
+)
+
+
+def is_linkage_artifact_name(name: str) -> bool:
+    """Kiểm tra tên có phải **rác do liên kết entity** hay không (D-124).
+
+    Args:
+        name: Tên hiển thị của node.
+
+    Returns:
+        ``True`` nếu tên mang dấu hiệu là hậu tố phân giải trùng tên.
+    """
+    text = (name or "").strip()
+    if not text:
+        return False
+    return bool(WIKIPEDIA_SUFFIX_PATTERN.search(text))
+
+
 def is_noisy_edge(
     relation: str,
     object_name: str,
@@ -179,6 +212,16 @@ def filter_noisy_edges(edges: list[dict]) -> list[dict]:
         )
         target_type = edge.get("target_type") or edge.get("object_type")
         if is_noisy_edge(relation, target_name, object_type=target_type):
+            continue
+        # D-124: loại cạnh mà **một đầu** có tên rác do liên kết entity
+        # (vd "Chuẩn đề đốc Page") — kể cả khi quan hệ không phải quan hệ
+        # địa danh (nên `is_noisy_edge` không bắt được).
+        if any(
+            is_linkage_artifact_name(
+                str(edge.get(key) or "")
+            )
+            for key in ("source_name", "target_name")
+        ):
             continue
         kept.append(edge)
     return kept

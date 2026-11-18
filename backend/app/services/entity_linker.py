@@ -157,10 +157,32 @@ class EntityLinker:
                 # (bề mặt danh xưng/đại từ gom từ văn bản: "ông", "vua",
                 # "trận", "đời"…). Đo được: 23.190/50.820 alias là `mention`,
                 # và chúng gây nhiễu nặng cho câu hỏi.
+                #
+                # **Ngoại lệ (D-121)**: alias `mention` **bằng chính tên entity**
+                # (chỉ khác chữ hoa/thường) vẫn phải giữ — ví dụ entity "Cách
+                # mạng tháng Tám" có alias "Cách mạng Tháng Tám"; câu hỏi viết
+                # "Cách mạng Tháng Tám" khớp chính xác alias này. Đo được:
+                # **15.103/15.931 entity (94,8%)** chỉ có alias `mention`, mà
+                # trong đó phần lớn chỉ là **biến thể HOA/THƯỜNG** của tên ⇒
+                # loại hết ⇒ mất alias ⇒ câu hỏi không link được (hay link nhầm
+                # vào entity khác có tên ngắn hơn, vd "Cách mạng Tháng").
+                name_key = str(
+                    entity.get("name_normalized") or normalize_name(name)
+                )
                 keys: set[str] = set()
                 for alias in entity.get("aliases") or []:
                     alias_type = str(alias.get("type") or "")
                     if alias_type in NON_NAME_ALIAS_TYPES:
+                        # Chỉ giữ nếu là biến thể hoa/thường của chính tên.
+                        alias_text = str(alias.get("alias") or "")
+                        if not alias_text:
+                            continue
+                        if normalize_name(alias_text) != name_key:
+                            continue
+                        keys.add(normalize_name(alias_text))
+                        self.alias_display.setdefault(
+                            normalize_name(alias_text), set()
+                        ).add(alias_text)
                         continue
                     alias_text = str(alias.get("alias") or "")
                     if alias_text:
@@ -171,10 +193,8 @@ class EntityLinker:
                         self.alias_display.setdefault(normalize_name(alias_text), set()).add(
                             alias_text
                         )
-                keys.add(str(entity.get("name_normalized") or normalize_name(name)))
-                self.alias_display.setdefault(
-                    str(entity.get("name_normalized") or normalize_name(name)), set()
-                ).add(name)
+                keys.add(name_key)
+                self.alias_display.setdefault(name_key, set()).add(name)
 
                 for key in keys:
                     if not key:

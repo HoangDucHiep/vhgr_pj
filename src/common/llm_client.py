@@ -278,12 +278,26 @@ class LLMCache:
     def set(self, cache_key: str, model: str, response: str) -> None:
         """Ghi một phản hồi vào cache.
 
+        **Không** ghi phản hồi **rỗng** (D-127). Vì sao?
+        ---------------------------------
+        Model thinking (vd `gemini-4-hydrogen`) có thể trả về chuỗi rỗng khi
+        `max_output_tokens` không đủ cho phần suy nghĩ (`finish_reason =
+        MAX_TOKENS`). Nếu ghi chuỗi rỗng vào cache ⇒ mọi lần gọi lại **với
+        cùng prompt** đều nhận lại chuỗi rỗng ⇒ `rag_answer` quy về
+        `not_in_data` ⇒ **sai số liệu** *vĩnh viễn*, kể cả sau khi đã sửa
+        `max_output_tokens` (đo được 18/11/2026: 5 bản ghi rỗng của
+        `gemini-4-hydrogen` làm 3 câu bị "Không có trong dữ liệu").
+
+        ⇒ Chỉ cache phản hồi **có nội dung**.
+
         Args:
             cache_key: Khoá cache (sha256).
             model: Tên model đã dùng.
             response: Nội dung phản hồi.
         """
         if not self.enabled:
+            return
+        if not (response or "").strip():
             return
         with self._lock:
             with self._connect() as connection:
@@ -357,6 +371,8 @@ class ProviderConfig:
         timeout_s: Timeout mỗi request.
         max_retries: Số lần retry tối đa.
         backoff_base_s: Thời gian chờ backoff cơ sở (nhân dần theo lần retry).
+        thinking: Model có **suy nghĩ** (thinking) không.
+        thinking_budget: Ngân sách token dành cho phần suy nghĩ.
     """
 
     name: str
@@ -367,6 +383,11 @@ class ProviderConfig:
     timeout_s: int = 60
     max_retries: int = 3
     backoff_base_s: float = 2.0
+    #: D-126: model Gemini **thinking** (vd `gemini-4-hydrogen`) cần ngân sách
+    #: token riêng cho suy nghĩ, nếu không sẽ trả về câu trả lời **rỗng**.
+    thinking: bool = False
+    #: D-126: số token dành cho suy nghĩ (thêm vào `max_output_tokens`).
+    thinking_budget: int = 3200
 
 
 class LLMClient:
@@ -447,6 +468,8 @@ class LLMClient:
                     timeout_s=int(spec.get("timeout_s", 60)),
                     max_retries=int(spec.get("max_retries", 3)),
                     backoff_base_s=float(spec.get("backoff_base_s", 2.0)),
+                    thinking=bool(spec.get("thinking", False)),
+                    thinking_budget=int(spec.get("thinking_budget", 2048)),
                 )
             )
 
@@ -514,6 +537,23 @@ class LLMClient:
         }
         if json_mode:
             generation_config["response_mime_type"] = "application/json"
+        # D-126: model **thinking** (vd `gemini-4-hydrogen`) tiêu **ngân sách
+        # output token** cho phần suy nghĩ ⇒ với `max_output_tokens=900` phần
+        # còn lại cho câu trả lời **không đủ** ⇒ model trả về **chuỗi rỗng**
+        # (`finish_reason = MAX_TOKENS`) ⇒ `rag_answer` quy về `not_in_data`
+        # ⇒ **sai số liệu** (đo được 18/11/2026: `gemini-4-hydrogen` trả
+        # rỗng với `max_output_tokens=900`, còn `4096` thì ra 702 ký tự).
+        #
+        # ⇒ Tách **ngân sách suy nghĩ** khỏi ngân sách câu trả lời: cộng thêm
+        # `thinking_budget` vào `max_output_tokens` cho model thinking.
+        #
+        # Lưu ý: SDK `google-generativeai` (đang dùng) **không** có
+        # `thinking_config` ⇒ không tắt được phần suy nghĩ ⇒ chỉ có thể
+        # **cấp thêm** ngân sách.
+        if provider.thinking:
+            generation_config["max_output_tokens"] = (
+                max_tokens + provider.thinking_budget
+            )
         response = model.generate_content(
             prompt,
             generation_config=genai.types.GenerationConfig(**generation_config),

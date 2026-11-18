@@ -40,7 +40,11 @@ from src.common.logger import get_logger
 
 from src.qa.conversation import SessionStore, rewrite_question
 from src.qa.fusion import FusedContext, fuse
-from src.qa.graph_context import GraphContext, GraphContextBuilder
+from src.qa.graph_context import (
+    CONTEXT_RELATIONS,
+    GraphContext,
+    GraphContextBuilder,
+)
 from src.qa.intent import IntentResult, classify
 from src.qa.rag_answer import (
     NO_DATA_ANSWER,
@@ -61,11 +65,15 @@ con của ai, sự kiện diễn ra ở đâu...). Hãy **kết hợp** phần v
 và thuộc tính cụ thể. Trích dẫn cả hai loại nguồn theo đúng số `[n]`.
 
 ### Cách đọc phần "DỮ LIỆU ĐỒ THỊ"
-Các dòng trong phần đồ thị có dạng:
+Các dòng trong phần đồ thị có **2 dạng**:
 
-    [n] A — quan hệ → B
+**(a) Mệnh đề tự nhiên** (đã chuẩn hoá, không thể đọc ngược) — D-139:
 
-⇒ Đọc là: **"B là quan hệ của A"**.
+    [n] Ngô Văn Sở là người chỉ huy Trận Hà Hồi
+    [n] Nhà Thanh là bên tham chiến trong Trận Hà Hồi
+
+**(b) Dạng mũi tên** ``[n] A — quan hệ → B`` ⇒ đọc là:
+**"B là quan hệ của A"**.
 
 Ví dụ:
 
@@ -75,10 +83,73 @@ Ví dụ:
     [5] Nguyễn Phúc Ưng Dự — con của → Nguyễn Phúc Hồng Thiết
     ⇒ "Nguyễn Phúc Ưng Dự là **con của** Nguyễn Phúc Hồng Thiết."
 
+    [17] Trận Hà Hồi — chỉ huy trận → Ngô Văn Sở
+    ⇒ "**Ngô Văn Sở** là người **chỉ huy trận** Hà Hồi."
+
 Nhãn quan hệ đã được chuẩn hoá theo **đúng chiều nghĩa** — hãy tin đúng
 nhãn, **không** tự suy đoán ngược lại. Dòng "Bằng chứng" bên dưới là câu
 gốc từ Wikipedia và là bằng chứng chính xác nhất: khi nhãn quan hệ và
 bằng chứng có vẻ khác nhau, hãy ưu tiên **bằng chứng**.
+
+### Cách trả lời câu hỏi tự sự (diễn biến trận đánh) — D-123
+Câu hỏi kiểu "Kể lại diễn biến Trận X" / "Trận X diễn ra thế nào" cần
+**một đoạn văn kể chuyện** với đủ các thành phần sau:
+
+1. **Bối cảnh**: sự kiện diễn ra ở đâu, vào thời gian nào (dùng dữ liệu đồ
+   thị để định vị địa điểm; dùng văn bản cho mốc thời gian).
+2. **Các bên liên quan**: **tên đầy đủ** của người chỉ huy mỗi bên và tên
+   của các quân/bên tham chiến. Dùng **đúng** các tên trong đồ thị —
+   **không** dùng danh xưng chung chung ("quận công", "tướng", "người tướng")
+   nếu đồ thị đã cho tên riêng.
+3. **Diễn biến**: các giai đoạn/mốc của trận đánh, theo trình tự thời gian.
+4. **Kết quả**: ai thắng/thua, hậu quả, và diễn biến tiếp theo.
+
+Quy tắc bắt buộc:
+- **Không bịa** tên người, tên quân, địa điểm, năm, hoặc số liệu không có
+  trong văn bản **và** đồ thị. Nếu đồ thị không nêu bên tham chiến thì đừng
+  bịa tên bên tham chiến — hãy nói "quân X (do … chỉ huy)".
+- Chỉ nêu một người chỉ huy **cho mỗi bên**; nếu đồ thị liệt kê nhiều tên
+  cùng gắn với một trận, hãy nói "trong đó có …" để không gán sai vai trò.
+- **Trích dẫn** mỗi khẳng định cụ thể (tên chỉ huy, địa điểm, bên tham
+  chiến) bằng số `[n]` của nguồn tương ứng (văn bản hoặc đồ thị).
+- Nếu văn bản và đồ thị **không đủ** để kể trọn vẹn, hãy kể đến mức nào
+  có bằng chứng thì dừng, đừng suy diễn.
+
+### Ưu tiên nguồn khi có **xung đột** — D-124
+Đồ thị là một bản **tóm tắt cấu trúc** của Wikipedia, nên nó có thể **thiếu**
+người chỉ huy mà văn bản có (đo được: 31/60 câu narrative có tên trong đáp án
+chuẩn mà **không** xuất hiện trong đồ thị). ⇒ Áp dụng thứ tự ưu tiên:
+
+1. **Văn bản quyết định _diễn biến_**: ai chỉ huy, diễn biến ra sao, kết cục.
+   Khi văn bản nói rõ "Quang Trung cho quân vây chặt đồn" mà đồ thị chỉ ghi
+   ba chỉ huy khác ⇒ hãy kể theo **văn bản**, đừng thay bằng tên trong đồ thị.
+2. **Đồ thị quyết định _quan hệ và thuộc tính_**: địa điểm, bên tham chiến,
+   danh sách người tham gia — và đặc biệt là các **tên** mà văn bản chưa nêu.
+3. Nếu **hai nguồn mâu thuẫn** về một sự kiện ⇒ chọn cái nào **có câu bằng
+   chứng** ("Bằng chứng: …") đi kèm; tuyệt đối **không** tự chế ra tên để
+   "hòa giải" hai bên.
+
+Nói cách khác: **đồ thị bổ sung cho văn bản, không thay thế văn bản**. Thiếu
+dữ liệu ở đồ thị không phải lý do để bỏ qua thông tin đã có trong văn bản.
+
+### Khi văn bản **không** kể diễn biến — D-124
+Đồ thị chỉ có **metadata** (địa điểm, bên tham chiến, tên chỉ huy, nguồn tài
+liệu) — nó **không** chứa diễn biến. Nếu phần văn bản không mô tả diễn biến
+sự kiện ⇒ **đừng dựng một câu chuyện từ metadata**.
+
+- Được phép: nêu địa điểm, các bên tham chiến, tên chỉ huy (có trích dẫn `[n]`)
+  rồi nói rõ phần diễn biến **không có trong dữ liệu**.
+- **Không** được: viết "diễn biến diễn ra tại …, các bên tham gia …" rồi kể
+  tiếp bằng những mốc không có trong văn bản — đó là **bịa** và sẽ bị trừ điểm
+  nặng nhất (0 điểm).
+
+Nếu văn bản **có** diễn biến ⇒ hãy kể theo văn bản, dùng đồ thị để bổ sung
+tên/địa điểm/bên liên quan mà văn bản chưa nêu, và ghi rõ trích dẫn của mỗi
+phần.
+
+
+Trả lời bằng **tiếng Việt**, ưu tiên **một đoạn văn liền mạch** (3–6 câu),
+không phải danh sách gạch đầu dòng.
 """
 
 
@@ -221,7 +292,7 @@ class HybridAnswerer:
         # 5) Context KG.
         graph = GraphContext()
         if use_graph:
-            graph = self._build_graph(intent, linked, results, session)
+            graph = self._build_graph(intent, linked, results, session, question)
 
         # 6) Fusion.
         fused = fuse(
@@ -302,6 +373,7 @@ class HybridAnswerer:
         linked: list[tuple[str, str, str]],
         results: list[Any],
         session: Any,
+        question: str = "",
     ) -> GraphContext:
         """Dựng context KG: template theo ý định + mở rộng 1-hop.
 
@@ -310,6 +382,7 @@ class HybridAnswerer:
             linked: Entity đã link.
             results: Chunk đã truy xuất.
             session: Phiên hội thoại.
+            question: Câu hỏi gốc (dùng cho truy vấn chuỗi quan hệ — D-120).
 
         Returns:
             `GraphContext` (có thể rỗng).
@@ -321,7 +394,13 @@ class HybridAnswerer:
         elif session.last_subject_entity_id:
             entity_id = session.last_subject_entity_id
 
-        if entity_id:
+        # D-120: chuỗi quan hệ ("cha của cha X") — ưu tiên cao nhất vì 1-hop
+        # **không** chứa mắt xích thứ hai ⇒ không có câu trả lời.
+        if question:
+            chain = self.graph_builder.fetch_chain(question, linked)
+            if not chain.is_empty():
+                context = chain
+        if context.is_empty() and entity_id:
             template = self._template_for_intent(intent.intent)
             context = self.graph_builder.fetch(template, entity_id)
 
@@ -330,7 +409,20 @@ class HybridAnswerer:
         for item in results:
             chunk_entity_ids.extend(item.chunk.entity_ids)
         if chunk_entity_ids:
-            expansion = self.graph_builder.expand_from_entities(chunk_entity_ids)
+            # D-123: câu hỏi `narrative` chỉ lấy quan hệ **bối cảnh** —
+            # loại quan hệ sinh tử ("sinh tại"/"mất tại") vì chúng là nhiễu
+            # cho câu hỏi tự sự (đo được: 27,4 cạnh nhiễu/câu khi dùng mọi
+            # quan hệ ⇒ 0,0 khi chỉ dùng quan hệ bối cảnh).
+            expansion_relations = (
+                CONTEXT_RELATIONS
+                if intent.intent == "narrative"
+                else None
+            )
+            expansion = self.graph_builder.expand_from_entities(
+                chunk_entity_ids,
+                anchor_id=entity_id,
+                relations=expansion_relations,
+            )
             if not context.is_empty():
                 known = {
                     (edge.get("source_id"), edge.get("relation"), edge.get("target_id"))
@@ -365,7 +457,9 @@ class HybridAnswerer:
             Tên template.
         """
         mapping = {
-            "narrative": "event",
+            # D-121: câu hỏi narrative cần **các bên liên quan** (người chỉ
+            # huy, quân tham chiến, địa điểm) ⇒ truy vấn 2-hop quanh sự kiện.
+            "narrative": "event_deep",
             "relational": "relational",
             "multi_hop": "one_hop",
             "count": "dynasty",

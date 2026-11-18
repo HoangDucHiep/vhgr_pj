@@ -45,6 +45,11 @@ services:
       # `data/eval/` (bộ câu hỏi đánh giá).
       - ./data:/app/data
       - ./configs:/app/configs
+      # Cache HuggingFace dùng chung với máy host ⇒ container **không tải lại
+      # model dense** (MiniLM ~470MB) mỗi lần rebuild ⇒ request đầu tiên
+      # không treo 1–2 phút chờ mạng (đo được 17/11/2026: request treo ở
+      # `huggingface_hub/file_download.py` ⇒ `retriever._ensure_dense_model`).
+      - ${HF_HOME:-~/.cache/huggingface}:/root/.cache/huggingface
 
   frontend:
     image: node:24-alpine

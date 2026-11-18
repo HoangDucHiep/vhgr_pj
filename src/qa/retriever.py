@@ -581,6 +581,9 @@ class Retriever:
         self.config = config or {}
         self._model: Any | None = None
         self._tokenizer: Any | None = None
+        #: Index chunk theo `(doc_id, section_path)` — dùng cho parent
+        #: expansion (D-122). Lazy build.
+        self._parent_index: dict[tuple[str, str], list[int]] | None = None
 
     # ------------------------------------------------------------------
     # Load
@@ -763,7 +766,102 @@ class Retriever:
         if results:
             floor = results[0].rrf_score * floor_ratio
             results = [item for item in results if item.rrf_score >= floor]
-        return results[:top_k]
+        results = results[:top_k]
+        # D-122: **mở rộng ngữ cảnh cha** (parent expansion).
+        parent_cfg = retrieval.get("parent_expansion") or {}
+        if parent_cfg.get("enabled", False):
+            results = self._expand_parents(results, parent_cfg)
+        return results
+
+    # ------------------------------------------------------------------
+    # Parent expansion (D-122)
+    # ------------------------------------------------------------------
+
+    def _expand_parents(
+        self,
+        results: list[RetrievedChunk],
+        cfg: dict[str, Any],
+    ) -> list[RetrievedChunk]:
+        """Bổ sung **chunk cha** (cùng `doc_id` + `section`) cho mỗi chunk.
+
+        Vì sao cần?
+        ----------
+        Chunk trong corpus **rất nhỏ**: độ dài trung vị chỉ **248 ký tự**,
+        20% chunk dưới 100 ký tự, 42% dưới 200 ký tự. Hệ quả trực tiếp với
+        câu hỏi **diễn biến**:
+
+        - RAG thuần truy xuất được các mảnh rời rạc ("Giao Chỉ (nay là miền
+          Bắc Việt Nam…)") mà **không** có mốc thời gian ⇒ LLM không dựng
+          được trình tự ⇒ trả "Không có trong dữ liệu";
+        - LLM cần **cả một section** ("Diễn biến", "Kết quả") để kể lại
+          câu chuyện.
+
+        ⇒ Ta bổ sung các chunk **cùng `section`** của chunk đã truy xuất
+        (đã có sẵn trong corpus) để context có **mạch hồi chuyện** liền mạch.
+
+        Đây là sửa ở **tầng truy xuất** ⇒ áp dụng cho **cả hai arm** ⇒
+        so sánh A vs B vẫn công bằng (khác biệt chỉ còn là KG).
+
+        Args:
+            results: Chunk đã truy xuất.
+            cfg: Cấu hình `retrieval.parent_expansion`.
+
+        Returns:
+            Danh sách chunk đã mở rộng (giữ nguyên thứ tự, chunk cha đi sau
+            chunk con để trích dẫn `[n]` không đổi).
+        """
+        max_siblings = int(cfg.get("max_siblings", 6))
+        max_chars = int(cfg.get("max_parent_chars", 2400))
+        max_total = int(cfg.get("max_total_parents", 10))
+        if max_siblings <= 0:
+            return results
+
+        # Index chunk theo (doc_id, section_path) để tìm anh em.
+        if self._parent_index is None:
+            self._parent_index: dict[tuple[str, str], list[int]] = {}
+            for index, chunk in enumerate(self.chunks):
+                key = (chunk.doc_id, chunk.section_path or chunk.section or "")
+                self._parent_index.setdefault(key, []).append(index)
+
+        out: list[RetrievedChunk] = []
+        parents: list[RetrievedChunk] = []
+        seen: set[str] = set()
+        for item in results:
+            out.append(item)
+            seen.add(item.chunk.chunk_id)
+            key = (item.chunk.doc_id, item.chunk.section_path or item.chunk.section or "")
+            siblings = self._parent_index.get(key) or []
+            if len(siblings) <= 1:
+                continue
+            # Chỉ lấy chunk **liền kề** (trước/sau) để giữ trình tự.
+            position = siblings.index(item.index) if item.index in siblings else -1
+            if position < 0:
+                continue
+            used_chars = len(item.chunk.text)
+            for offset in range(1, max_siblings + 1):
+                for neighbour in (position - offset, position + offset):
+                    if neighbour < 0 or neighbour >= len(siblings):
+                        continue
+                    sibling = self.chunks[siblings[neighbour]]
+                    if sibling.chunk_id in seen:
+                        continue
+                    if used_chars + len(sibling.text) > max_chars:
+                        continue
+                    seen.add(sibling.chunk_id)
+                    used_chars += len(sibling.text)
+                    parents.append(
+                        RetrievedChunk(
+                            chunk=sibling,
+                            index=siblings[neighbour],
+                            rrf_score=item.rrf_score * 0.5,
+                        )
+                    )
+                    if len(parents) >= max_total:
+                        return out + parents
+        # **Chunk hit gốc luôn trước** ⇒ chúng không bị đẩy ra khỏi ngân sách
+        # context bởi phần mở rộng (đo được: trước khi sửa, 6 chunk "Hán – Nam
+        # Việt" đúng bị chiếm chỗ bởi chunk anh em của bài "Hán–Việt (42–43)").
+        return out + parents
 
 
 def build_context(

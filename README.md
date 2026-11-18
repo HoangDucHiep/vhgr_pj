@@ -80,15 +80,15 @@ do retriever, mà do kênh đồ thị.
 
 | Chỉ số | A — Vanilla RAG | B — Hybrid GraphRAG | B− — Hybrid không KG |
 |---|---|---|---|
-| correctness (0–2) | 1.2915 | 1.4372 | 1.2955 |
-| correctness_rate | 0.5951 | 0.6478 | 0.5992 |
-| faithfulness (0–2) | 1.8664 | 1.7247 | 1.8502 |
-| faithfulness_rate | 0.9271 | 0.8381 | 0.9231 |
-| citation_precision | 0.6984 | 0.7656 | 0.7085 |
+| correctness (0–2) | 1.1619 | 1.5506 | 1.17 |
+| correctness_rate | 0.5304 | 0.7328 | 0.5344 |
+| faithfulness (0–2) | 1.834 | 1.8745 | 1.8502 |
+| faithfulness_rate | 0.9109 | 0.915 | 0.9231 |
+| citation_precision | 0.6154 | 0.8275 | 0.6275 |
 | no_data_accuracy | 0.9655 | 0.9655 | 0.9655 |
-| latency p50 (ms) | 1763 | 2096 | 1644 |
-| latency p95 (ms) | 11794 | 22429 | 13515 |
-| context_tokens (TB) | 712 | 1739 | 734 |
+| latency p50 (ms) | 1749 | 2054 | 1633 |
+| latency p95 (ms) | 11794 | 16741 | 13155 |
+| context_tokens (TB) | 712 | 1711 | 734 |
 
 **Công bằng của phép so sánh** (D-104 · D-108 · D-109):
 

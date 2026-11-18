@@ -12,7 +12,7 @@
 | Hạng mục | Trạng thái |
 |---|---|
 | Giai đoạn | **Đang triển khai** — Phase 1–17 trong khuôn khung mới (17/11/2026) |
-| Phase hiện tại | **Phase 16 — Đánh giá A vs B vs B− (LLM-judge)** · **Phase 17 — Giao diện + đóng gói** |
+| Phase hiện tại | **Phase 16 — Đánh giá A vs B vs B− (LLM-judge)** ✅ đạt Gate (sau D-118) · **Phase 17 — Giao diện + đóng gói** |
 | Phase đã xong | 0 Bootstrap · 1 Lọc bài · 2 Làm sạch+tách câu · 3 Infobox · 4 Nhãn bạc NER · 5 Huấn luyện+suy luận NER · 6 Coreference · 7 Wikidata DS + tập train RE · 8 Mô hình RE + LLM + hợp nhất triple · 9 Entity linking · 10 Đồ thị + Neo4j · 11 Text-to-Cypher backend · 12 Giao diện web · **13 Sửa chất lượng nền tảng (linking exact-case, chiều đảo quan hệ, lọc nhiễu KG)** · **14 Vanilla RAG (chunking + embedding + BM25/dense/RRF + sinh câu trả lời)** · **15 Hybrid GraphRAG (KG template + intent + fusion + hội thoại)** |
 | Tài liệu | `docs/00` … `docs/09` (đã đánh số lại 13–17) · `docs/10-nhat-ky/` nhật ký triển khai chi tiết theo phase |
 | Môi trường | Python 3.12.3, Docker 29.9.2, Node 24.15, RAM 23GB, đĩa 2.5TB, **không GPU local** |
@@ -21,8 +21,9 @@
 | Frontend | Vite + React 18 + TS — `npm run build` 0 lỗi ✅ · toggle A/B/B− + citations click-to-source ✅ |
 | Kaggle | `KAGGLE_USERNAME=hoangduchiep` + `KAGGLE_KEY` trong `.env` ✅ (auth bằng `Authorization: Bearer`) — ⚠️ CLI ≥ 2.2: `~/.kaggle/access_token` **đè** env ⇒ phải `env -u KAGGLE_USERNAME -u KAGGLE_KEY KAGGLE_API_TOKEN=<tok>` (D-089) |
 | API key | `GEMINI_API_KEY`, `GROQ_API_KEY` trong `.env` ✅ |
-| Test | `pytest -q tests/` → **700 passed** (Phase 13 thêm 19 regression; Phase 14/15 thêm test chunking/retriever/hybrid) |
+| Test | `pytest -q tests/` → **779 passed** (Phase 13 thêm 19 regression; Phase 14/15 thêm test chunking/retriever/hybrid; Phase 16 thêm test eval + chiều KG) |
 | Số liệu hiện tại | 2.441 bài · 186.960 câu · **65.608 chunk** (1 đoạn = 1 chunk; kế hoạch ghi 101.628 — thực tế thấp hơn vì `min_chars=40` loại đoạn stub, xem `reports/deviations.md` D-105) · **65.608 chunk đã embed** (MiniLM-L12, 384-dim float16) · 10.078 triple infobox · **13.379** triple hợp nhất (13 trường) · KG **19.548 node / 13.379 edge** · bộ đánh giá **247 câu / 5 dạng** (`data/eval/qa_rag_250.jsonl`) |
+| Kết quả benchmark (247 câu × 3 arm) | `correctness`: A **1,1619** · B **1,5506** · B− **1,1700** (Δ B vs A = **+0,3887**) · `faithfulness_rate`: A 0,9109 · B **0,9150** · B− 0,9231 (✅ ≥ 0,90) · `citation_precision`: B **0,8275** |
 
 ## 2. Quyết định đã chốt (KHÔNG đổi nếu không có lý do ghi vào DECISIONS.md)
 
@@ -221,12 +222,12 @@ Chi tiết đầy đủ: `docs/04-schema-knowledge-graph.md`.
 
 | Chỉ số | Mục tiêu | Thực tế |
 |---|---|---|
-| `correctness(B)` (LLM-judge 0–2) | **> `correctness(A)`** | xem `reports/eval_rag_*.md` |
-| `correctness(B−)` | nằm giữa A và B (chứng minh đóng góp đến từ **kênh KG**) | xem `reports/eval_rag_*.md` |
-| `faithfulness_rate` | ≥ 0.90 | xem `reports/eval_rag_*.md` |
-| `citation_precision` | ≥ 0.70 | xem `reports/eval_rag_*.md` |
-| `no_data_accuracy` | ≥ 0.90 | xem `reports/eval_rag_*.md` |
-| `latency_p95` | < 6 s | xem `reports/eval_rag_*.md` |
+| `correctness(B)` (LLM-judge 0–2) | **> `correctness(A)`** | **B 1,5506 > A 1,1619** (Δ **+0,3887**) |
+| `correctness(B−)` | nằm giữa A và B (chứng minh đóng góp đến từ **kênh KG**) | **B− 1,1700 ≈ A 1,1619** ⇒ Δ(B vs B−) = **+0,3806** ⇒ lợi ích đến từ *đồ thị*, không từ prompt |
+| `faithfulness_rate` | ≥ 0.90 | A **0,9109** · B **0,9150** · B− **0,9231** ✅ |
+| `citation_precision` | ≥ 0.70 | A 0,6154 · **B 0,8275** ✅ · B− 0,6275 |
+| `no_data_accuracy` | ≥ 0.90 | **0,9655** (cả 3 arm) |
+| `latency_p95` | < 6 s | A **11794 ms** · B **16741 ms** ⚠️ (vượt — đánh đổi đã biết của kênh KG) |
 | Bộ câu hỏi đánh giá | 250 câu / 5 dạng | **247 câu** (`data/eval/qa_rag_250.jsonl`) — 60 narrative · 60 multi_turn · 58 relational · 40 multi_hop · 29 no_data |
 
 ### 3.2. Chỉ số pipeline (giai đoạn trước)

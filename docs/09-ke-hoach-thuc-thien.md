@@ -1052,8 +1052,17 @@ npm run dev
 - [x] `correctness(B) > correctness(A)` — **hoặc** báo cáo minh bạch số thực tế + phân tích lỗi top-20
 - [x] B− nằm giữa/sát A ⇒ chứng minh đóng góp đến từ kênh KG
 - [x] `reports/eval_rag_*.md` + `.json` + `docs/10-nhat-ky/so-lieu/phase-16-*.json`
+- [x] `faithfulness_rate ≥ 0.90` — đạt sau D-118 (B **0,9150**; trước đó 0,8381)
+- [x] `n_judge_missing = 0` · `n_infra_errors = 0` · `n_model_mismatch = 0`
+
+**Kết quả (17/11/2026, sau D-118 + D-119):** 247/247 câu · `correctness` A
+**1,1619** · B **1,5506** · B− **1,1700** (Δ B vs A = **+0,3887**, Δ B vs B− =
+**+0,3806**) · `faithfulness_rate` A 0,9109 · B **0,9150** · B− 0,9231 ·
+`citation_precision` B **0,8275** · `no_data_accuracy` 0,9655 · `latency_p95`
+A 11.794 ms · B 16.741 ms (⚠️ vượt mục tiêu 6 s — đánh đổi đã biết của kênh KG).
 
 **Lùi:** nếu quota LLM không đủ ⇒ giảm tập con LLM (giữ nguyên tỉ lệ 5 dạng), ghi rõ phạm vi trong báo cáo. Không sửa số liệu để "cho xanh".
+> **Đã dùng:** D-119 (`--reuse-arms-from`) để tái dùng arm không đổi khi chạy lại ⇒ chỉ sinh 247 lời gọi thay vì 741.
 
 ---
 

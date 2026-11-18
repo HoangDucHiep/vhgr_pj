@@ -53,7 +53,7 @@ import statistics
 import sys
 import time
 from pathlib import Path
-from typing import Any
+from typing import Any, Iterable
 
 from src.common.config import REPO_ROOT, load_config, resolve_path
 from src.common.llm_client import LLMClient
@@ -105,9 +105,18 @@ Với **mỗi** phương án, chấm:
    - 0 = sai hoặc không trả lời được câu hỏi
    Nếu `expected_answer` là "Không có trong dữ liệu." thì chấm 2 khi câu trả lời
    nói không có dữ liệu, 0 nếu câu trả lời bịa.
+   ⇒ **NGƯỢC LẠI** (D-140): nếu `expected_answer` **KHÔNG** phải "Không có
+   trong dữ liệu." (ví dụ loại `narrative` — đoạn tham chiảu là văn bản) mà
+   câu trả lời lại nói "Không có trong dữ liệu." ⇒ chấm **0** (đáp án có
+   sẵn, câu trả lời từ chối trả lời ⇒ **sai**). Đo được (D-124): **16/60**
+   câu arm A và **14/60** câu arm B− bị cho điểm 2 oan vì lý do này.
    Nếu loại câu hỏi là `narrative` (expected_answer là một đoạn văn tham chiếu
    trích từ Wikipedia) ⇒ chấm theo **mức độ bao phủ các mốc sự kiện chính**
    có trong đoạn tham chiếu, không đòi hỏi trùng văn bản.
+   ⇒ **KHÔNG** trừ điểm chỉ vì câu trả lời nêu **thêm** thông tin có trong
+   CONTEXT mà đoạn tham chiảu không có (vd thêm tên người chỉ huy lấy từ phần
+   đồ thị) ⇒ đó là **bổ sung**, không phải sai. Chỉ trừ điểm nếu câu trả lời
+   **sai** so với đoạn tham chiảu, hoặc **thiếu** mốc sự kiện chính.
    Nếu loại câu hỏi là `multi_turn` ⇒ câu hỏi là lượt tiếp theo trong hội thoại,
    dùng đại từ; hãy hiểu đại từ theo lượt trước trong CONTEXT (nếu có).
    Nếu mục "CHỦ THỂ CỦA CÂU HỎI" có nêu tên ⇒ đó **chính là** đối tượng mà
@@ -131,6 +140,36 @@ QUY TẮC BẮT BUỘC:
 - Phải có **đúng 1 entry cho MỖI phương án** được nêu trong phần "CÁC PHƯƠNG ÁN CẦN CHẤM".
 - `reason` **tối đa 15 từ**, không lặp lại nội dung đáp án.
 - Không thêm entry nào ngoài danh sách phương án.
+
+## CÁCH ĐỌC PHẦN "DỮ LIỆU ĐỒ THỊ" TRONG CONTEXT (D-138/D-139)
+
+Nếu CONTEXT của phương án có phần `### DỮ LIỆU ĐỒ THỊ (Knowledge Graph)`,
+các dòng cạnh có **2 dạng**:
+
+**(a) Mệnh đề tự nhiên** (không thể đọc ngược):
+
+    [n] Ngô Văn Sở là người chỉ huy Trận Hà Hồi
+    ⇒ Ngô Văn Sở **là người chỉ huy** Trận Hà Hồi.
+
+    [n] Nhà Thanh là bên tham chiến trong Trận Hà Hồi
+    ⇒ Nhà Thanh **là bên tham chiến** trong Trận Hà Hồi.
+
+**(b) Dạng mũi tên** ``[n] A — quan hệ → B`` (quan hệ ghi theo
+**chủ thể → đối tượng**) ⇒ đọc là: **"B là quan hệ của A"**:
+
+    [n] Trận Hà Hồi — chỉ huy trận → Ngô Văn Sở
+    ⇒ "**Ngô Văn Sở** là người **chỉ huy trận** Hà Hồi."
+
+    [n] Trận Hà Hồi — diễn ra tại → Hà Tây (tỉnh)
+    ⇒ "Trận Hà Hồi **diễn ra tại** Hà Tây (tỉnh)."
+
+Dòng "Bằng chứng" là câu gốc từ Wikipedia và là nguồn **chính xác nhất**:
+khi nhãn quan hệ và bằng chứng có vẻ khác nhau ⇒ hãy tin **bằng chứng**.
+
+⇒ TUYỆT ĐỐI **KHÔNG** kết luận "thông tin về chỉ huy không có trong ngữ cảnh"
+chỉ vì bạn đọc hướng ngược. Hãy kiểm tra lại theo quy ước trên, và coi phần
+đồ thị là **nguồn hợp lệ** cho thông tin quan hệ (người chỉ huy, bên tham
+chiến, địa điểm) — đó là điểm khác biệt của phương án dùng đồ thị.
 """
 
 #: Mô tả loại câu hỏi cho judge.
@@ -173,39 +212,151 @@ def estimate_tokens(text: str) -> int:
     return max(1, len(text or "") // 3)
 
 
-def compact_context(context: str, *, per_block: int = 600, total: int = 16000) -> str:
+def compact_context(
+    context: str,
+    *,
+    per_block: int = 600,
+    total: int = 9000,
+    keep_indices: Iterable[int] | None = None,
+) -> str:
     """Nén context trước khi đưa cho judge.
 
     Mỗi khối `[n] ...` bị cắt còn `per_block` ký tự ⇒ judge thấy đủ "nội dung
     khối đó nói gì" mà không bị tràn context. Quan trọng: phải giữ **mọi** số
     `[n]` trong khối vì đó là không gian trích dẫn dùng chung cho text + KG.
 
+    Vì sao `total` = 9.000 (D-124)?
+    ---------------------------
+    Judge nhận **3 arm** trong **một** lời gọi ⇒ prompt = 3 × context + phần
+    đáp án tham khảo. Với `total = 16.000` ⇒ prompt vượt **7.000 token/phút**
+    (ITPM) của Groq ⇒ Groq trả lỗi **413** ⇒ judge **hỏng** ⇒ câu bị hoãn.
+    Đo được: prompt 3 arm ≈ 10.456 ký tự ≈ 3.485 token vượt trần ITPM của
+    Groq cho model `qwen/qwen3.8-27b` (7.000 token/phút).
+
+    ⇒ Hạ trần mỗi arm còn 9.000 ký tự ⇒ tổng ≈ 27.000 ký tự ≈ 9.000 token —
+    vẫn **vừa** cho Gemini (context rất lớn) và **vừa** cho Groq.
+
+    D-132: **giữ phần KG** (không cắt mất).
+    -------------------------------------
+    Vì sao cần?
+    ----------
+    Context của arm B gồm 2 phần: `### VĂN BẢN TỪ WIKIPEDIA` rồi tới
+    `### DỮ LIỆU ĐỒ THỊ (Knowledge Graph)`. Cắt theo thứ tự ⇒ khi trần
+    `total` bị đạt ở giữa phần văn bản ⇒ **toàn bộ phần KG bị mất** ⇒
+    judge **không nhìn thấy** thông tin KG của arm B ⇒ phép so sánh **lệch
+    có lợi cho arm A** (đo được: ở `total = 2.200`, **35/37** câu có KG bị
+    mất phần KG; ở `total = 9.000` còn **8/37**).
+
+    ⇒ Cắt **phần văn bản** trước (nó có dự phòng), **luôn giữ** phần KG.
+
+    D-138: **giữ luôn các khối mà câu trả lời đã trích dẫn**.
+    ---------------------------------------------
+    Vì sao cần?
+    ----------
+    Câu trả lời trích dẫn `[n]`. Nếu `compact_context()` cắt bỏ khối `[n]` đó
+    ⇒ judge thấy trích dẫn **không tồn tại** ⇒ trừ `citation_precision` về 0
+    ⇒ **điểm giảm ở arm B** (arm B có context dài nhất ⇒ hay bị cắt nhất).
+    Đo được (D-124): **7/60** câu arm B trích dẫn khối đã bị cắt
+    (q0081 [27], q0087 [28], q0089 [13,15], q0095 [15], q0099 [15],
+    q0108 [13], q0113 [13]).
+
+    ⇒ `keep_indices` cho phép giữ **bắt buộc** những khối đã được trích dẫn.
+
     Args:
         context: Context đầy đủ.
         per_block: Số ký tự tối đa cho mỗi khối.
         total: Tổng ký tự tối đa.
+        keep_indices: Số thứ tự khối `[n]` **phải** giữ (dù đã trích dẫn).
 
     Returns:
         Context đã nén.
     """
     if not context:
         return ""
-    blocks = re.split(r"(?m)^(?=\[\d+\]\s)", context)
-    out: list[str] = []
-    used = 0
-    for block in blocks:
-        if not block.strip():
-            continue
-        head = block.split("\n", 1)[0]
-        body = block[len(head):].strip()
-        if len(body) > per_block:
-            body = body[:per_block].rsplit(" ", 1)[0] + " …"
-        piece = f"{head}\n{body}" if body else head
-        if used + len(piece) > total:
-            break
-        out.append(piece)
-        used += len(piece)
-    return "\n\n".join(out)
+    # D-132: tách phần **KG** (giữ **nguyên vẹn**) khỏi phần **văn bản**
+    # (được cắt trước) ⇒ judge luôn nhìn thấy cạnh KG của arm B.
+    kg_marker = "### DỮ LIỆU ĐỒ THỊ"
+    head, sep, kg_part = context.partition(kg_marker)
+    if not sep:
+        head, kg_part = context, ""
+
+    keep = {int(i) for i in (keep_indices or ())}
+
+    def _block_index(block: str) -> int | None:
+        """Trích số thứ tự khối `[n]` từ đầu khối (None nếu không phải khối)."""
+        match = re.match(r"\[(\d+)\]", block.strip())
+        return int(match.group(1)) if match else None
+
+    def _pieces(source: str) -> list[tuple[str, bool]]:
+        """Tách `source` thành các khối `[n]`, kèm cờ "đã được trích dẫn"."""
+        blocks = re.split(r"(?m)^(?=\[\d+\]\s)", source)
+        out: list[tuple[str, bool]] = []
+        for block in blocks:
+            if not block.strip():
+                continue
+            block_head = block.split("\n", 1)[0]
+            body = block[len(block_head):].strip()
+            if len(body) > per_block:
+                body = body[:per_block].rsplit(" ", 1)[0] + " …"
+            piece = f"{block_head}\n{body}" if body else block_head
+            index = _block_index(block)
+            out.append((piece, index is not None and index in keep))
+        return out
+
+    def _assemble(
+        text_pieces: list[tuple[str, bool]],
+        kg_pieces: list[tuple[str, bool]],
+    ) -> str:
+        """Ghép 2 phần với ngân sách, **ưu tiên giữ khối đã trích dẫn**.
+
+        Thứ tự ưu tiên (D-138):
+        1. Khối **đã được trích dẫn** (bắt buộc) — kể cả khi vượt ngân sách.
+        2. Phần **KG** (có giá trị bổ sung, không có dự phòng).
+        3. Phần **văn bản** (có dự phòng trong Wikipedia ⇒ cắt được).
+        """
+        marker_len = len(kg_marker) + 2 if kg_pieces else 0
+        forced = [p for p, is_keep in text_pieces + kg_pieces if is_keep]
+        forced_len = sum(len(p) + 2 for p in forced)
+        remaining = max(0, total - marker_len - forced_len)
+
+        # Phần KG trước (giá trị cao hơn văn bản).
+        kg_kept: list[str] = []
+        used = 0
+        for piece, is_keep in kg_pieces:
+            if is_keep:
+                kg_kept.append(piece)
+                continue
+            if used + len(piece) + 2 > remaining:
+                continue
+            kg_kept.append(piece)
+            used += len(piece) + 2
+
+        # Phần văn bản với phần ngân sách còn lại.
+        text_kept: list[str] = []
+        used_text = 0
+        for piece, is_keep in text_pieces:
+            if is_keep:
+                text_kept.append(piece)
+                continue
+            if used_text + len(piece) + 2 > remaining - used:
+                continue
+            text_kept.append(piece)
+            used_text += len(piece) + 2
+
+        parts: list[str] = []
+        if text_kept:
+            parts.append("\n\n".join(text_kept))
+        if kg_kept:
+            parts.append(kg_marker + "\n\n".join(kg_kept))
+        return "\n\n".join(parts)
+
+    text_pieces = _pieces(head)
+    kg_pieces = _pieces(kg_part) if kg_part else []
+    result = _assemble(text_pieces, kg_pieces)
+    # Trường hợp hiếm: phần KG một mình đã vượt trần ⇒ cắt đuôi.
+    if len(result) > total:
+        result = result[:total].rsplit("\n\n", 1)[0]
+    return result
 
 
 def build_client(provider: str, *, model: str | None = None) -> LLMClient:
@@ -233,6 +384,33 @@ def build_client(provider: str, *, model: str | None = None) -> LLMClient:
         providers[provider] = spec
         config["providers"] = providers
     return LLMClient.from_config(config)
+
+
+#: Tiền tố model Gemini **thinking** (có phần suy nghĩ ẩn) — D-126.
+#:
+#: Vì sao cần?
+#: ----------
+#: Model thinking **tiêu ngân sách output token** cho suy nghĩ ⇒ với
+#: `max_output_tokens=900` (mặc định của `rag_answer`/`hybrid`) phần còn lại
+#: cho câu trả lời **không đủ** ⇒ model trả về **chuỗi rỗng** ⇒
+#: `rag_answer` quy về `not_in_data` ⇒ **sai số liệu** (đo được 18/11/2026:
+#: `gemini-4-hydrogen` trả rỗng với `max_output_tokens=900`).
+#:
+#: ⇒ Tách ngân sách: `thinking_budget` (suy nghĩ) + `max_tokens` (trả lời).
+THINKING_MODEL_PREFIXES: tuple[str, ...] = ("gemini-4-",)
+
+
+def _is_thinking_model(model: str) -> bool:
+    """Kiểm tra model Gemini có **suy nghĩ** (thinking) hay không.
+
+    Args:
+        model: Tên model.
+
+    Returns:
+        ``True`` nếu model cần ngân sách token riêng cho suy nghĩ.
+    """
+    name = (model or "").strip().lower()
+    return any(name.startswith(prefix) for prefix in THINKING_MODEL_PREFIXES)
 
 
 def build_client_pool(
@@ -271,6 +449,15 @@ def build_client_pool(
         spec["max_retries"] = 0
         if requests_per_day is not None:
             spec["requests_per_day"] = requests_per_day
+        # D-126: model Gemini **thinking** (vd `gemini-4-hydrogen`) cần ngân
+        # sách token riêng cho suy nghĩ ⇒ nếu không, `max_output_tokens=900`
+        # bị hết ⇒ model trả về câu trả lời **rỗng** ⇒ quy về `not_in_data`.
+        # ⇒ Tự nhận diện theo tên model ⇒ không cần khai báo thủ công.
+        if provider == "gemini" and _is_thinking_model(model):
+            spec["thinking"] = True
+            # D-126: đo được — `900` ⇒ rỗng (`MAX_TOKENS`); `4096` ⇒ 702 ký tự
+            # ⇒ cần **cộng thêm** ngân sách suy nghĩ vào `max_tokens`.
+            spec["thinking_budget"] = int(spec.get("thinking_budget") or 3200)
         providers[provider] = spec
         config["providers"] = providers
         clients.append(LLMClient.from_config(config))
@@ -332,6 +519,8 @@ class PooledLLM:
         quota_cooldown_s: float = 900.0,
         max_quota_wait_s: float = 0.0,
         max_cooldown_s: float = 900.0,
+        rpd_threshold_s: float = 1800.0,
+        rpm_min_cooldown_s: float = 60.0,
     ) -> None:
         """Khởi tạo.
 
@@ -349,6 +538,13 @@ class PooledLLM:
                 rất xa (vd Gemini "5h14m") ⇒ không nên loại model khỏi pool
                 lâu như vậy (nó có thể hồi sớm hơn, và mỗi phút thử lại vẫn
                 rẻ hơn là bỏ câu).
+            rpd_threshold_s: D-130 — ngưỡng phân biệt **RPD** (hạn mức
+                ngày) với **RPM** (hạn mức phút). Mốc reset do provider báo
+                **≥** ngưỡng này ⇒ coi là RPD ⇒ tin mốc reset dài hạn.
+                Ngắn hơn ⇒ RPM ⇒ chỉ loại tạm thời gian ngắn.
+            rpm_min_cooldown_s: D-130 — thời gian loại tạm **tối thiểu** khi
+                lỗi là RPM (giây). Đo được 18/11/2026: quota Gemini hồi sau
+                ~40–60 giây ⇒ 60 giây là mốc hợp lý để thử lại.
         """
         self.clients = clients
         self.index = 0
@@ -359,6 +555,10 @@ class PooledLLM:
         self.max_quota_wait_s = max(0.0, float(max_quota_wait_s))
         #: Trần thời gian loại tạm một model sau lỗi quota (giây).
         self.max_cooldown_s = max(1.0, float(max_cooldown_s))
+        #: D-130: ngưỡng phân biệt RPD (ngày) với RPM (phút).
+        self.rpd_threshold_s = max(1.0, float(rpd_threshold_s))
+        #: D-130: cooldown tối thiểu cho lỗi RPM.
+        self.rpm_min_cooldown_s = max(1.0, float(rpm_min_cooldown_s))
         #: Thứ tự **ưu tiên provider** khi chọn model (ví dụ: ``("groq",
         #: "gemini")`` ⇒ ưu tiên Groq trước Gemini). Vì sao: quota free tier
         #: mỗi provider hữu hạn theo **thang đo khác nhau** — Groq giới hạn
@@ -587,6 +787,36 @@ class PooledLLM:
             )
             time.sleep(sleep_s)
 
+    @staticmethod
+    def _gemini_quota_kind(error: BaseException) -> str | None:
+        """Phân loại hạn mức Gemini theo ``quota_id`` trong lỗi 429.
+
+        Vì sao cần?
+        ----------
+        Gemini báo **một** thông điệp 429 cho cả RPM và RPD, chỉ khác ở
+        ``quota_id``:
+
+        - `GenerateRequestsPerMinutePerProjectPerModel-FreeTier` ⇒ **RPM**
+          ⇒ hồi sau vài chục giây.
+        - `GenerateRequestsPerDayPerProjectPerModel-FreeTier` ⇒ **RPD**
+          ⇒ cả ngày mới hồi (thực tế ~24 h, không phải "1h" như báo).
+
+        Trước D-135, harness chỉ đoán qua **độ dài** mốc reset
+        (`rpd_threshold_s`) ⇒ dễ **nhầm** ⇒ cooldown sai ⇒ mất cả ngày.
+
+        Args:
+            error: Lỗi từ provider.
+
+        Returns:
+            ``"rpd"``, ``"rpm"`` hoặc ``None`` nếu không nhận diện được.
+        """
+        text = str(error)
+        if "PerDay" in text or "per_day" in text.lower():
+            return "rpd"
+        if "PerMinute" in text or "per_minute" in text.lower():
+            return "rpm"
+        return None
+
     def _record_quota_cooldown(self, key: str, error: BaseException) -> None:
         """Ghi nhận mốc hồi quota cho 1 model (có trần).
 
@@ -598,16 +828,59 @@ class PooledLLM:
         lỡ ⇒ mất cả ngày. ⇒ Cắt cooldown ở `max_cooldown_s` để thử lại
         định kỳ.
 
+        D-130: phân biệt hạn mức **theo provider**.
+        -----------------------------------------
+        Đo được 18/11/2026 (2 phép thực nghiệm):
+
+        | Provider | Mốc reset **báo** | Hành vi **thật** |
+        |---|---|---|
+        | Gemini | "retry in 1h58m" | hồi sau **~40–60 giây** |
+        | Groq | "try again in 5m1s" | TPD 200K ⇒ **đúng** mốc reset |
+
+        ⇒ Gemini báo mốc reset **không đáng tin** (nó là mốc reset *ngày*,
+        nhưng lỗi thực tế là do hạn mức *phút*) ⇒ **không** tin mốc đó ⇒
+        dùng cooldown **ngắn** (`rpm_min_cooldown_s`) rồi thử lại. Groq báo
+        mốc reset TPD **chính xác** ⇒ tin mốc đó (có trần `max_cooldown_s`).
+
+        D-135: nhận diện **chính xác** RPM vs RPD của Gemini.
+        ---------------------------------------------------
+        Gemini ghi `quota_id` trong lỗi 429:
+
+        - `...PerMinute...-FreeTier` ⇒ **RPM** ⇒ hồi sau ~40–60 s.
+        - `...PerDay...-FreeTier` ⇒ **RPD** ⇒ cả ngày mới hồi.
+
+        ⇒ Nếu là **RPD** ⇒ cooldown dài (tin mốc provider, có trần
+        `max_cooldown_s`) ⇒ **không** probe lại model đó mỗi vòng (mỗi
+        lần probe = 1 request **bị tính** vào RPD ⇒ tự làm cạn thêm).
+        ⇒ Nếu là **RPM** ⇒ cooldown ngắn (`rpm_min_cooldown_s`).
+
         Args:
             key: Khoá model.
             error: Lỗi (chứa thông tin mốc reset nếu provider báo).
         """
         retry_after = self._retry_after_s(error)
-        cooldown = (
-            min(max(0.0, float(retry_after)), self.max_cooldown_s)
-            if retry_after is not None
-            else self.quota_cooldown_s
-        )
+        kind = self._gemini_quota_kind(error) if key.startswith("gemini/") else None
+        if kind == "rpd":
+            # Gemini hạn mức **ngày** ⇒ hồi rất xa ⇒ loại tạm lâu, có trần.
+            cooldown = (
+                min(retry_after, self.max_cooldown_s)
+                if retry_after is not None
+                else self.max_cooldown_s
+            )
+        elif kind == "rpm":
+            # Gemini hạn mức **phút** ⇒ hồi sau vài chục giây.
+            cooldown = self.rpm_min_cooldown_s
+        elif retry_after is None:
+            cooldown = self.quota_cooldown_s
+        elif key.startswith("gemini/"):
+            # Gemini: mốc reset **không đáng tin** (D-130) ⇒ cooldown ngắn.
+            cooldown = self.rpm_min_cooldown_s
+        elif retry_after >= self.rpd_threshold_s:
+            # Groq báo mốc reset dài (TPD) ⇒ tin mốc đó (có trần).
+            cooldown = min(retry_after, self.max_cooldown_s)
+        else:
+            # Mốc reset **ngắn** ⇒ RPM ⇒ chỉ cần chờ một chút.
+            cooldown = max(retry_after, self.rpm_min_cooldown_s)
         self._cooldown_until[key] = max(
             self._cooldown_until.get(key, 0.0),
             time.time() + cooldown,
@@ -635,12 +908,19 @@ class PooledLLM:
         if match:
             hours, minutes, seconds = match.groups()
             return int(hours) * 3600 + int(minutes) * 60 + float(seconds)
-        # Groq: "Please try again in 2m53.664s."
+        # Groq: "Please try again in 2m53.664s." — có thể kèm giờ cho TPD dài.
         match = re.search(
-            r"try again in ([\d.]+)m([\d.]+)s", text, flags=re.IGNORECASE
+            r"try again in (?:(\d+)h)?(?:(\d+)m)?([\d.]+)s",
+            text,
+            flags=re.IGNORECASE,
         )
         if match:
-            return float(match.group(1)) * 60 + float(match.group(2))
+            hours, minutes, seconds = match.groups()
+            return (
+                int(hours or 0) * 3600
+                + int(minutes or 0) * 60
+                + float(seconds)
+            )
         # Gemini dạng khác: "retry_delay { seconds: 35820 }"
         match = re.search(r"retry_delay[^0-9]{0,20}(\d+)", text)
         if match:
@@ -999,6 +1279,22 @@ def _parse_pool_spec(spec: str) -> list[tuple[str, list[str]]]:
     return groups
 
 
+def _parse_provider_priority(spec: str) -> tuple[str, ...]:
+    """Phân tích chuỗi thứ tự ưu tiên provider.
+
+    Args:
+        spec: Chuỗi provider cách nhau bởi dấu phẩy (vd ``"gemini,groq"``).
+
+    Returns:
+        Tuple thứ tự ưu tiên (rỗng ⇒ không ưu tiên ⇒ sắp theo tên model).
+    """
+    return tuple(
+        part.strip().lower()
+        for part in (spec or "").split(",")
+        if part.strip()
+    )
+
+
 def _build_pool_or_single(
     *,
     pool_spec: str,
@@ -1010,6 +1306,8 @@ def _build_pool_or_single(
     max_quota_wait_s: float = 0.0,
     max_cooldown_s: float = 900.0,
     provider_priority: tuple[str, ...] = (),
+    rpd_threshold_s: float = 1800.0,
+    rpm_min_cooldown_s: float = 60.0,
 ) -> Any:
     """Dựng client sinh/judge: ưu tiên pool đa provider, fallback pool 1 provider.
 
@@ -1024,6 +1322,8 @@ def _build_pool_or_single(
         max_cooldown_s: Trần thời gian loại tạm 1 model sau lỗi quota.
         provider_priority: Thứ tự ưu tiên provider khi chọn model (vd
             ``("groq", "gemini")`` ⇒ ưu tiên Groq trước Gemini).
+        rpd_threshold_s: D-130 — ngưỡng phân biệt RPD với RPM.
+        rpm_min_cooldown_s: D-130 — cooldown tối thiểu cho lỗi RPM.
 
     Returns:
         `PooledLLM` hoặc `LLMClient`.
@@ -1043,6 +1343,8 @@ def _build_pool_or_single(
             quota_cooldown_s=quota_cooldown_s,
             max_quota_wait_s=max_quota_wait_s,
             max_cooldown_s=max_cooldown_s,
+            rpd_threshold_s=rpd_threshold_s,
+            rpm_min_cooldown_s=rpm_min_cooldown_s,
         )
         pool.provider_priority = provider_priority
         return pool
@@ -1056,6 +1358,8 @@ def _build_pool_or_single(
             quota_cooldown_s=quota_cooldown_s,
             max_quota_wait_s=max_quota_wait_s,
             max_cooldown_s=max_cooldown_s,
+            rpd_threshold_s=rpd_threshold_s,
+            rpm_min_cooldown_s=rpm_min_cooldown_s,
         )
     logger.info("Dùng provider đơn cho %s: %s", label, provider)
     return build_client(provider)
@@ -1266,6 +1570,7 @@ class Judge:
         candidates: list[dict[str, Any]],
         question_type: str = "",
         subject_name: str = "",
+        context_chars: int = 9000,
     ) -> dict[str, dict[str, Any]]:
         """Chấm điểm nhiều phương án của **cùng một câu hỏi**.
 
@@ -1303,8 +1608,19 @@ class Judge:
         blocks: list[str] = []
         for candidate in usable:
             arm = str(candidate.get("arm"))
-            context = compact_context(str(candidate.get("context") or ""))
-            answer = str(candidate.get("answer") or "")[:3000]
+            answer_text = str(candidate.get("answer") or "")
+            # D-138: giữ **bắt buộc** các khối `[n]` mà câu trả lời đã trích
+            # dẫn ⇒ judge không thấy trích dẫn "không tồn tại".
+            cited = {
+                int(value)
+                for value in re.findall(r"\[(\d+)\]", answer_text)
+            }
+            context = compact_context(
+                str(candidate.get("context") or ""),
+                total=context_chars,
+                keep_indices=cited,
+            )
+            answer = answer_text[:3000]
             blocks.append(
                 f"### PHƯƠNG ÁN {arm}\n"
                 f"CONTEXT:\n{context or '(không có context)'}\n\n"
@@ -1407,12 +1723,12 @@ class Judge:
                         question=question,
                         expected_answer=expected_answer or "(không có đáp án tham khảo)",
                         subject_hint=subject_hint,
-                        candidates="\n\n".join(
-                            f"### PHƯƠNG ÁN {c.get('arm')}\n"
-                            f"CONTEXT:\n{compact_context(str(c.get('context') or '')) or '(không có context)'}\n\n"
-                            f"CÂU TRẢ LỜI:\n{str(c.get('answer') or '')[:3000]}"
-                            for c in solo
-                        ),
+                    candidates="\n\n".join(
+                        f"### PHƯƠNG ÁN {c.get('arm')}\n"
+                        f"CONTEXT:\n{compact_context(str(c.get('context') or ''), keep_indices={int(v) for v in re.findall(r'\\[(\\d+)\\]', str(c.get('answer') or ''))}) or '(không có context)'}\n\n"
+                        f"CÂU TRẢ LỜI:\n{str(c.get('answer') or '')[:3000]}"
+                        for c in solo
+                    ),
                     ),
                     temperature=0.0,
                     max_tokens=600,
@@ -1538,6 +1854,52 @@ def _clamp_float(value: Any, low: float, high: float) -> float:
 # ----------------------------------------------------------------------
 # Metrics
 # ----------------------------------------------------------------------
+
+
+def _load_reuse_map(path: str | Path) -> dict[str, dict[str, Any]]:
+    """Đọc checkpoint cũ để **tái dùng** kết quả của arm không đổi.
+
+    Vì sao cần?
+    -----------
+    Sau một bản sửa chỉ ảnh hưởng **một** arm (vd D-118 chỉ đổi arm B vì
+    arm A/B− giữ nguyên prompt + context), chạy lại **cả 3 arm** sẽ đốt
+    gấp 3 lần quota LLM — mà quota free tier (Groq 200K token/ngày) **không
+    đủ**. Tái dùng kết quả cũ của arm **không đổi** ⇒ chỉ tốn quota cho arm
+    thực sự thay đổi.
+
+    Vì sao vẫn **công bằng**?
+    -------------------
+    1. Arm được tái dùng **giữ nguyên** `context` + `answer` cũ ⇒ context
+       đó **đúng** với mã hiện tại (vì arm đó không đổi) ⇒ tái dùng là
+       *tái lập được*, không phải "chép điểm".
+    2. Điểm **luôn được chấm lại** bởi judge hiện tại (judge đã đổi: thêm
+       `subject_hint`) ⇒ điểm là điểm **mới**, không phải điểm cũ.
+    3. `gen_model` được **giữ nguyên** ⇒ cùng model với lần chạy cũ ⇒
+       không phát sinh confound model ⇒ so sánh 3 arm vẫn cùng model.
+
+    Args:
+        path: Đường dẫn checkpoint cũ.
+
+    Returns:
+        Mapping ``qid`` → bản ghi checkpoint cũ.
+    """
+    file_path = Path(path)
+    if not file_path.exists():
+        return {}
+    rows: dict[str, dict[str, Any]] = {}
+    with file_path.open("r", encoding="utf-8") as handle:
+        for line in handle:
+            line = line.strip()
+            if not line:
+                continue
+            try:
+                record = json.loads(line)
+            except json.JSONDecodeError:
+                continue
+            qid = str(record.get("qid") or "")
+            if qid:
+                rows[qid] = record
+    return rows
 
 
 def _has_infra_error(
@@ -1704,6 +2066,14 @@ def main() -> int:
     )
     parser.add_argument("--arms", default="A,B,B-", help="Danh sách arm (A, B, B-).")
     parser.add_argument("--limit", type=int, default=0, help="Giới hạn số câu (0 = tất cả).")
+    parser.add_argument(
+        "--only-types",
+        default="",
+        help=(
+            "Chỉ chạy các loại câu hỏi cụ thể, phân tách bằng dấu phẩy "
+            "(ví dụ: 'multi_hop,relational'). Rỗng = chạy tất cả."
+        ),
+    )
     parser.add_argument("--no-judge", action="store_true", help="Bỏ qua LLM-judge.")
     parser.add_argument(
         "--out-prefix", default="eval_rag",
@@ -1716,6 +2086,31 @@ def main() -> int:
         "--reset-sessions",
         action="store_true",
         help="Xoá session đánh giá cũ (`data/interim/sessions/eval_*.json`) trước khi chạy.",
+    )
+    parser.add_argument(
+        "--reuse-arms-from",
+        default="",
+        help=(
+            "File checkpoint cũ để **tái dùng** kết quả của các arm **không "
+            "thay đổi** (D-118: chỉ arm B thay đổi ⇒ arm A/B− giữ nguyên "
+            "prompt + context ⇒ cache hit 100%% ⇒ **miễn phí**). Arm được "
+            "tái dùng vẫn được **chấm lại** bởi judge hiện tại (judge đổi: "
+            "thêm `subject_hint`) ⇒ điểm luôn là điểm mới."
+        ),    )
+    parser.add_argument(
+        "--gen-provider-priority",
+        default="groq,groq",
+        help=(
+            "Thứ tự ưu tiên provider cho pool sinh câu trả lời. "
+            "Mặc định `groq,gemini` (Groq giới hạn theo **token/ngày** ⇒ "
+            "giữ chỗ cho câu có model cũ còn quota; Gemini giới hạn theo "
+            "**request/ngày** ⇒ dự phòng khi Groq cạn token)."
+        ),
+    )
+    parser.add_argument(
+        "--judge-provider-priority",
+        default="gemini,groq",
+        help="Thứ tự ưu tiên provider cho pool LLM-judge.",
     )
     parser.add_argument(
         "--judge-provider",
@@ -1823,6 +2218,20 @@ def main() -> int:
         ),
     )
     parser.add_argument(
+        "--judge-context-chars",
+        type=int,
+        default=9000,
+        help=(
+            "D-131 — ngân sách **ký tự context** cho mỗi arm trong prompt "
+            "judge (mặc định 9.000). Vì sao cần? Groq có trần **8.000 "
+            "token/phút** (TPM) cho `openai/gpt-oss-*` ⇒ prompt judge gộp 3 "
+            "arm với context 9.000 ký tự/arm ≈ 10.800 token ⇒ **413 Request "
+            "too large**. ⇒ Khi judge dùng Groq, đặt ngân sách nhỏ hơn "
+            "(vd 2.500) để vừa trần TPM. Lưu ý: **ngân sách là như nhau cho "
+            "cả 3 arm** ⇒ phép so sánh A vs B vs B− vẫn công bằng."
+        ),
+    )
+    parser.add_argument(
         "--max-cooldown-s",
         type=float,
         default=900.0,
@@ -1830,6 +2239,27 @@ def main() -> int:
             "Trần tối đa cho thời gian loại tạm 1 model sau lỗi quota "
             "(giây). Provider có thể báo mốc reset rất xa (vd Gemini "
             "'5h14m') ⇒ cắt còn 15 phút để không bỏ lỡ khi quota hồi sớm."
+        ),
+    )
+    parser.add_argument(
+        "--rpd-threshold-s",
+        type=float,
+        default=1800.0,
+        help=(
+            "D-130 — ngưỡng phân biệt hạn mức **ngày** (RPD) với hạn mức "
+            "**phút** (RPM). Mốc reset provider báo **≥** ngưỡng này ⇒ coi là "
+            "RPD ⇒ tin mốc reset dài hạn; ngắn hơn ⇒ RPM ⇒ chỉ loại tạm "
+            "ngắn. Đo được 18/11/2026: Gemini báo 429 kèm 'retry in 2h15m' "
+            "nhưng quota thực tế hồi sau ~40–60 giây ⇒ là RPM. Mặc định 1800."
+        ),
+    )
+    parser.add_argument(
+        "--rpm-min-cooldown-s",
+        type=float,
+        default=60.0,
+        help=(
+            "D-130 — thời gian loại tạm **tối thiểu** khi lỗi là RPM "
+            "(giây). Mặc định 60 (đo được: quota Gemini hồi sau ~40–60s)."
         ),
     )
     parser.add_argument(
@@ -1897,6 +2327,12 @@ def main() -> int:
                 questions.append(json.loads(line))
     if args.limit:
         questions = questions[: args.limit]
+    if args.only_types:
+        wanted = {item.strip() for item in args.only_types.split(",") if item.strip()}
+        questions = [
+            item for item in questions if str(item.get("type") or "") in wanted
+        ]
+        logger.info("Lọc theo type=%s ⇒ còn %d câu", sorted(wanted), len(questions))
     logger.info("Nạp %d câu hỏi từ %s", len(questions), qa_path)
 
     config = load_config(REPO_ROOT / "configs" / "retrieval.yaml")
@@ -1914,7 +2350,9 @@ def main() -> int:
         max_cooldown_s=args.max_cooldown_s,
         # Sinh câu trả lời **nặng token** ⇒ ưu tiên provider giới hạn theo
         # token/ngày (Groq) để **giữ** quota request/ngày (Gemini) cho judge.
-        provider_priority=("groq", "gemini"),
+        provider_priority=_parse_provider_priority(args.gen_provider_priority),
+        rpd_threshold_s=args.rpd_threshold_s,
+        rpm_min_cooldown_s=args.rpm_min_cooldown_s,
     )
     # **Session store dùng chung** cho cả 2 answerer ⇒ nhưng mỗi arm có
     # session **tách riêng** (`<session_id>__<arm>`) ⇒ không ô nhiễm lượt
@@ -1949,7 +2387,9 @@ def main() -> int:
         # Judge **gọn** (1 request/câu, prompt ~2.8k token) ⇒ ưu tiên
         # provider giới hạn theo request/ngày (Gemini) vì token/ngày của
         # Groq cần dành cho sinh câu trả lời.
-        provider_priority=("gemini", "groq"),
+        provider_priority=_parse_provider_priority(args.judge_provider_priority),
+        rpd_threshold_s=args.rpd_threshold_s,
+        rpm_min_cooldown_s=args.rpm_min_cooldown_s,
     )
     judge = Judge(judge_client)
 
@@ -2019,6 +2459,19 @@ def main() -> int:
         logger.info("Resume: %d câu đã có trong checkpoint", len(done))
 
     checkpoint_handle = checkpoint_path.open("a", encoding="utf-8")
+    #: Bản đồ ``qid`` → bản ghi cũ để **tái dùng** arm không đổi (D-118).
+    reuse_map: dict[str, dict[str, Any]] = {}
+    #: Tập arm được **tái dùng** (không gọi LLM sinh lại).
+    reuse_arms: set[str] = set()
+    if args.reuse_arms_from:
+        reuse_map = _load_reuse_map(resolve_path(args.reuse_arms_from))
+        # Chỉ arm **không thay đổi** mới được tái dùng. Mặc định: arm A và B−
+        # (D-118 chỉ đổi arm B: chiều KG + ngân sách context + prompt đồ thị).
+        reuse_arms = {"A", "B-"} & set(arms)
+        logger.info(
+            "Tái dùng %d câu cũ cho arm %s (từ %s)",
+            len(reuse_map), sorted(reuse_arms), args.reuse_arms_from,
+        )
     #: Danh sách qid bị **hoãn** (mọi model hết quota) ⇒ không ghi checkpoint
     #: ⇒ vòng `--resume` sau chạy lại.
     deferred_qids: list[str] = []
@@ -2054,6 +2507,70 @@ def main() -> int:
         #: để vòng sau chạy lại (nhờ `_has_infra_error` bỏ qua bản ghi lỗi).
         deferred = False
 
+        # --- Tái dùng arm KHÔNG thay đổi (D-118) -----------------------
+        # Vì sao?
+        # --------
+        # D-118 chỉ đổi **arm B** (chiều KG + ngân sách context + hướng dẫn
+        # đọc đồ thị). Arm A và B− giữ nguyên prompt + context ⇒ **tái lập
+        # được** với mã hiện tại ⇒ tái dùng `context` + `answer` cũ là hợp lệ
+        # (không phải "chép điểm": điểm vẫn do judge hiện tại chấm lại).
+        #
+        # Vì sao cần?
+        # ---------
+        # Quota free tier: Groq **200K token/ngày/model**. 247 câu × 3 arm
+        # ≈ 2M token ⇒ **vượt quota 10×** ⇒ chạy cả 3 arm là không khả thi.
+        # Chỉ sinh lại arm B ⇒ 247 lời gọi ≈ 670K token ⇒ chia 3 model Groq
+        # ⇒ khả thi trong 1 ngày.
+        reused_from_old: dict[str, dict[str, Any]] = {}
+        old_record = reuse_map.get(qid) if reuse_map else None
+        #: Model của lần chạy cũ (nếu có) — dùng để ghim ⇒ giữ tính nhất quán.
+        reuse_model = ""
+        if old_record:
+            for arm in reuse_arms:
+                old_entry = old_record.get(arm)
+                if not old_entry:
+                    continue
+                old_arm = old_entry.get("arm") or {}
+                # Bỏ qua bản ghi lỗi hạ tầng (không có câu trả lời thật).
+                if old_arm.get("infrastructure_error") or not str(
+                    old_arm.get("answer") or ""
+                ).strip():
+                    continue
+                reused_from_old[arm] = old_entry
+                candidate = str(old_entry.get("gen_model") or "")
+                if candidate and not reuse_model:
+                    reuse_model = candidate
+
+        # Model của lần chạy cũ **không còn dùng được** (đã hết quota) ⇒
+        # **không tái dùng** arm nào của câu này. Vì sao?
+        # -------------------------------------------------
+        # Arm tái dùng giữ `gen_model` cũ; arm chạy lại sinh bằng model mới ⇒
+        # 3 arm dùng **khác model** ⇒ **confound model** ⇒ câu đó bị loại
+        # khỏi mẫu số ⇒ mất dữ liệu. ⇒ Tốt hơn: **sinh lại toàn bộ** câu
+        # bằng 1 model (tốn 3 lời gọi thay vì 1) nhưng giữ được câu trong
+        # mẫu số.
+        if reused_from_old and reuse_model and isinstance(gen_client, PooledLLM):
+            if reuse_model not in set(gen_client.keys()):
+                logger.info(
+                    "Câu %s — model cũ (%s) không có trong pool ⇒ sinh lại toàn bộ",
+                    qid, reuse_model,
+                )
+                reused_from_old = {}
+            elif reuse_model not in set(gen_client.healthy_keys()):
+                logger.info(
+                    "Câu %s — model cũ (%s) đã hết quota ⇒ sinh lại toàn bộ",
+                    qid, reuse_model,
+                )
+                reused_from_old = {}
+
+        #: Arm thực sự cần gọi LLM (tất cả trừ arm tái dùng).
+        arms_to_run = [arm for arm in arms if arm not in reused_from_old]
+        if reused_from_old:
+            logger.info(
+                "Câu %s — tái dùng arm %s (không đổi) ⇒ chỉ gọi LLM cho %s",
+                qid, ",".join(sorted(reused_from_old)), ",".join(arms_to_run),
+            )
+
         # --- Pre-check: judge có sẵn sàng không? -------------------------
         # Vì sao kiểm tra TRƯỚC khi sinh câu trả lời?
         # ---------------------------------------------
@@ -2083,6 +2600,43 @@ def main() -> int:
         # lại** sang model thay thế (vẫn cùng model cho cả 3 arm).
         pinned_model = ""
         if isinstance(gen_client, PooledLLM):
+            # **Ưu tiên 1 — ghim theo model của lần chạy cũ** khi có arm
+            # được tái dùng. Vì sao?
+            # -------------------
+            # Arm tái dùng giữ `gen_model` cũ ⇒ nếu arm B (chạy lại) sinh bằng
+            # model **khác** ⇒ 3 arm dùng **khác model** ⇒ **confound model**
+            # ⇒ câu đó phải bị loại khỏi mẫu số ⇒ mất dữ liệu.
+            # ⇒ Ghim **đúng** model của lần chạy cũ ⇒ 3 arm cùng model ⇒
+            #   không confound, **và** cache hit cho context cũ.
+            pool_keys = set(gen_client.keys())
+            if reuse_model and reuse_model in pool_keys:
+                # D-124: **chỉ** ghim model cũ nếu nó **còn quota**.
+                # Vì sao?
+                # --------
+                # Khi model cũ hết quota, `reused_from_old` đã bị **xoá** ở
+                # trên ⇒ 3 arm đều **sinh lại** ⇒ ghim model cũ (đã chết) là
+                # vô nghĩa: mọi lời gọi đều 429 ⇒ câu bị **hoãn** vô ích.
+                # Đo được (18/11/2026): 17 câu kẹt ở vòng lặp
+                # "lỗi hạ tầng → retry → lệch model" vì ghim model chết.
+                #
+                # ⇒ Chỉ ghim cứng khi model cũ **còn dùng được**; nếu không
+                # thì để pool chọn model khác ⇒ 3 arm cùng model mới ⇒ vẫn
+                # **không confound** (tất cả 3 arm đều sinh lại).
+                if reuse_model in set(gen_client.healthy_keys()):
+                    pinned_model = reuse_model
+                    gen_client.pin_strict(pinned_model)
+                    logger.info(
+                        "Câu %s — ghim model của lần chạy cũ (%s) để giữ "
+                        "tính nhất quán 3 arm",
+                        qid, pinned_model,
+                    )
+                else:
+                    logger.info(
+                        "Câu %s — model cũ (%s) hết quota ⇒ sinh lại toàn bộ "
+                        "bằng model khác (3 arm cùng model ⇒ không confound)",
+                        qid, reuse_model,
+                    )
+        if isinstance(gen_client, PooledLLM) and not pinned_model:
             # Ưu tiên model **chưa từng lỗi** (quota còn) ⇒ tránh ghim phải
             # model đã cạn quota (đã có trong `errors`) vì model đó vẫn còn
             # trong pool nhưng mọi lời gọi đều 429.
@@ -2150,7 +2704,7 @@ def main() -> int:
             # token/ngày ⇒ đây là mấu chốt để hoàn tất 247 câu).
             attempt_outcomes = _run_question_arms(
                 text=text,
-                arms=arms,
+                arms=arms_to_run,
                 retriever=retriever,
                 rag_answerer=rag_answerer,
                 hybrid_answerer=hybrid_answerer,
@@ -2161,7 +2715,7 @@ def main() -> int:
             # token ⇒ không được mất kết quả arm đã thành công).
             outcomes.update(attempt_outcomes)
             failed = [
-                arm for arm in arms
+                arm for arm in arms_to_run
                 if (outcomes.get(arm) or {}).get("infrastructure_error")
             ]
             if not failed or attempt >= max_infra_retries:
@@ -2232,9 +2786,15 @@ def main() -> int:
         # được cho phép so sánh. ⇒ Chạy lại **toàn bộ** câu với model đang
         # còn quota để cả 3 arm cùng model.
         used_models = {
-            (outcomes.get(arm) or {}).get("gen_model", "") for arm in arms
+            (outcomes.get(arm) or {}).get("gen_model", "") for arm in arms_to_run
         }
         used_models.discard("")
+        #: Model của các arm **tái dùng** (phải khớp ⇒ nếu lệch thì câu đó
+        #: không dùng được cho so sánh).
+        for old_entry in reused_from_old.values():
+            old_model = str(old_entry.get("gen_model") or "")
+            if old_model:
+                used_models.add(old_model)
         max_model_retries = max(0, int(args.model_retries))
         for attempt in range(max_model_retries + 1):
             if len(used_models) <= 1:
@@ -2254,23 +2814,32 @@ def main() -> int:
                         for key in gen_client.keys()
                         if key not in set(gen_client.cooldown_keys())
                     ]
-                if retry_available:
+                # **Ưu tiên model của arm tái dùng** (nếu còn quota) ⇒ arm
+                # chạy lại sinh bằng **cùng model** ⇒ không confound.
+                if reuse_model and reuse_model in set(retry_available):
+                    pinned_model = reuse_model
+                elif retry_available:
                     pinned_model = retry_available[
                         random.Random(f"{SEED}:model:{qid}").randrange(len(retry_available))
                     ]
+                if pinned_model:
                     gen_client.pin_strict(pinned_model)
             outcomes = _run_question_arms(
                 text=text,
-                arms=arms,
+                arms=arms_to_run,
                 retriever=retriever,
                 rag_answerer=rag_answerer,
                 hybrid_answerer=hybrid_answerer,
                 session_id=session_id,
             )
             used_models = {
-                (outcomes.get(arm) or {}).get("gen_model", "") for arm in arms
+                (outcomes.get(arm) or {}).get("gen_model", "") for arm in arms_to_run
             }
             used_models.discard("")
+            for old_entry in reused_from_old.values():
+                old_model = str(old_entry.get("gen_model") or "")
+                if old_model:
+                    used_models.add(old_model)
 
         if args.no_judge:
             scores = {
@@ -2285,7 +2854,19 @@ def main() -> int:
         else:
             ordered = judge_order.get(qid, arms)
             candidates = [
-                {"arm": arm, "context": outcomes[arm]["context"], "answer": outcomes[arm]["answer"]}
+                {
+                    "arm": arm,
+                    "context": (
+                        outcomes[arm]["context"]
+                        if arm in outcomes
+                        else str((reused_from_old.get(arm) or {}).get("arm", {}).get("context", ""))
+                    ),
+                    "answer": (
+                        outcomes[arm]["answer"]
+                        if arm in outcomes
+                        else str((reused_from_old.get(arm) or {}).get("arm", {}).get("answer", ""))
+                    ),
+                }
                 for arm in ordered
             ]
             scores = judge.score(
@@ -2294,6 +2875,7 @@ def main() -> int:
                 candidates=candidates,
                 question_type=str(question.get("type") or ""),
                 subject_name=str(question.get("subject_name") or ""),
+                context_chars=args.judge_context_chars,
             )
 
         # Câu còn arm lỗi hạ tầng ⇒ **không** ghi checkpoint.
@@ -2304,7 +2886,7 @@ def main() -> int:
         # chạy lại ở vòng sau.
         if any(
             (outcomes.get(arm) or {}).get("infrastructure_error")
-            for arm in arms
+            for arm in arms_to_run
         ):
             logger.info(
                 "Câu %s — còn arm lỗi hạ tầng ⇒ không ghi checkpoint (chạy lại "
@@ -2316,6 +2898,35 @@ def main() -> int:
 
         checkpoint_record: dict[str, Any] = {"qid": qid}
         for arm in arms:
+            if arm in reused_from_old:
+                # Arm **tái dùng**: giữ nguyên `context` + `answer` + `gen_model`
+                # của lần chạy cũ (tái lập được vì arm này không đổi) ⇒ nhưng
+                # điểm là **điểm mới** (judge hiện tại đã chấm lại).
+                old_entry = reused_from_old[arm]
+                old_arm = dict(old_entry.get("arm") or {})
+                old_arm["reused_from_previous_run"] = True
+                record = {
+                    "qid": qid,
+                    "question": text,
+                    "type": question.get("type"),
+                    "expected_answer": question.get("expected_answer"),
+                    "evidence_doc_id": question.get("evidence_doc_id"),
+                    "gen_model": old_entry.get("gen_model") or pinned_model,
+                    "gen_model_pinned": pinned_model,
+                    "arm": old_arm,
+                    "judge": scores.get(
+                        arm,
+                        {
+                            "correctness": 0,
+                            "faithfulness": 0,
+                            "citation_precision": 0.0,
+                            "reason": "missing",
+                        },
+                    ),
+                }
+                all_results[arm].append(record)
+                checkpoint_record[arm] = record
+                continue
             # Model **thực sự** đã sinh câu trả lời của arm này (không phải
             # model dự định ghim) ⇒ để kiểm chứng "3 arm cùng 1 model".
             used_model = (outcomes[arm] or {}).get("gen_model") or pinned_model

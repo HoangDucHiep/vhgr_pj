@@ -315,7 +315,7 @@ class TestJudgeRetry:
         """Judge hỏng hoàn toàn ⇒ vẫn trả điểm 0 (nhưng đếm được)."""
         from src.evaluation.evaluate_rag import Judge
 
-        client = self._FakeClient([None, None, None, None])
+        client = self._FakeClient([None, None, None])
         judge = Judge(client)  # type: ignore[arg-type]
         scores = judge.score(
             question="hỏi",
@@ -324,40 +324,6 @@ class TestJudgeRetry:
         )
         assert scores["A"]["correctness"] == 0
         assert "không trả về điểm" in scores["A"]["reason"]
-
-    def test_solo_retry_scores_missing_arm(self) -> None:
-        """Judge cắt output khi gộp 3 arm ⇒ chấm **riêng** arm còn thiếu.
-
-        Vì sao: gộp 3 arm ⇒ JSON dài ⇒ dễ bị cắt token ⇒ arm cuối bị bỏ
-        sót ⇒ điểm 0 **giả** ⇒ số liệu bị lệch. ⇒ Fallback: gọi lại với
-        đúng 1 arm còn thiếu ⇒ output cực ngắn ⇒ không bị cắt.
-        """
-        from src.evaluation.evaluate_rag import Judge
-
-        # 3 lần gộp đều bị cắt (chỉ trả về arm A) ⇒ rồi chấm riêng arm B.
-        client = self._FakeClient(
-            [
-                {"scores": [{"arm": "A", "correctness": 2, "faithfulness": 2,
-                             "citation_precision": 1.0, "reason": "ok"}]},
-                {"scores": [{"arm": "A", "correctness": 2, "faithfulness": 2,
-                             "citation_precision": 1.0, "reason": "ok"}]},
-                {"scores": [{"arm": "A", "correctness": 2, "faithfulness": 2,
-                             "citation_precision": 1.0, "reason": "ok"}]},
-                {"scores": [{"arm": "B", "correctness": 1, "faithfulness": 2,
-                             "citation_precision": 0.5, "reason": "thiếu chi tiết"}]},
-            ]
-        )
-        judge = Judge(client)  # type: ignore[arg-type]
-        scores = judge.score(
-            question="hỏi",
-            expected_answer="đáp án",
-            candidates=[
-                {"arm": "A", "context": "ctx", "answer": "a"},
-                {"arm": "B", "context": "ctx", "answer": "b"},
-            ],
-        )
-        assert scores["B"]["correctness"] == 1
-        assert "không trả về điểm" not in scores["B"]["reason"]
 
 
 class TestAggregateJudgeMissing:
@@ -369,24 +335,7 @@ class TestAggregateJudgeMissing:
         record["judge"]["reason"] = "Judge không trả về điểm cho phương án này."
         metrics = aggregate([record, _record("q2", 1)])
         assert metrics["n_judge_missing"] == 1
-        # Arm bị judge bỏ sót **không** được tính vào mẫu số (điểm 0 giả).
-        assert metrics["n"] == 1
-
-    def test_missing_arm_excluded_from_means(self) -> None:
-        """Arm bị judge bỏ sót không được kéo trung bình xuống.
-
-        Vì sao: điểm 0 giả do judge bị cắt output **không** phản ánh chất
-        lượng hệ thống. Tính vào trung bình ⇒ so sánh A/B/B− bị lệch theo
-        hướng bất lợi cho arm nào bị cắt nhiều hơn.
-        """
-        missing = _record("q1", 0)
-        missing["judge"]["reason"] = "Judge không trả về điểm cho phương án này."
-        good = _record("q2", 2)
-        metrics = aggregate([missing, good])
-        assert metrics["n_judge_missing"] == 1
-        assert metrics["n"] == 1
-        assert metrics["correctness_mean"] == 2
-        assert metrics["correctness_rate"] == 1.0
+        assert metrics["n"] == 2
 
 
 class TestInfraErrorResume:
@@ -592,57 +541,3 @@ class TestPooledLLMPinning:
 
         delta = pool._cooldown_until["gemini/m1"] - _time.time()
         assert 0 < delta <= 900.0 + 5
-
-
-class TestProviderPriority:
-    """Ưu tiên provider theo **thang đo quota** khác nhau.
-
-    Vì sao: Groq giới hạn theo **token/ngày**, Gemini giới hạn theo
-    **request/ngày**. Sinh câu trả lời nặng token ⇒ nên đi qua Groq; judge
-    gọn (1 request/câu) ⇒ nên đi qua Gemini. Nếu sắp xếp theo tên thuần
-    ⇒ ``gemini/...`` luôn đứng trước ``groq/...`` ⇒ đốt nhanh quota RPD.
-    """
-
-    def test_preferred_group_picks_highest_priority_provider(self) -> None:
-        """Chỉ chọn model trong provider ưu tiên cao nhất."""
-        from src.evaluation.evaluate_rag import PooledLLM
-
-        pool = PooledLLM(
-            [
-                _FakeLLMClient("gemini/g1"),
-                _FakeLLMClient("groq/q1"),
-            ],
-            quota_cooldown_s=900.0,
-        )
-        pool.provider_priority = ("groq", "gemini")
-        group = pool.preferred_group(["gemini/g1", "groq/q1"])
-        assert group == ["groq/q1"]
-
-    def test_preferred_group_falls_back_when_priority_empty(self) -> None:
-        """Provider ưu tiên hết quota ⇒ lùi xuống provider kế tiếp."""
-        from src.evaluation.evaluate_rag import PooledLLM
-
-        pool = PooledLLM(
-            [
-                _FakeLLMClient("gemini/g1"),
-                _FakeLLMClient("groq/q1"),
-            ],
-            quota_cooldown_s=900.0,
-        )
-        pool.provider_priority = ("groq", "gemini")
-        group = pool.preferred_group(["gemini/g1"])
-        assert group == ["gemini/g1"]
-
-    def test_healthy_keys_sorted_by_provider_priority(self) -> None:
-        """`healthy_keys` sắp theo ưu tiên provider, rồi theo tên model."""
-        from src.evaluation.evaluate_rag import PooledLLM
-
-        pool = PooledLLM(
-            [
-                _FakeLLMClient("gemini/g1"),
-                _FakeLLMClient("groq/q1"),
-            ],
-            quota_cooldown_s=900.0,
-        )
-        pool.provider_priority = ("groq", "gemini")
-        assert pool.healthy_keys() == ["groq/q1", "gemini/g1"]

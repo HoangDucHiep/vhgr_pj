@@ -130,12 +130,81 @@ class FusedContext:
         }
 
 
+def _has_label(edge: dict[str, Any], side: str, label: str) -> bool:
+    """Kiểm tra node ở `side` (`source`/`target`) có nhãn `label` hay không.
+
+    Args:
+        edge: Cạnh KG.
+        side: `"source"` hoặc `"target"`.
+        label: Nhãn cần kiểm tra (ví dụ `"Event"`).
+
+    Returns:
+        ``True`` nếu node có nhãn đó.
+    """
+    labels = edge.get(f"{side}_labels") or []
+    if isinstance(labels, str):
+        labels = [labels]
+    return any(str(item).lower() == label.lower() for item in labels)
+
+
+def _format_event_edge(edge: dict[str, Any]) -> str:
+    """Dựng mệnh đề tự nhiên cho quan hệ **sự kiện** (D-139).
+
+    Vì sao?
+    --------
+    Dạng mũi tên ``Trận Hà Hồi — chỉ huy trận → Ngô Văn Sở`` bị đọc ngược
+    ⇒ LLM (và judge) hiểu thành "Trận Hà Hồi chỉ huy trận" ⇒ trả lời sai /
+    judge chấm *"thông tin về chỉ huy không có trong ngữ cảnh"*.
+    Đo được (D-124, 60 câu narrative): **7/60** câu arm B bị trừ điểm vì
+    lý do này.
+
+    ⇒ Dựng mệnh đề theo **nhãn node thật** (`Event`/`Person`/`Place`) ⇒ không
+    phụ thuộc chiều `source`/`target` ⇒ **không thể đọc ngược**.
+
+    Args:
+        edge: Cạnh KG.
+
+    Returns:
+        Mệnh đề, hoặc chuỗi rỗng nếu cạnh không thuộc nhóm quan hệ sự kiện.
+    """
+    from src.qa.graph_context import EVENT_RELATION_TEMPLATES
+
+    relation = str(edge.get("relation") or "")
+    template = EVENT_RELATION_TEMPLATES.get(relation)
+    if not template:
+        return ""
+    source = str(edge.get("source_name") or edge.get("source") or "?")
+    target = str(edge.get("target_name") or edge.get("target") or "?")
+    source_is_event = _has_label(edge, "source", "Event")
+    target_is_event = _has_label(edge, "target", "Event")
+    if source_is_event == target_is_event:
+        # Không xác định được node sự kiện ⇒ để dạng mũi tên (an toàn).
+        return ""
+    event, other = (source, target) if source_is_event else (target, source)
+    return template.format(event=event, other=other)
+
+
 def _format_edge(edge: dict[str, Any], index: int) -> str:
     """Định dạng 1 cạnh KG thành khối văn bản có số `[n]`.
 
-    Quy ước đọc: ``[n] {source} — {label} → {target}`` nghĩa
-    *"target là {label} của source"*. Cạnh đã được chuẩn hoá chiều ở
-    `src/graph/direction.py` (D-118) nên nhãn luôn đúng nghĩa.
+    Vì sao dùng **mệnh đề tự nhiên** cho quan hệ gia đình?
+    ---------------------------------------------------
+    Dạng mũi tên ``A — mẹ của → B`` **bị LLM đọc ngược** (đo được ở q0001:
+    dòng ``Mai Ngọc Đỉnh — mẹ của → Nguyễn Thị Tuyến`` bị hiểu là "Mai Ngọc
+    Đỉnh là **mẹ** của Nguyễn Thị Tuyến" ⇒ trả lời sai ⇒ judge chấm
+    `faithfulness = 0`). ⇒ Với quan hệ gia đình, hiển thị thành câu có
+    **chủ thể → vị thể rõ ràng** (theo `RELATION_TEMPLATE`) ⇒ không thể đọc
+    ngược.
+
+    D-139: **quan hệ sự kiện** cũng chuyển sang mệnh đề tự nhiên (dựng theo
+    **nhãn node thật** `Event`/`Person`/`Place`) vì dạng mũi tên bị đọc ngược
+    ⇒ LLM/judge hiểu sai "Trận Hà Hồi chỉ huy trận".
+
+    Quan hệ khác (thuộc triều đại, sinh năm…) giữ dạng mũi tên vì **không có
+    nghĩa đảo** ⇒ không gây nhầm lẫn.
+
+    Cạnh đã được chuẩn hoá chiều ở `src/graph/direction.py` (D-118) nên
+    nhãn luôn đúng nghĩa.
 
     Args:
         edge: Cạnh KG.
@@ -144,14 +213,23 @@ def _format_edge(edge: dict[str, Any], index: int) -> str:
     Returns:
         Khối văn bản.
     """
-    from src.qa.graph_context import RELATION_LABEL
+    from src.qa.graph_context import RELATION_LABEL, RELATION_TEMPLATE
 
     source = edge.get("source_name") or edge.get("source") or "?"
     target = edge.get("target_name") or edge.get("target") or "?"
     relation = str(edge.get("relation") or "")
-    label = RELATION_LABEL.get(relation, relation)
+    # D-139: quan hệ sự kiện — mệnh đề tự nhiên (không thể đọc ngược).
+    event_sentence = _format_event_edge(edge)
+    if event_sentence:
+        line = f"[{index}] {event_sentence}"
+    else:
+        template = RELATION_TEMPLATE.get(relation)
+        if template:
+            line = f"[{index}] " + template.format(source=source, target=target)
+        else:
+            label = RELATION_LABEL.get(relation, relation)
+            line = f"[{index}] {source} — {label} → {target}"
     evidence = str(edge.get("evidence_sentence") or "").strip()
-    line = f"[{index}] {source} — {label} → {target}"
     if evidence:
         line += f"\n    Bằng chứng: {evidence}"
     url = str(edge.get("source_url") or "").strip()

@@ -57,6 +57,21 @@ retrieval:
   # Token budget cho context (ước lượng 1 token ≈ 3 ký tự tiếng Việt)
   context_char_budget: 12000
 
+  # D-122 — **Mở rộng ngữ cảnh cha** (parent expansion).
+  #
+  # Chunk trong corpus rất nhỏ (trung vị 248 ký tự, 20% dưới 100 ký tự) ⇒
+  # câu hỏi "diễn biến trận X" chỉ truy xuất được các mảnh rời rạc, không
+  # dựng được trình tự. Bổ sung **chunk anh em cùng section** để context có
+  # mạch hồi chuyện liền mạch.
+  #
+  # Sửa ở tầng truy xuất ⇒ áp dụng cho **cả arm A và arm B** ⇒ so sánh
+  # A vs B vẫn công bằng (khác biệt chỉ còn là KG).
+  parent_expansion:
+    enabled: true
+    max_siblings: 3          # số chunk anh em lấy mỗi bên (trước/sau)
+    max_parent_chars: 1400   # trần ký tự cho phần mở rộng của 1 chunk
+    max_total_parents: 8     # trần **tổng** số chunk mở rộng cho 1 câu hỏi
+
 generation:
   max_tokens: 900
   temperature: 0.0

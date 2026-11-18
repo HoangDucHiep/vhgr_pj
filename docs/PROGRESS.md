@@ -23,17 +23,63 @@
 | 13 | **Sửa chất lượng** (entity linking · chiều đảo · lọc nhiễu KG) | ✅ Xong | 17/11/2026 | **12/12** ca lỗi demo → 0 · alias 13.760 → **13.582** (−178) · exact-case + 176 alias thường + 42 đại từ · chiều đảo: **5/5** con Trần Nhân Tông · lọc **23** cạnh nhiễu (0 tổn thương đúng) · guard chống trả N người ngẫu nhiên · **644 test pass** |
 | 14 | **Vanilla RAG (nhánh A)** | ✅ Xong | 17/11/2026 | **65.608 chunk** (1 đoạn = 1 chunk, giữ ranh giới `section`; kế hoạch ghi 101.628 — xem deviations D-105) · MiniLM-L12 **384-dim** float16 · BM25 (title×3 + section×2 + body×1) + dense + **RRF k=60** · `POST /api/ask/rag` ✓ · top-1 đúng bài 6/6 câu thật · **700 test pass** · D-099, D-100 |
 | 15 | **Hybrid GraphRAG (nhánh B)** | ✅ Xong | 17/11/2026 | Kênh KG = **template Cypher tất định** + mở rộng 1-hop (bài Bạch Đằng: **30 entity → 60 cạnh / 0,11 s**) · 6 ý định · fusion `text_first`/`kg_first` với **không gian `[n]` liên tục** · hội thoại nhiều lượt (`SessionStore` + query rewriting) · `POST /api/ask/hybrid` + `GET /api/session/{id}` ✓ · D-101, D-102 |
-| 16 | **Đánh giá A vs B vs B− (LLM-judge)** | 🟡 Đang làm | 17/11/2026 | Bộ câu hỏi **247 câu / 5 dạng** (60 narrative · 60 multi_turn · 58 relational · 40 multi_hop · 29 no_data) từ Wikidata (độc lập KG) · judge **gộp 3 arm/câu** + hoán vị thứ tự theo `qid` (seed 42) · pool LLM **đa provider** (Gemini + Groq) + **ghim model theo câu** + **tách session theo arm** + **loại lỗi hạ tầng khỏi mẫu số** · **retry judge khi thiếu arm** (`n_judge_missing`) + `scripts/rejudge_missing.py` · **loại câu có confound model** (`n_model_mismatch`) · D-103, D-104, D-106, D-108, D-109, D-111 |
+| 16 | **Đánh giá A vs B vs B− (LLM-judge)** | ✅ Xong | 17/11/2026 | Bộ câu hỏi **247 câu / 5 dạng** (60 narrative · 60 multi_turn · 58 relational · 40 multi_hop · 29 no_data) từ Wikidata (độc lập KG) · judge **gộp 3 arm/câu** + hoán vị thứ tự theo `qid` (seed 42) · pool LLM **đa provider** (Gemini + Groq) + **ghim model theo câu** + **tách session theo arm** + **loại lỗi hạ tầng khỏi mẫu số** · **retry judge khi thiếu arm** (`n_judge_missing`) + `scripts/rejudge_missing.py` · **loại câu có confound model** (`n_model_mismatch`) · **sửa chiều quan hệ KG ở tầng đọc** (D-118) ⇒ `faithfulness_rate(B)` 0,8381 → **0,9150** ✅ · **tái dùng arm không đổi** (D-119) ⇒ chỉ sinh 247 lời gọi thay vì 741 · **Kết quả**: `correctness` A **1,1619** · B **1,5506** · B− **1,1700** (Δ B vs A = **+0,3887**) · `citation_precision(B)` **0,8275** · `no_data_accuracy` 0,9655 · 0 arm judge bỏ sót · 0 câu lệch model · D-103, D-104, D-106, D-108, D-109, D-111, D-118, D-119 |
 | 17 | **Giao diện so sánh + đóng gói** | ✅ Xong | 17/11/2026 | Toggle **A / B / B−** · `CitationPanel` click-to-source (phân biệt `KG` / `Văn bản`) · đồ thị 1-hop từ `KgGraph` · `npm run typecheck` **0 lỗi** · `npm run build` ✓ · `docker compose up` 3 service healthy (`/api/health` → `neo4j: up`, frontend HTTP 200) · 2 ảnh demo trong `reports/screenshots/` · D-099..D-103 |
+| 18 | **Sửa chất lượng Hybrid trên nhóm `narrative`** | 🟡 Đang làm | 18/11/2026 | **D-123** (tách hop-1/hop-2 thành 2 truy vấn độc lập — hết cartesian product; sửa điều kiện chạy hop-2; lọc nhiễu sinh tử bằng `CONTEXT_RELATIONS`; `_resolve_title_names` sửa tên node `Title` "quận công"; prompt trả lời câu tự sự) → eval 60 câu: A **1,84** · B **1,79** · B− **1,85** (D-122: A 1,91 · B 1,78 · B− 1,85) · B bổ sung thông tin bên liên quan **33 → 38/60** câu · **D-124** (scope hop-2 `n2 = e` — loại 71% nhiễu; template `event_parties` — phủ 21/60 câu thiếu bên liên quan; quy tắc ưu tiên văn bản khi xung đột; lọc tên rác liên kết Wikipedia "Chuẩn đề đốc Page"; biến thể tiền tố "Chi Huy 1/2") → eval 43/60 câu (hết quota): A **1,95** · B **1,79** · B− **1,92** · A "Không có trong dữ liệu" mà B có đủ **5/43** câu · **D-125** (harness: không ghim cứng model hết quota + ngân sách context 16.000 → 9.000 ký tự) · **D-134** (nén context **giữ phần KG**) · **D-137..D-141** (harness: giữ khối đã trích dẫn, cạnh KG viết thành mệnh đề tự nhiên, rubric đối xứng, `scripts/rejudge_all.py` chấm lại) → **eval 60/60 câu**: A **1,617** · B **1,783** · B− **1,650** ⇒ **B thắng A 6 câu / thua 0** · 20 test `tests/test_phase17_d123_d124.py` **20/20 pass** · 11 test `tests/test_phase18_d138_judge_harness.py` **11/11 pass** |
 
 Ký hiệu: ⬜ chưa · 🟡 đang làm · ✅ xong (đạt Gate) · ⚠️ xong nhưng lệch kế hoạch (xem `reports/deviations.md`)
 
 ## Việc tiếp theo
 
-**Phase hiện tại: Phase 16 — Đánh giá A vs B vs B− (LLM-judge)** + **Phase 17 — Giao diện + đóng gói** — 17/11/2026.
+**Phase hiện tại: Phase 18 — Sửa chất lượng Hybrid trên nhóm `narrative`** 🟡 — 18/11/2026.
+Phase 16 (đánh giá A vs B vs B−) ✅ + Phase 17 (giao diện + đóng gói) ✅ — 17/11/2026.
 
 > **Định hướng mới (chốt 16/11/2026):** so sánh **Vanilla RAG (A)** vs **Hybrid GraphRAG (B)** vs **Hybrid không KG (B−)**.
 > Nhánh Text-to-Cypher không còn là arm so sánh.
+
+> **Vấn đề đang xử lý (Phase 18):** ở nhóm câu hỏi `narrative` (60 câu — nhóm duy
+> nhất KG phải thể hiện giá trị thật), Hybrid (B) **thua** Vanilla RAG (A).
+> Ba vòng sửa đã làm: D-121 (truy vấn KG 2-hop) → D-122 (parent expansion ở
+> tầng truy xuất) → **D-123/D-124** (tách hop-1/hop-2, lọc nhiễu, sửa tên node
+> `Title`, scope hop-2 vào sự kiện, bổ sung "các bên liên quan", quy tắc ưu tiên
+> văn bản khi xung đột). Số liệu hiện tại xem bảng dưới.
+
+**Kết quả eval nhóm `narrative` (60 câu) — tiến trình:**
+
+| Checkpoint | Ngày | A | B | B− | Ghi chú |
+|---|---|---|---|---|---|
+| `eval_d122_checkpoint.jsonl` | 17/11 | **1,91** | 1,78 | 1,85 | Baseline — B thua A |
+| `eval_d123_checkpoint.jsonl` | 18/11 | 1,84 | **1,79** | 1,85 | Sau D-123 (60/60 câu) |
+| `eval_d124_checkpoint.jsonl` (lần 2) | 18/11 | 1,617 | **1,783** | 1,650 | **60/60 câu** — sau D-134 + D-137..D-141 (harness) ⇒ **B > A, B > B−** ✅ |
+
+> ✅ **Số liệu D-123 trước đây là artefact của harness** (đã tìm ra và sửa
+> xong). Bốn lỗi, **đều ở tầng đánh giá chứ không phải kiến trúc**:
+>
+> | # | Artefact | Sửa | Đo được |
+> |---|---|---|---|
+> | 1 | `compact_context()` cắt từ **đầu** ⇒ mất hết phần KG ở cuối | **D-134** — tách context tại marker KG, dành ngân sách riêng cho KG | 35/37 câu mất KG → 0/60 |
+> | 2 | Ngân sách context judge **khác nhau** giữa D-123 (9.000) và D-124 lần 1 (2.200) | **D-141** — `scripts/rejudge_all.py` chấm lại **mọi** checkpoint bằng cùng ngân sách | cả 3 arm giảm đồng đều ~0,33 |
+> | 3 | Cạnh KG sự kiện hiển thị dạng mũi tên ⇒ bị đọc **ngược** | **D-137** — mệnh đề tự nhiên theo nhãn node thật | 7/60 câu arm B trừ oan |
+> | 4 | `compact_context()` cắt mất khối `[n]` **đã trích dẫn** ⇒ `citation_precision = 0` | **D-138** — `keep_indices` giữ bắt buộc | 7/60 câu arm B |
+> | 5 | Judge trừ điểm cho thông tin **bổ sung** của arm B; và cho 2 điểm cho "không có dữ liệu" khi đáp án có sẵn | **D-139**, **D-140** | 16/60 câu arm A được điểm oan |
+>
+> ⇒ Kết quả cuối (60/60 câu, cùng judge pool, cùng ngân sách 9.000):
+> **A 1,617 · B 1,783 · B− 1,650** ⇒ **B thắng A 6 câu, không thua câu nào** ·
+> **B thắng B− 5 câu, không thua câu nào** ⇒ **gate đạt**.
+
+**Vì sao không đổi model judge giữa các lần chấm (D-136).** Pool của D-124
+lần 2 **giống hệt** D-123 (đọc từ `logs/eval_d123_narrative.log`):
+gen = `gemini-3.5-flash-lite` + `gemini-3.1-flash-lite` +
+`gemini-3.1-flash-lite-preview`; judge = `gemini-3.1-flash-lite` +
+`gemini-3.1-flash-lite-preview` + `gemini-3-flash-preview`. Groq là dự phòng.
+Không dùng model khác hẳn (`gemma-4-31b-it` còn quota lúc 18/11 nhưng
+**khác hệ** ⇒ số liệu **không so sánh được**).
+
+**Harness chịu rate-limit (D-126 → D-136).** 9 quyết định liên tiếp:
+ngân sách token cho model thinking (D-126) · cache không lưu phản hồi rỗng
+(D-127) · phân biệt RPM/RPD (D-128) · ngân sách context judge là tham số
+(D-129) · driver lặp (D-130) · nén context giữ KG (D-134) · nhận diện
+chính xác RPM vs RPD qua `quota_id` (D-135) · không đổi model judge (D-136).
 
 Chi tiết ở `docs/09-ke-hoach-thuc-thien.md` → mục "Phase 16" và "Phase 17".
 
@@ -42,13 +88,18 @@ Lệnh chạy đánh giá (Phase 16):
 ./.venv/bin/python -m src.evaluation.build_qa_set
 ./.venv/bin/python -u -m src.evaluation.evaluate_rag \
   --qa-set data/eval/qa_rag_250.jsonl --arms A,B,B- --reset-sessions \
-  --gen-pool "gemini:gemini-3.1-flash-lite,gemini-3.1-flash-lite-preview,gemini-3-flash-preview;groq:openai/gpt-oss-120b,qwen/qwen3.8-27b,openai/gpt-oss-20b" \
-  --judge-pool "gemini:gemini-3.1-flash-lite,gemini-3.1-flash-lite-preview,gemini-3-flash-preview;groq:openai/gpt-oss-120b,qwen/qwen3.8-27b" \
+  --gen-pool "gemini:gemini-3.5-flash-lite,gemini-3.1-flash-lite,gemini-3.1-flash-lite-preview;groq:openai/gpt-oss-120b,qwen/qwen3.8-27b,openai/gpt-oss-20b" \
+  --judge-pool "gemini:gemini-3.1-flash-lite,gemini-3.1-flash-lite-preview,gemini-3.5-flash-lite;groq:openai/gpt-oss-120b,qwen/qwen3.8-27b" \
   --checkpoint data/eval/eval_rag_checkpoint.jsonl --resume \
+  --reuse-arms-from data/eval/eval_rag_checkpoint_prev.jsonl \
   --infra-retries 3 --infra-retry-wait-s 45 --stamp phase16
 ```
 > ⚠️ Quota free tier **không đủ** nếu dùng 1 provider: Gemini 500 RPD/**model**,
 > Groq `gpt-oss-20b` 200K TPD ⇒ dùng pool **đa provider** — D-108.
+>
+> Chạy lại sau khi sửa **chỉ arm B** ⇒ dùng `--reuse-arms-from` để **tái dùng**
+> arm A/B− (đã chứng minh tái lập được 100%) ⇒ chỉ sinh 247 lời gọi thay vì 741;
+> điểm vẫn được judge hiện tại **chấm lại** ⇒ D-119.
 >
 > Sau khi run xong: `scripts/rejudge_missing.py` (chấm lại arm bị judge bỏ sót)
 > → `scripts/rebuild_phase16_report.py` → `scripts/make_phase16_log.py`.
@@ -358,11 +409,16 @@ Kết quả Phase 5 đã chốt:
 | Cypher p95 (s) | < 2 | — (chưa đo, cần ≥100 truy vấn) |
 | End-to-end p50 (s) | < 10 | **2,5–8,0** (Phase 11) |
 | RAG — số câu benchmark | ≥ 200 | **247** (Phase 16 — đủ 5 dạng) |
-| RAG — correctness A (Vanilla) | — | **1,2915** (247 câu, LLM-judge) |
-| RAG — correctness B (Hybrid GraphRAG) | > A | **1,4372** (Δ **+0,1457**) |
-| RAG — correctness B− (Hybrid không KG) | ≈ A | **1,2955** (Δ(B vs B−) = **+0,1417**) |
-| RAG — citation_precision B | ≥ 0.70 | **0,7656** (A 0,6984 · B− 0,7085) |
-| RAG — faithfulness_rate | ≥ 0.90 | A **0,9271** · B **0,8381** (⚠️ B thấp hơn — xem D-116) |
+| RAG — correctness A (Vanilla) | — | **1,1619** (247 câu, LLM-judge) |
+| RAG — correctness B (Hybrid GraphRAG) | > A | **1,5506** (Δ **+0,3887**) |
+| RAG — correctness B− (Hybrid không KG) | ≈ A | **1,1700** (Δ(B vs B−) = **+0,3806**) |
+| RAG — citation_precision B | ≥ 0.70 | **0,8275** (A 0,6154 · B− 0,6275) |
+| RAG — correctness A · **narrative** (60 câu) | — | D-122 **1,91** → D-123 **1,84** → D-124 **1,617** (60 câu, harness đã sửa xong) |
+| RAG — correctness B · **narrative** (60 câu) | > A | D-122 **1,78** → D-123 **1,79** → D-124 **1,783** ✅ — **B thắng A 6 câu, thua 0** |
+| RAG — correctness B− · **narrative** (60 câu) | ≈ A | D-122 **1,85** → D-123 **1,85** → D-124 **1,650** (60 câu) — **B thắng B− 5 câu, thua 0** |
+| RAG — B bổ sung thông tin "bên liên quan" | — | D-122 **33/60** → D-123 **38/60** → D-124 **43/60** câu (Phase 18) |
+| RAG — A "Không có trong dữ liệu" mà B trả đủ | > 0 | D-123 **6/60** · D-124 **10/60** câu (B trả "không có dữ liệu" **ít hơn**: 7/60 vs A 16/60) |
+| RAG — faithfulness_rate | ≥ 0.90 | A **0,9109** · B **0,9150** · B− **0,9231** (✅ sau D-118; trước: B 0,8381 ❌) |
 | RAG — no_data_accuracy | ≥ 0.90 | **0,9655** (cả 3 arm) |
 | RAG — mismatch model giữa 3 arm | 0 | **0** / 247 câu |
 | RAG — arm bị judge bỏ sót | 0 | **0** (cả 3 arm) |

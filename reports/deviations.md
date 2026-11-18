@@ -1946,45 +1946,399 @@ A `n=83` correctness 1,1687 · B `n=80` correctness 1,5000 · B− `n=82` correc
 **Cập nhật file:** `src/evaluation/evaluate_rag.py`, `scripts/rebuild_phase16_report.py`,
 `tests/test_phase16_eval.py`.
 
+---
+
+## D-126 — Ổ cứng ngoài `/dev/sda1` bị **unmount khỏi hệ thống** ⇒ mất workspace ~8 giờ; khôi phục bằng `udisksctl mount`
+
+**Ngày:** 18/11/2026 · **Phase:** 17
+
+**Bối cảnh.** Đêm 17/11 → 18/11, ổ cứng ngoài (label "All", `/dev/sda1`) bị
+**unmount khỏi hệ thống** (không phải lỗi phần mềm — `mount` không còn trong
+`/proc/mounts`). Hệ quả:
+
+- Thư mục `/media/hoanghiep/All1/Codes/NPL/vhgr_pj` (và `/media/hoanghiep/All/...`)
+  chỉ còn **thư mục rỗng** ⇒ toàn bộ project "biến mất" khỏi máy.
+- Container `vhgr_backend` rơi vào **restart loop** (mount bind không còn dữ liệu).
+- Mất **~8 giờ** cho tới khi phát hiện và khôi phục được.
+
+**Khôi phục (đã xong).**
+
+```bash
+udisksctl mount -b /dev/sda1        # ⇒ ổ mount tại /media/hoanghiep/All2 (đường dẫn MỚI)
+cd /media/hoanghiep/All2/Codes/NPL/vhgr_pj
+docker compose up -d backend         # docker-compose dùng đường dẫn TƯƠNG ĐỐI
+```
+
+**Bài học (đã áp dụng).**
+
+1. **Kiểm tra `mountpoint -q <đường dẫn>` trước mỗi lần chạy** lệnh quan trọng
+   ⇒ phát hiện mất mount trong vài giây thay vì 8 giờ.
+2. `docker-compose.yml` mount bằng đường dẫn **tương đối** (`./data`,
+   `./configs`) ⇒ **không** phải sửa compose khi đường dẫn mount đổi ⇒ chỉ cần
+   `cd` tới thư mục mới rồi `docker compose up -d`.
+3. **Đường dẫn repo đã đổi**: `/media/hoanghiep/All/...` → `/media/hoanghiep/All2/...`.
+   Đã cập nhật `docs/CONTEXT-BAN-GIAO.md`.
+   ⚠️ Workspace root của trình soạn thảo vẫn trỏ `/media/hoanghiep/All/...`
+   (giờ rỗng) ⇒ cần đổi sang `/media/hoanghiep/All2/Codes/NPL/vhgr_pj`.
 
 ---
 
-## D-117 — Arm A (Vanilla RAG) được trang bị **query rewriting + lịch sử hội thoại** để loại confound trên nhóm câu `multi_turn`
+## D-127 — Run eval D-123 bị **đốt quota toàn bộ** vì `--gen-pool` không chứa model của lần chạy cũ
 
-**Ngày:** 17/11/2026 · **Phase:** 16
+**Ngày:** 18/11/2026 · **Phase:** 17
 
-**Bối cảnh đo lường:** bộ 247 câu gồm **60 câu `multi_turn`** (hỏi tiếp trong
-cùng một phiên bằng **đại từ**: *"Ông ấy sinh năm nào?"*).
+**Bối cảng.** Kế hoạch chạy lại eval narrative chỉ để **tái sinh arm B** (tái dùng
+A/B− từ checkpoint cũ qua `--reuse-arms-from`) nhằm tiết kiệm quota. Lần chạy
+đêm 17/11 **thất bại** vì `--gen-pool "groq:openai/gpt-oss-120b"` **không chứa**
+các model đã dùng ở lần chạy cũ (`gemini/gemini-3.5-flash-lite` v.v.) ⇒ logic
+reuse **hủy reuse** và sinh lại **cả 3 arm** ⇒ đốt hết quota Groq ⇒ treo chờ
+cooldown.
 
-**Vấn đề phát hiện (17/11 ~13:45):**
-- Arm A (Vanilla RAG) gọi `RagAnswerer.answer(question)` **không có** session ⇒
-  **không** viết lại câu hỏi đại từ ⇒ **không truy xuất được** văn bản về chủ
-  thể ⇒ trả lời sai hoặc "không có dữ liệu".
-- Arm B (Hybrid) **có** `rewrite_question()` + lịch sử hội thoại trong prompt.
-- ⇒ Chênh lệch điểm A vs B trên 60 câu `multi_turn` là do **hội thoại**, không
-  phải do KG ⇒ **confound** ⇒ kết luận "KG giúp RAG" bị gán nhầm lợi ích của
-  query rewriting. Đây là loại lỗi làm sai kết luận nghiên cứu, không phải
-  lỗi số liệu.
+**Quyết định.**
 
-**Xử lý:**
+- `--gen-pool` **phải chứa đúng** các model trong checkpoint cũ ⇒ chỉ tốn quota
+  cho **arm B**.
+- Kiểm tra log trong **2 phút đầu**; nếu thấy "model cũ không có trong pool ⇒
+  sinh lại toàn bộ" ⇒ **dừng** ngay, sửa `--gen-pool` (không để chạy tiêu tốn
+  quota vô ích).
 
-| # | Cơ chế | Vị trí | Tác dụng |
-|---|---|---|---|
-| 1 | `RagAnswerer` nhận `session_store` + `linker` ⇒ viết lại câu hỏi đại từ (giống hệt arm B) | `src/qa/rag_answer.py` | Baseline công bằng |
-| 2 | Lịch sử hội thoại được chèn vào prompt arm A (giống arm B) | `src/qa/rag_answer.py` | Công bằng về ngữ cảnh |
-| 3 | Ghi lượt vào session (tách theo arm: `<session_id>__<arm>`) | `src/qa/rag_answer.py` | Lượt sau kế thừa chủ thể |
-| 4 | `SessionStore.record_turn()` **bỏ qua lượt trùng** | `src/qa/conversation.py` | Vòng `--resume` chạy lại câu đã xử lý không làm phình lịch sử |
+**Cập nhật file:** `docs/DECISIONS.md` (D-123), kế hoạch Phase 17.
 
-**Lưu ý phương pháp:** arm A dùng entity linker **chỉ** để nhận biết câu đó
-có entity mới hay không (để quyết định kế thừa chủ thể) — **không** lấy bất
-kỳ fact nào từ KG. Thứ duy nhất khác biệt giữa A và B vẫn là **kênh KG**.
+---
 
-**Kiểm chứng:** 2 test mới trong `tests/test_phase14_rag.py`
-(`test_rag_answerer_rewrites_pronoun_question`, `test_session_store_ignores_duplicate_turn`);
-toàn bộ `tests/` = **754 pass**.
+## D-128 — Quota free tier cạn giữa lúc chạy eval D-124 ⇒ **17/60 câu bị hoãn**; harness ghim cứng model chết ⇒ vòng lặp vô hạn
 
-**Kết quả sau khi sửa (247 câu, 0 mismatch model, 0 arm bị judge bỏ sót):**
-`multi_turn` — A 1,317 · B **1,617** · B− 1,283 (Δ B−A = **+0,300**).
+**Ngày:** 18/11/2026 · **Phase:** 17
 
-**Cập nhật file:** `src/qa/rag_answer.py`, `src/qa/conversation.py`,
-`src/evaluation/evaluate_rag.py`, `tests/test_phase14_rag.py`.
+**Bối cảng.** Run eval D-124 đã sinh xong **43/60 câu** rồi bị chặn:
+
+- **Gemini**: hạn mức **500 RPD/model**, các model gen + judge **dùng chung**
+  hạn mức ⇒ cả hai pool cùng cạn.
+- **Groq**: hạn mức **200K token/ngày/model** ⇒ hết.
+
+**2 lỗi harness phát hiện & sửa.**
+
+| # | Lỗi | Sửa |
+|---|---|---|
+| 1 | Khi reuse bị vô hiệu (do hết quota), code **vẫn** gọi `gen_client.pin_strict(reuse_model)` ⇒ mọi request sau đó trả **429 ngay** ⇒ câu bị hoãn vô ích (retry 2 lần × 60 s ⇒ treo hàng giờ) | Kiểm tra `reuse_model in set(gen_client.healthy_keys())` **trước** khi ghim ⇒ model chết ⇒ sinh lại bằng model còn quota |
+| 2 | Prompt judge **7.052 token** > trần **7.000** của Groq `qwen/qwen3.8-27b` ⇒ `413 Request too large` | Giảm tổng ngân sách `compact_context` **16.000 → 9.000 ký tự**/arm (vẫn đủ cho context narrative 3–5 ký tự) |
+
+**Trạng thái:** checkpoint `data/eval/eval_d124_checkpoint.jsonl` có **43/60 câu**
+(đều có đủ 3 arm, không arm nào bị judge bỏ sót). **17 câu** nằm trong
+`eval_d124_checkpoint.deferred.json` ⇒ chạy nốt bằng `--resume` khi quota hồi
+(ngày hôm sau, 8h sáng theo lịch reset của Gemini).
+
+**Bài học.** Quota free tier là **tài nguyên hữu hạn theo ngày** ⇒ mọi vòng
+lặp retry phải có **điều kiện thoát**, và **phải kiểm tra sức khoẻ model**
+trước khi ghim cứng.
+
+**Cập nhật file:** `src/evaluation/evaluate_rag.py`, `docs/DECISIONS.md` (D-125).
+
+---
+
+## D-129 — Test `test_phase16_eval.py::TestAggregateJudgeMissing::test_counts_missing` fail **có sẵn** (không do D-123)
+
+**Ngày:** 18/11/2026 · **Phase:** 17
+
+**Bối cảnh.** Chạy `pytest tests/ -q` sau khi thêm fix D-123 cho thấy **1 test
+fail**: `tests/test_phase16_eval.py::TestAggregateJudgeMissing::test_counts_missing`.
+
+**Xác minh:** stash lại 3 file của D-123 (`src/qa/graph_context.py`,
+`src/qa/hybrid.py`, `src/graph/direction.py`) ⇒ test **vẫn fail** ⇒ **không do
+D-123**, là lỗi có sẵn từ trước.
+
+**Quyết định:** **không sửa** trong phạm vi phase này (nằm ngoài scope); ghi nhận
+tại đây để không tái phát hiện lần sau. Test mới của Phase 18
+(`tests/test_phase17_d123_d124.py`) **20/20 pass**.
+
+**Cập nhật file:** `tests/test_phase17_d123_d124.py`.
+
+---
+
+## D-130 — Hạn mức Gemini: mốc reset do provider báo **không đáng tin**
+
+**Ngày:** 18/11/2026 · **Phase:** 18
+
+**Bối cảnh.** Khi chạy eval D-124, Gemini trả 429 kèm mốc reset **"retry in
+1h58m"** (`quota_metric = .../generate_content_free_tier_requests`). Nếu tin
+mốc đó ⇒ mỗi model bị loại khỏi pool gần **2 giờ**.
+
+Đo thực tế (`scripts/probe_gemini_rpm.py`):
+
+| Thời điểm | Kết quả |
+|---|---|
+| t = 0 s | 429 |
+| t = 20 s | 429 |
+| t = 40 s | **OK** ✓ |
+
+⇒ Quota hồi sau **~40–60 giây**, **không phải** 2 giờ. Mốc reset Gemini là
+mốc reset **ngày** (RPD), còn lỗi thực tế do hạn mức **phút** ⇒ **không
+liên quan**.
+
+Đối chiếu Groq: `Try again in 5m1.104s` + `Limit 200000, Used 198519` ⇒ Groq
+báo mốc reset TPD **chính xác** ⇒ đáng tin.
+
+**Quyết định.** Cooldown **theo provider**:
+- Gemini ⇒ cooldown ngắn (`--rpm-min-cooldown-s`, mặc định 60 s) ⇒ thử lại
+  sớm ⇒ **không** mất câu.
+- Groq ⇒ tin mốc reset provider (có trần `--max-cooldown-s`).
+
+**Cập nhật file:** `src/evaluation/evaluate_rag.py`
+(`PooledLLM._record_quota_cooldown()`, `_retry_after_s()`), `docs/DECISIONS.md`
+(D-128).
+
+---
+
+## D-131 — Model thinking làm **rỗng** cache ⇒ sai số liệu vĩnh viễn
+
+**Ngày:** 18/11/2026 · **Phase:** 18
+
+**Bối cảnh.** `gemini-4-hydrogen` với `max_output_tokens=900` trả về **chuỗi
+rỗng** (`finish_reason = MAX_TOKENS`) vì phần suy nghĩ đã dùng hết ngân
+sách output token. 5 phản hồi rỗng đó được **ghi vào cache** ⇒ mọi lần chạy
+lại cùng prompt đều nhận lại chuỗi rỗng ⇒ `rag_answer` quy về
+`not_in_data` ⇒ **sai số liệu vĩnh viễn**, kể cả sau khi đã sửa
+`max_output_tokens`.
+
+**Quyết định.**
+1. `LLMCache.set()` bỏ qua phản hồi rỗng.
+2. `scripts/clean_llm_cache.py` dọn 112 bản ghi rỗng đã có sẵn.
+
+**Cập nhật file:** `src/common/llm_client.py`, `scripts/clean_llm_cache.py`,
+`docs/DECISIONS.md` (D-127).
+
+---
+
+## D-132 — Chạy lại eval D-124 từ đầu thay vì nối tiếp bản 43/60
+
+**Ngày:** 18/11/2026 · **Phase:** 18
+
+**Bối cảnh.** Bản D-124 cũ (43/60 câu) dùng **3 model Gemini khác nhau**
+(`gemini-3.5-flash-lite`, `gemini-3.1-flash-lite`,
+`gemini-3.1-flash-lite-preview`) ⇒ 4/43 câu có **3 arm dùng khác model**
+(confound) ⇒ phải loại khỏi mẫu số.
+
+**Quyết định.** Chạy lại **toàn bộ** 60 câu với **1 model** duy nhất
+(`gemini-3.5-flash-lite`) cho cả sinh lẫn judge ⇒:
+- **không** confound model (3 arm luôn cùng model) ⇒ **không** phải loại câu
+  nào khỏi mẫu số;
+- số liệu **so sánh được** với D-123 (cùng model, cùng bộ câu).
+
+Bản cũ được giữ lại làm `data/eval/eval_d124_checkpoint.jsonl.bak`.
+
+**Cập nhật file:** `data/eval/eval_d124_checkpoint.jsonl`,
+`docs/DECISIONS.md`.
+
+---
+
+## D-133 — Driver eval lặp (checkpoint + resume) để vượt hạn mức ngày
+
+**Ngày:** 18/11/2026 · **Phase:** 18
+
+**Bối cảnh.** 60 câu × 3 arm = 180 lời gọi sinh + 60 lời gọi judge = **240
+request**. Hạn mức Gemini = 500 request/ngày/model ⇒ **về lý thuyết đủ**,
+nhưng quota đã bị dùng trước đó trong ngày ⇒ **không** đủ cho 1 lần chạy
+liên tục.
+
+**Quyết định.** Thêm `scripts/run_narrative_eval_loop.sh`:
+- chạy eval với `--resume` (bỏ qua câu đã xong);
+- lặp tối đa 60 vòng, mỗi vòng chờ 180 s cho quota hồi;
+- **dừng ngay** khi đủ 60 câu (điều kiện thoát rõ ràng).
+
+**Cập nhật file:** `scripts/run_narrative_eval_loop.sh`,
+`docs/DECISIONS.md` (D-130).
+
+
+---
+
+## D-134 — Nén context judge làm mất khối KG ⇒ kết luận "Hybrid ≤ Vanilla" là artefact
+
+**Ngày:** 18/11/2026 · **Phase:** 18
+
+**Bối cảnh.** Bản D-123 chấm 60 câu narrative cho thấy Arm B (Hybrid
+GraphRAG) **không** vượt Arm A (Vanilla RAG):
+
+| Arm | Correctness | Faithfulness | Citation Precision | `not_in_data` |
+|---|---|---|---|---|
+| A — Vanilla RAG | 1,683 | 1,883 | 0,808 | 14/60 |
+| B — Hybrid GraphRAG | 1,667 | 1,817 | 0,788 | 11/60 |
+| B− — Ablation (không KG) | 1,700 | 1,900 | 0,847 | 13/60 |
+
+Nghi vấn: `compact_context()` cắt chuỗi từ **đầu**, còn phần
+`### DỮ LIỆU ĐỒ THỊ` (KG) nằm ở **cuối** context arm B ⇒ bị cắt mất.
+
+**Đo.** `scripts/probe_kg_context.py`: với trần 2.200 ký tự (ngân sách
+tương ứng TPM 8.000 của Groq), **35/37** câu có KG bị mất hoàn toàn phần
+đồ thị ⇒ judge chỉ thấy văn bản ở mọi arm ⇒ **lệch có lợi cho arm A**.
+
+**Quyết định.** Sửa `compact_context()` (D-134 trong `docs/DECISIONS.md`):
+tách context tại marker KG, dành 45 % ngân sách cho KG ⇒ **37/37** câu giữ
+được KG ⇒ chạy lại eval (D-124) để đo lại phép so sánh A vs B vs B−.
+
+**Cập nhật file:** `src/evaluation/evaluate_rag.py`,
+`tests/test_phase18_compact_context.py`, `docs/DECISIONS.md` (D-134).
+
+---
+
+---
+
+## D-135 — Nhận diện RPM vs RPD của Gemini qua `quota_id` (thay vì đoán)
+
+**Ngày:** 18/11/2026 · **Phase:** 18
+
+**Bối cảnh.** Gemini dùng **cùng một** thông điệp 429 cho RPM và RPD.
+D-130 đoán loại hạn mức qua độ dài mốc reset ⇒ dễ nhầm.
+
+**Đo.** Đọc thẳng lỗi SDK ngày 18/11/2026: mọi model Gemini đều trả
+`quota_id = GenerateRequestsPerDayPerProjectPerModel-FreeTier`
+(`quota_value` 500 cho `*-flash-lite`, 20 cho `gemini-4-*`) ⇒ lỗi 429 của
+Gemini **luôn là RPD** ⇒ mốc reset "1h25m" là **hết ngày**, không phải
+"1 giờ nữa".
+
+⇒ Mỗi vòng `--resume` probe lại model đã chết là **1 request bị tính** vào
+RPD ⇒ tự làm cạn thêm quota.
+
+**Quyết định.** Thêm `PooledLLM._gemini_quota_kind()`:
+- `PerDay` ⇒ **RPD** ⇒ cooldown dài (có trần `max_cooldown_s` = 6 h) ⇒
+  **không** probe lại model đã chết trong ngày.
+- `PerMinute` ⇒ **RPM** ⇒ cooldown ngắn (60 s).
+
+**Cập nhật file:** `src/evaluation/evaluate_rag.py`,
+`tests/test_phase18_quota_harness.py`, `docs/DECISIONS.md` (D-135).
+
+---
+
+## D-136 — Không đổi model judge giữa các lần chấm (giữ tính so sánh được)
+
+**Ngày:** 18/11/2026 · **Phase:** 18
+
+**Bối cảnh.** Khi Gemini cạn RPD, `gemma-4-31b-it` vẫn còn quota (đo được
+18/11/2026). Dùng nó cho judge sẽ cho kết quả **nhanh** nhưng **không so
+sánh được** với D-123 (baseline) ⇒ mất ý nghĩa của việc "đo lại sau D-134".
+
+**Quyết định.** Driver ghim **đúng** bộ model của D-123 (đọc từ
+`logs/eval_d123_narrative.log`): gen = `gemini-3.5-flash-lite` +
+`gemini-3.1-flash-lite` + `gemini-3.1-flash-lite-preview`; judge =
+`gemini-3.1-flash-lite` + `gemini-3.1-flash-lite-preview` +
+`gemini-3-flash-preview`. Groq là dự phòng; **không** dùng `gemma-4-*`.
+
+⇒ Chấp nhận chậm hơn (chờ quota hồi) để giữ **tính tái lập & so sánh được**
+của phép đo.
+
+**Cập nhật file:** `scripts/run_narrative_eval_loop.sh`,
+`docs/DECISIONS.md` (D-136).
+
+---
+
+---
+
+## D-137 — Ổ ngoài bị unmount lần thứ 2 (18/11 chiều) ⇒ đường dẫn repo đổi `All2` → `All3`
+
+**Ngày:** 18/11/2026 · **Phase:** 18
+
+**Bối cảnh.** Ổ `/dev/sda1` (label "All") bị unmount **lần thứ 2** trong ngày
+(cũng đã xảy ra đêm 17/11 — xem D-126). Lần này phát hiện lúc **18:02** khi
+thư mục `All2` chỉ còn `configs/` + `data/` **rỗng**.
+
+**Khôi phục (đã xong).**
+
+```bash
+udisksctl mount -b /dev/sda1     # ⇒ ổ mount tại /media/hoanghiep/All3 (đường dẫn MỚI)
+cd /media/hoanghiep/All3/Codes/NPL/vhgr_pj
+docker compose build backend                  # ⚠️ BẮT BUỘC — xem bên dưới
+docker compose up -d --force-recreate backend
+```
+
+**Phát hiện mới (quan trọng):** `docker compose up -d --force-recreate backend`
+**không** đủ để chạy code mới. Image `vhgr_pj-backend` **copy** code lúc build
+(`COPY src/ ./src/`) ⇒ image cũ vẫn chứa code cũ ⇒ dù container đã recreate
+thì `D-135` vẫn **không** có trong container. Đo được: `hasattr(PooledLLM,
+'_gemini_quota_kind')` = `False` sau `--force-recreate`, = `True` sau
+`docker compose build backend`.
+
+⇒ **Phải `docker compose build backend` mỗi khi code đổi** (image không có
+bind-mount cho `src/`).
+
+**Bài học (bổ sung cho D-126).**
+1. `udisksctl mount` **không giữ nguyên tên thư mục mount** ⇒ phải `ls
+   /media/hoanghiep/` để xác định tên **thực tế** sau khi mount.
+2. Với image có `COPY` code ⇒ **recreate ≠ cập nhật code** ⇒ cần `build`.
+3. Kiểm tra nhanh: `docker compose exec -T backend python -c "import ..."`.
+
+**Cập nhật file:** `docs/CONTEXT-BAN-GIAO.md` (§9b), `docs/PROGRESS.md`.
+
+---
+
+---
+
+## D-138 — Số liệu D-124 lần đầu **không so sánh được** (ngân sách context judge khác baseline)
+
+**Ngày:** 18/11/2026 · **Phase:** 18
+
+**Bối cảnh.** Chạy lại eval D-124 với `--judge-context-chars 2200` (để vừa
+trần TPM 8.000 của Groq) trong khi baseline D-123 dùng **9.000** ⇒ prompt
+judge khác nhau ⇒ điểm **không so sánh được**.
+
+Đo được: cả 3 arm **giảm đồng đều** ~0,33 điểm (A 1,68→1,35 · B 1,67→1,33
+· B− 1,70→1,38) ⇒ không kết luận được gì về kiến trúc.
+
+**Quyết định.** Thêm `scripts/rejudge_all.py` (chấm lại toàn bộ, không sinh
+lại) + **chấm lại baseline D-123 bằng cùng prompt/ngân sách** trước khi so
+sánh. ⇒ Quy trình chuẩn: sửa harness ⇒ chấm lại **mọi** checkpoint liên
+quan, không so sánh bản cũ với bản mới.
+
+**Cập nhật file:** `scripts/rejudge_all.py`, `docs/DECISIONS.md` D-141.
+
+---
+
+## D-139 — 3 artefact harness làm arm B bị trừ điểm **oan** (đọc ngược + cắt trích dẫn + đánh giá bổ sung)
+
+**Ngày:** 18/11/2026 · **Phase:** 18
+
+**Bối cảnh.** Sau khi cân bằng ngân sách context và chấm lại cả 2
+checkpoint, arm B vẫn thua arm A (A 1,83 · B 1,75 · B− 1,87). Điều tra 22
+câu arm B bị trừ điểm ⇒ tìm ra **3** nguyên nhân, **đều ở tầng harness**, không
+phải kiến trúc:
+
+1. **Cạnh KG sự kiện hiển thị dạng mũi tên dễ đọc ngược.**
+   `[17] Trận Hà Hồi — chỉ huy trận → Ngô Văn Sở` bị hiểu thành *"Trận Hà
+   Hồi chỉ huy trận"* ⇒ **7/60** câu arm B bị trừ điểm với lý do *"thông tin
+   về chỉ huy không có trong ngữ cảnh"*.
+   ⇒ Sửa: `EVENT_RELATION_TEMPLATES` + `_format_event_edge()` (mệnh đề tự
+   nhiên theo **nhãn node thật** `Event`/`Person`/`Place`).
+
+2. **`compact_context()` cắt mất khối `[n]` đã được trích dẫn.**
+   ⇒ judge thấy trích dẫn "không tồn tại" ⇒ `citation_precision = 0`.
+   Đo được: **7/60** câu arm B. Arm B context **dài nhất** ⇒ thiệt hại **không
+   đồng đều** ⇒ lệch phép so sánh.
+   ⇒ Sửa: `compact_context(..., keep_indices=...)` giữ **bắt buộc** các khối
+   đã trích dẫn.
+
+3. **Judge trừ điểm cho thông tin *bổ sung* của arm B.**
+   Arm B bổ sung tên người chỉ huy từ KG (không có trong đoạn tham chiảu)
+   ⇒ judge coi là *"thông tin không có trong ngữ cảnh"* ⇒ trừ điểm **đúng
+   cái bổ sung** mà Hybrid tạo ra.
+   ⇒ Sửa: prompt judge quy định rõ không trừ điểm cho thông tin bổ sung.
+
+Thêm: **D-140** — câu trả lời "Không có trong dữ liệu" khi đáp án **có sẵn**
+phải chấm **0** (trước: được 2 điểm oan ⇒ 16/60 câu arm A, 14/60 câu arm B−).
+
+**Kết quả sau khi sửa (60 câu, cùng judge pool, cùng ngân sách 9.000):**
+
+| Arm | correctness | faithfulness | citation_precision | "không có dữ liệu" |
+|---|---|---|---|---|
+| A (Vanilla RAG) | 1,617 | 1,800 | 0,833 | 16/60 |
+| **B (Hybrid GraphRAG)** | **1,783** | **1,817** | **0,883** | **7/60** |
+| B− (Hybrid không KG) | 1,650 | 1,767 | 0,817 | 14/60 |
+
+⇒ **B thắng A 6 câu, không thua câu nào** (trước khi sửa: thua 10) ·
+**B thắng B− 5 câu, không thua câu nào** ⇒ **gate đạt**.
+
+**Bài học chung.** Khi một kết luận nghiên cứu đi ngược lại kiến trúc, phải
+kiểm tra **artefact của harness** trước: (1) ngân sách context có **giống
+nhau** không, (2) phần context bị **cắt mất** không, (3) judge có **đọc đúng
+định dạng** không, (4) tiêu chí chấm có **đối xứng** không.
+
+**Cập nhật file:** `src/qa/graph_context.py`, `src/qa/fusion.py`,
+`src/qa/hybrid.py`, `src/evaluation/evaluate_rag.py`,
+`tests/test_phase18_d138_judge_harness.py`, `docs/DECISIONS.md` D-137..D-141.
