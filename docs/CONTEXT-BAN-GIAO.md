@@ -242,6 +242,9 @@ nhất** theo D-141 (cùng judge pool, cùng ngân sách context 9.000 ký tự)
 - **B thắng B−: 5 câu · B thua B−: 0 câu · hòa 55** ⇒ Δ(B−B−) = **+0,133**.
 - B bổ sung tên **"bên liên quan"** mà A không có ở **43/60** câu.
 - A trả "không có dữ liệu" còn B trả đủ ở **10/60** câu.
+- **Đối chiếu chéo**: chấm lại checkpoint **D-123** bằng **cùng rubric mới**
+  ⇒ A 1,733 · B 1,717 · B− 1,783 ⇒ **vẫn B ≤ A**. ⇒ phần lớn cải thiến của
+  D-124 đến từ **cải thiến kiến trúc/context**, **không** phải từ nới rubric.
 - ⚠️ `q0059` có **model sinh khác** giữa các arm (`gpt-oss-20b` vs `gpt-oss-120b`)
   ⇒ đã đánh dấu `model_mismatch_qids` và tách riêng khi phân tích.
 

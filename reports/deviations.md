@@ -2287,6 +2287,14 @@ lại) + **chấm lại baseline D-123 bằng cùng prompt/ngân sách** trướ
 sánh. ⇒ Quy trình chuẩn: sửa harness ⇒ chấm lại **mọi** checkpoint liên
 quan, không so sánh bản cũ với bản mới.
 
+**Kiểm chứng chéo (chống "nới rubric").** Chấm lại checkpoint **D-123** bằng
+**cùng rubric mới** (D-137..D-141) cho A 1,733 · B 1,717 · B− 1,783 ⇒ **vẫn
+B ≤ A**. Nếu thắng là do nới rubric thì D-123 cũng phải đổi theo hướng đó.
+⇒ Phần lớn cải thiến của **D-124** đến từ **cải thiến kiến trúc/context**
+(scope hop-2 `n2 = e` · template `event_parties` · lọc tên rác Wikipedia ·
+quy tắc ưu tiên văn bản khi xung đột), **không** phải từ hạ tiêu chí đánh
+giá. Đây là phép kiểm chứng bắt buộc cho mọi lần sửa rubric.
+
 **Cập nhật file:** `scripts/rejudge_all.py`, `docs/DECISIONS.md` D-141.
 
 ---

@@ -49,7 +49,7 @@ Phase 16 (đánh giá A vs B vs B−) ✅ + Phase 17 (giao diện + đóng gói)
 | Checkpoint | Ngày | A | B | B− | Ghi chú |
 |---|---|---|---|---|---|
 | `eval_d122_checkpoint.jsonl` | 17/11 | **1,91** | 1,78 | 1,85 | Baseline — B thua A |
-| `eval_d123_checkpoint.jsonl` | 18/11 | 1,84 | **1,79** | 1,85 | Sau D-123 (60/60 câu) |
+| `eval_d123_checkpoint.jsonl` | 18/11 | 1,733 | 1,717 | 1,783 | Sau D-123 (60/60 câu) — **đã chấm lại** theo rubric D-137..D-141 (rubric cũ cho A 1,84 · B 1,79 · B− 1,85) |
 | `eval_d124_checkpoint.jsonl` (lần 2) | 18/11 | 1,617 | **1,783** | 1,650 | **60/60 câu** — sau D-134 + D-137..D-141 (harness) ⇒ **B > A, B > B−** ✅ |
 
 > ✅ **Số liệu D-123 trước đây là artefact của harness** (đã tìm ra và sửa
@@ -66,6 +66,13 @@ Phase 16 (đánh giá A vs B vs B−) ✅ + Phase 17 (giao diện + đóng gói)
 > ⇒ Kết quả cuối (60/60 câu, cùng judge pool, cùng ngân sách 9.000):
 > **A 1,617 · B 1,783 · B− 1,650** ⇒ **B thắng A 6 câu, không thua câu nào** ·
 > **B thắng B− 5 câu, không thua câu nào** ⇒ **gate đạt**.
+>
+> **Đối chiếu chéo (quan trọng).** Chấm lại checkpoint **D-123** bằng **cùng
+> rubric mới** cho A 1,733 · B 1,717 · B− 1,783 ⇒ **vẫn B ≤ A**. Điều này
+> chứng minh phần lớn cải thiến của D-124 **không** đến từ việc "nới rubric"
+> mà đến từ **cải thiến kiến trúc/context** (scope hop-2 `n2 = e`, template
+> `event_parties`, lọc tên rác, quy tắc ưu tiên văn bản khi xung đột).
+> Nói cách khác: **rubric công bằng ⇒ D-124 mới thật sự tốt hơn D-123.**
 
 **Vì sao không đổi model judge giữa các lần chấm (D-136).** Pool của D-124
 lần 2 **giống hệt** D-123 (đọc từ `logs/eval_d123_narrative.log`):
