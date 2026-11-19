@@ -242,9 +242,15 @@ def context_has_gold(
         return False
     doc_ids = {str(d) for d in (evidence_doc_ids or []) if str(d)}
     if not doc_ids:
-        # Không rõ bằng chứng ⇒ coi như context có dữ liệu (thiên về phát
-        # hiện lỗi hơn là bỏ sót lỗi).
-        return True
+        # ⚠️ Phase 19 — **không** có `evidence_doc_id` ⇒ vẫn phải kiểm tra
+        # **đáp án có thật sự trong context** không (nếu không thì trả "không
+        # có" là **đúng** ⇒ tính oan là lỗi).
+        #
+        # Vì sao? q0045 ("Ai là chồng của Elizabeth II?") không có
+        # `evidence_doc_id` ⇒ trước đây **mọi** câu "không có" ở nhóm này đều
+        # bị đếm là lỗi ⇒ oan. Nay chỉ tính lỗi khi context **thật sự** có
+        # đáp án.
+        return _answer_in_context(expected_answer, context_text)
     section = (evidence_section or "").strip()
     matched_doc = False
     for block in items:
@@ -263,20 +269,40 @@ def context_has_gold(
         return False
 
     # --- Kiểm tra thêm: đáp án (tên/năm) có **trong context** không? --------
+    return _answer_in_context(expected_answer, context_text)
+
+
+def _answer_in_context(expected_answer: str | None, context_text: str | None) -> bool:
+    """Kiểm tra **đáp án tham chiếu** có thật sự nằm trong context không.
+
+    Vì sao cần?
+    ----------
+    Với câu hỏi quan hệ/năm, chỉ so `doc_id` là **chưa đủ** ⇒ phải kiểm tra
+    **đáp án có thật sự xuất hiện trong context** không. Nếu không có ⇒ "không
+    có trong dữ liệu" là **đúng** ⇒ đếm là lỗi là **sai**.
+
+    Args:
+        expected_answer: Đáp án tham chiếu (tên hoặc năm).
+        context_text: Toàn văn context.
+
+    Returns:
+        ``True`` nếu context có đáp án (hoặc không đủ thông tin để kết luận).
+    """
     answer = str(expected_answer or "").strip()
     haystack = str(context_text or "")
-    if answer and haystack:
-        years = _extract_years(answer)
-        if years:
-            # Câu hỏi về **năm** ⇒ năm phải xuất hiện trong context.
-            return all(year in haystack for year in years)
-        # Câu hỏi về **tên** ⇒ kiểm tra tên có trong context không
-        # (bỏ qua ngoặc/vế sau như "Lê Tuân (An vương)").
-        for token in _answer_tokens(answer):
-            if token and token.casefold() in haystack.casefold():
-                return True
-        return False
-    return True
+    if not answer or not haystack:
+        # Không đủ thông tin ⇒ coi như **có** (thiên về phát hiện lỗi).
+        return True
+    years = _extract_years(answer)
+    if years:
+        # Câu hỏi về **năm** ⇒ năm phải xuất hiện trong context.
+        return all(year in haystack for year in years)
+    # Câu hỏi về **tên** ⇒ kiểm tra tên có trong context không
+    # (bỏ qua ngoặc/vế sau như "Lê Tuân (An vương)").
+    for token in _answer_tokens(answer):
+        if token and token.casefold() in haystack.casefold():
+            return True
+    return False
 
 
 def _extract_years(text: str) -> list[str]:
