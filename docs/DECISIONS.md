@@ -2750,9 +2750,14 @@ quyền tuyên bố "đúng" ⇒ cần lớp kiểm chứng **độc lập**.
    **mệnh đề** của câu trả lời phải khớp ≥ 1 chunk context **đã được trích dẫn**
    ⇒ tỉ lệ "mệnh đề không có căn cứ".
 
-**Kết quả đo được (19/11/2026).** Kiểm chứng **câu hỏi**: **0/118** câu không
-hợp lệ ⇒ G19-7 đạt. Kiểm chứng **câu trả lời** (checkpoint đang chạy):
-**0** câu có năm không có trong Wikipedia live, **0** vi phạm `no_data`.
+**Kết quả đo được (19/11/2026).** Kiểm chứng **câu hỏi**: **0/246** câu không
+hợp lệ ⇒ G19-7 đạt. Kiểm chứng **câu trả lời** (checkpoint 131 câu × 3 arm):
+**336** câu trả lời có nội dung được đối chiếu live ⇒ **0** câu có năm không có
+trong Wikipedia live, **0** vi phạm `no_data` ⇒ G19-6 đạt (tạm).
+
+⚠️ Lưu ý (D-146): lần chạy đầu báo 4 câu "bịa" — sau điều tra, **cả 4 là false
+negative của chính script** (va chạm khoá cache do bỏ dấu; chỉ so năm với
+`evidence_doc_id`) ⇒ mọi cờ "bịa" phải được đối chiếu thủ công với nguồn trước khi tin.
 
 **Cập nhật file:** `scripts/verify_answers_online.py`, `scripts/summarize_eval.py`,
 `src/evaluation/evaluate_rag.py`.

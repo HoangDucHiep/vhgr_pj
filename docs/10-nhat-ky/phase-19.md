@@ -110,8 +110,8 @@ Tổng **98 mệnh đề quan hệ** được đối chiếu trực tiếp với
 
 ### 4.3 G19-6 — câu trả lời không bịa
 
-Trên checkpoint đang chạy: **0** câu có năm không có trong Wikipedia live, **0**
-vi phạm `no_data`.
+Trên checkpoint (131 câu × 3 arm = **336** câu trả lời có nội dung): **0** câu có
+năm không có trong Wikipedia live, **0** vi phạm `no_data`.
 
 ### 4.4 A vs B vs B−
 

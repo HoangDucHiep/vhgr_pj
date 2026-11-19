@@ -111,11 +111,12 @@ Lệnh: `python scripts/verify_answers_online.py --qa-set data/eval/qa_rag_250_v
 
 Lệnh: `python scripts/verify_answers_online.py --checkpoint data/eval/eval_phase19_checkpoint.jsonl --qa-set data/eval/qa_rag_250_v2.jsonl --out reports/phase19_verify_checkpoint.json`
 
-| Chỉ số | Kỳ vọng | Thực tế (checkpoint đang chạy) |
+| Chỉ số | Kỳ vọng | Thực tế (checkpoint 131 câu × 3 arm) |
 |---|---|---|
-| Câu trả lời có nội dung được kiểm chứng | — | đang tăng dần theo checkpoint |
+| Câu trả lời có nội dung được kiểm chứng | — | **336** |
 | Câu trả lời có **năm không có trong Wikipedia live** | **0** | **0** ✅ |
 | Vi phạm `no_data` (trả lời có nội dung khi phải từ chối) | **0** | **0** ✅ |
+| Câu hỏi **không hợp lệ** (kiểm chứng lại lần nữa) | **0** | **0** ✅ |
 
 ### 3.4 A vs B vs B− (checkpoint đang chạy — `scripts/summarize_eval.py`)
 
@@ -188,7 +189,7 @@ thật.
 | **G19-3** | `faithfulness_mean` cả 3 arm ≥ 1,90 | đang chờ eval đủ (hiện: A 1,904 · B 1,846 · B− 1,885 trên `narrative`; B 1,794 / B− 1,832 toàn checkpoint) | 🟡 |
 | **G19-4** | Bảng 4 nhóm + `no_data` + latency p50/p95 theo arm | script `summarize_eval.py` đã có; đang chờ dữ liệu | 🟡 |
 | **G19-5** | Kết luận A vs B vs B− **viết bằng số**, kèm phần "không kết luận được" | §5 | 🟡 |
-| **G19-6** | 100 % câu trả lời có nội dung **không có mệnh đề nào** bị bác bỏ online | **0** năm sai, **0** vi phạm `no_data` (checkpoint đang chạy) | ✅ (tạm) |
+| **G19-6** | 100 % câu trả lời có nội dung **không có mệnh đề nào** bị bác bỏ online | **336** câu trả lời kiểm chứng: **0** năm sai, **0** vi phạm `no_data` | ✅ (tạm — checkpoint còn tăng) |
 | **G19-7** | 100 % câu hỏi hợp lệ; câu hỏi vô lý phải bị loại **có ghi nhận** | **0/246** không hợp lệ (98 mệnh đề Wikidata đều khớp); **không** loại câu nào | ✅ |
 
 ## 5. Kết luận trung thực (G19-5)
