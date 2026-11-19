@@ -23,6 +23,7 @@ from src.qa.retriever import Chunk, Retriever
 
 QA_V1 = REPO_ROOT / "data" / "eval" / "qa_rag_250.jsonl"
 QA_V2 = REPO_ROOT / "data" / "eval" / "qa_rag_250_v2.jsonl"
+QA_V3 = REPO_ROOT / "data" / "eval" / "qa_rag_250_v3.jsonl"
 
 
 # ----------------------------------------------------------------------
@@ -683,6 +684,72 @@ def test_qa_v2_keeps_v1_intact() -> None:
     ]
     assert old, "Bộ cũ bị mất"
     assert {row["type"] for row in old} >= {"narrative", "no_data"}
+
+
+@pytest.mark.skipif(not QA_V3.exists(), reason="Thiếu qa_rag_250_v3.jsonl")
+def test_qa_v3_no_data_topics_are_absent_from_corpus() -> None:
+    """⚠️ Nhóm `no_data` của bộ v3 phải **thật sự vắng** trong corpus (D-148).
+
+    Vì sao? Đo được: corpus phủ **toàn bộ** lịch sử VN (đến 2026), không chỉ
+    9 triều đại ⇒ **33/37** chủ đề `no_data` của bộ v2 thực ra **có** trong
+    corpus ⇒ hệ thống trả lời **đúng** lại bị tính là **sai** ⇒ đo sai khả
+    năng "không bịa ngoài phạm vi".
+    """
+    from src.evaluation.build_qa_set import _no_data_anchor, _norm
+
+    corpus = []
+    for line in (REPO_ROOT / "data/interim/documents_clean.jsonl").read_text(
+        encoding="utf-8"
+    ).splitlines():
+        if line.strip():
+            corpus.append(str(json.loads(line).get("clean_text") or json.loads(line).get("text") or ""))
+    blob = _norm(" | ".join(corpus))
+    assert blob, "Không nạp được toàn văn corpus"
+
+    rows = [
+        json.loads(line)
+        for line in QA_V3.open("r", encoding="utf-8")
+        if line.strip()
+    ]
+    no_data = [row for row in rows if row["type"] == "no_data"]
+    assert len(no_data) == 30
+    for row in no_data:
+        anchor = _no_data_anchor(row["subject_name"])
+        assert anchor, f"Thiếu anchor cho {row['qid']}"
+        assert anchor not in blob, (
+            f"{row['qid']} — chủ đề '{row['subject_name']}' CÓ trong corpus "
+            f"(anchor='{anchor}') ⇒ câu hỏi ngoài phạm vi **không hợp lệ**"
+        )
+
+
+@pytest.mark.skipif(not QA_V2.exists() or not QA_V3.exists(), reason="Thiếu bộ eval")
+def test_qa_v3_only_changes_no_data_questions() -> None:
+    """Bộ v3 chỉ khác bộ v2 ở nhóm `no_data` ⇒ checkpoint đang chạy vẫn dùng được."""
+    v2 = {
+        row["qid"]: row
+        for row in (
+            json.loads(line)
+            for line in QA_V2.open("r", encoding="utf-8")
+            if line.strip()
+        )
+    }
+    v3 = {
+        row["qid"]: row
+        for row in (
+            json.loads(line)
+            for line in QA_V3.open("r", encoding="utf-8")
+            if line.strip()
+        )
+    }
+    assert set(v2) == set(v3), "v3 phải giữ nguyên bộ qid"
+    changed = [
+        qid for qid in v3 if v3[qid]["question"] != v2[qid]["question"]
+    ]
+    assert changed, "Không có câu nào thay đổi ⇒ builder không chạy đúng"
+    assert all(v3[qid]["type"] == "no_data" for qid in changed), (
+        f"Chỉ được đổi nhóm no_data, thực tế đổi: "
+        f"{[v3[q]['type'] for q in changed]}"
+    )
 
 
 # ----------------------------------------------------------------------

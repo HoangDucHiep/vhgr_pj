@@ -22,7 +22,9 @@ cd "$REPO_ROOT" || exit 1
 
 GROUP="${1:-all}"
 MAX_ROUNDS="${2:-40}"
-QA_SET="data/eval/qa_rag_250_v2.jsonl"
+# ⚠️ Phase 19 (D-148) — bộ **v3**: 246 câu, chỉ 30 câu `no_data` khác so với v2
+# ⇒ **216 câu còn lại giữ nguyên** ⇒ checkpoint đã chạy vẫn dùng được.
+QA_SET="data/eval/qa_rag_250_v3.jsonl"
 CHECKPOINT="data/eval/eval_phase19_checkpoint.jsonl"
 LOG="logs/eval_phase19_${GROUP}_loop.log"
 

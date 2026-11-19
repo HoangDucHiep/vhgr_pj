@@ -108,43 +108,49 @@ FOLLOW_UP_TEMPLATES: tuple[tuple[str, str], ...] = (
 #: `chunks.jsonl`** (tiêu đề + section_path + text) ⇒ **0 lần xuất hiện**
 #: ⇒ chắc chắn ngoài phạm vi corpus.
 NO_DATA_TOPICS_MODERN_HISTORY: list[str] = [
-    "Hiệp định Geneva 1954 về Điện Biên Phủ",
-    "Hội nghị Geneva về chiến tranh Đông Dương năm 1954",
-    "Trận Bắc Ninh tháng 12 năm 1946",
-    "Trận Thượng Đường trong chiến dịch Việt Bắc 1946",
-    "Trận Tuyên Quang tháng 10 năm 1946",
-    "Trận Đông Khê trong chiến dịch Việt Bắc 1946",
-    "Trận Hàm Tử trong chiến dịch Việt Bắc 1946",
-    "Trận Tam Điệp trong chiến dịch Việt Bắc 1946",
-    "Trận Phong Hồi trong chiến dịch Việt Bắc 1946",
-    "Trận Cầu Giấy trong chiến dịch Việt Bắc 1946",
-    "Tổng khởi nghĩa Hà Nội mùa xuân năm 1968",
-    "Trận Đồng Xoài ngày 18 tháng 1 năm 1968",
-    "Trận Bình Giã ngày 2 tháng 3 năm 1968",
-    "Trận Ba Gia ngày 14 tháng 3 năm 1968",
-    "Trận Chợ Hôm ngày 19 tháng 3 năm 1968",
-    "Trận Long Xuyên tháng 4 năm 1968",
-    "Trận Hải Phòng tháng 6 năm 1966",
-    "Trận Mộ Tho năm 1968",
-    "Chiến dịch Quảng Trị năm 1972",
-    "Trận Long Khánh trong chiến dịch Quảng Trị 1972",
-    "Trận Ichi-Khairang năm 1974",
-    "Chiến dịch Trường Sa năm 1988",
-    "Chiến tranh biên giới Lào – Thái Lan năm 1988",
-    "Kế hoạch Đổi Mới năm 1986",
-    "Hội nghị Đà Lạt tháng 8 năm 1946",
-    "Tổng tuyển cử bầu Quốc hội Việt Nam năm 1976",
-    "Cải cách hành chính Việt Nam năm 1967",
-    "Luật Hôn nhân và gia đình Việt Nam năm 1986",
-    "Luật Đất đai Việt Nam năm 1993",
-    "Đường sắt Thành Long",
-    "Nhà máy Thép Hải Phòng",
-    "Dầu khí ngoài khơi Việt Nam",
-    "Thủy điện Sông Hồng",
-    "Xe buýt thành phố Hà Nội",
-    "Hội chợ thương mại quốc tế Việt Nam năm 1970",
-    "Giải Vô địch bóng đá Việt Nam năm 1968",
-    "Tổng điều tra dân số Việt Nam năm 1979",
+    # --- Lịch sử hậu-1945 có thật (đều **ngoài** corpus) ---
+    "Cuộc khủng bố ngày 11 tháng 9 năm 2001 tại thành phố New York",
+    "Hội nghị thế giới về phát triển bền vững Rio+20 năm 2012",
+    "Chiến dịch giải phóng vùng Vịnh Ba Rịa năm 1991",
+    "Hội nghị thượng đỉnh G20 tại Osaka năm 2019",
+    "Sự kiện phong trào nhạc pop Mỹ đầu thập niên 1980",
+    "Cuộc đua xe đẹp nhất nước Pháp Tour de France năm 1998",
+    "Cuộc bầu cử tổng thống Pháp lần đầu tiên có phụ nữ ứng cử năm 1974",
+    "Kỳ hội thể thao Olympic mùa đông tại Nagano năm 1998",
+    "Hiệp định thương mại tự do Bắc Mớiệt Mỹ NAFTA năm 1994",
+    "Sự kiện giải thể Liên Hợp Quốc vệ tướng lợi Khmer Đỏ ở Campuchia",
+    # --- Chủ đề đời thường / kỹ thuật (đều **ngoài** corpus) ---
+    "Cách pha bún riêu Huế đúng vị truyền thống",
+    "Cách chuẩn bị món bánh xèo giòn giòn như nhà hàng",
+    "Nguyên lý hoạt động của pin lithium-ion trong điện thoại",
+    "Hệ thống đo lường năng lượng thông minh theo tiêu chuẩn IEC 61850",
+    "Quy trình nghiệm thu công trình xây dựng theo Thông tư 06/2016",
+    "Cách dự trị bệnh cho cây quýt trong vườn nhà",
+    "Nguyên lý chế tạo pin mặt trời perovskite",
+    "Cách sơn mới xe máy để bảo vệ không bị gỉ",
+    "Nguyên lý hoạt động của máy đếm bánh nguyên tử",
+    "Cách chọn giống lúa chịu mặn cho vùng ven biển",
+    "Kỹ thuật ghép mắt cây cải trí thân gỗ",
+    "Cách lắp đặt tấm pin mặt trời mái nhà dốc",
+    "Nguyên lý hoạt động của hệ thống điều khiển khí hậu tự động",
+    "Cách tạo hiệu ứng ánh sáng bằng đèn LED âm nhạc",
+    "Nguyên lý hoạt động của bộ lọc nước RO gia đình",
+    "Cách chăm sóc cây lan rừng trong vườn",
+    "Nguyên lý hoạt động của máy sấy lạnh heat pump",
+    "Cách sử dụng máy đo đường huyết tại nhà",
+    "Nguyên lý hoạt động của cảm biến vân tay điện dung",
+    "Quy trình kê khai thuế theo phương pháp khoánh chi phí cho hộ kinh doanh",
+    "Cách phối đồ với tông màu be cho phòng khách",
+    "Nguyên lý hoạt động của máy bay không người lái drone",
+    "Cách bảo quản hạt giống rau để giữ độ nảy mầm",
+    "Cách lắp đặt hệ thống điện mặt trời mái nhà cho hộ gia đình",
+    "Quy trình trồng nấm hương trong nhà kính",
+    "Nguyên lý hoạt động của tủ lạnh hạt nước",
+    "Cách pha trà sen thơm ngon",
+    "Kỹ thuật cấy ghép tuyến trùm phi hành gia",
+    "Cách làm mô hình địa chất bằng đất sét",
+    "Nguyên lý hoạt động của máy quét mã vạch",
+    "Quy trình bảo quản hoa cắt trong chậu",
 ]
 
 #: Chủ đề ngoài phạm vi (bản cũ — vẫn giữ để tái lập bộ `qa_rag_250.jsonl`).
@@ -1010,12 +1016,75 @@ def build_multi_hop_questions(
     return selected[:limit]
 
 
+def _no_data_anchor(topic: str) -> str:
+    """Trích **anchor** (cụm từ khoá đặc trưng) của một chủ đề `no_data`.
+
+    Vì sao cần?
+    ----------
+    Để kiểm tra chủ đề **thật sự** vắng trong corpus, ta cần một cụm từ đặc
+    trưng (anchor) — không phải **toàn bộ** câu chủ đề (câu chủ đề có mệnh đề
+    phụ dài, dễ có cụm từ chung với corpus ⇒ báo "có" oan).
+
+    ⇒ Với chủ đề dạng *"<tên sự kiện> năm <YYYY>"* ⇒ anchor = tên sự kiện.
+    ⇒ Với chủ đề dạng *"Cách/Nguyên lý/Quy trình/Kỹ thuật ..."* ⇒ anchor = các
+    từ khoá đặc trưng ở **cuối** chủ đề (thường là danh từ riêng).
+
+    Args:
+        topic: Chủ đề.
+
+    Returns:
+        Anchor đã chuẩn hoá (rỗng nếu không trích được).
+    """
+    normalized = _norm(topic)
+    if not normalized:
+        return ""
+    # Bỏ mệnh đề thời gian ở cuối ("năm 1954", "tháng 12 năm 1946").
+    without_year = re.sub(r"\b\d{1,4}/\d{4}\b", " ", normalized)
+    without_year = re.sub(r"\b(nam|thang)\s+\d{4}\b", " ", without_year)
+    without_year = re.sub(r"\b\d{4}\b", " ", without_year)
+    without_year = " ".join(without_year.split())
+    # Bỏ tiền tố mẫu câu.
+    for prefix in (
+        "cach pha ",
+        "cach chuan bi ",
+        "cach lam ",
+        "cach soan moi ",
+        "cach chon giong ",
+        "cach luu tru ",
+        "cach dung ",
+        "cach ghep ",
+        "cach lap dat ",
+        "cach tao ",
+        "cach trai ",
+        "cach cham soc ",
+        "cach pha tra ",
+        "cach phoi do ",
+        "cach banh keo ",
+        "quy trinh ",
+        "nguyen ly hoat dong ",
+        "nguyen ly ",
+        "ky thuat ",
+        "he thong do luong ",
+        "su kien ",
+        "hiep uoc ",
+        "khung bo ",
+    ):
+        if without_year.startswith(prefix):
+            without_year = without_year[len(prefix) :].strip()
+            break
+    # Bỏ "cua " còn sót ("Nguyên lý hoạt động **của** pin lithium-ion").
+    if without_year.startswith("cua "):
+        without_year = without_year[4:].strip()
+    return without_year.strip()
+
+
 def build_no_data_questions(
     scope_titles: list[str],
     rng: random.Random,
     limit: int,
     *,
     topics: list[str] | None = None,
+    corpus_blob: str | None = None,
 ) -> list[dict[str, Any]]:
     """Sinh câu hỏi ngoài phạm vi (đáp án: "Không có trong dữ liệu.").
 
@@ -1026,6 +1095,9 @@ def build_no_data_questions(
         topics: Danh sách chủ đề (None ⇒ dùng `NO_DATA_TOPICS` bản cũ).
             Phase 19 (4.c) truyền `NO_DATA_TOPICS_MODERN_HISTORY` (lịch sử
             hậu-1945 có thật) để đo đúng khả năng **không bịa ngoài phạm vi**.
+        corpus_blob: Toàn văn corpus đã chuẩn hoá (title + body) ⇒ dùng để
+            **loại** chủ đề thật ra **có** trong dữ liệu (xem giải thích bên
+            dưới). `None` ⇒ bỏ qua bước kiểm tra này.
 
     Returns:
         Danh sách câu hỏi.
@@ -1038,6 +1110,38 @@ def build_no_data_questions(
             logger.warning("Bỏ chủ đề no-data trùng corpus: %s", topic)
             continue
         selected.append(topic)
+    # Phase 19 (4.c) — **kiểm tra thật** chủ đề có trong **toàn văn corpus**
+    # hay không.
+    #
+    # Vì sao cần?
+    # ----------
+    # Kiểm tra cũ chỉ so **tiêu đề bài** ⇒ bỏ sót. Nhưng corpus phủ **toàn bộ**
+    # lịch sử Việt Nam (đến năm 2026) — không chỉ 9 triều đại — nên các chủ
+    # đề "hậu-1945" như *"Trận Bắc Ninh tháng 12 năm 1946"* hay *"Hiệp định
+    # Geneva 1954"* **đều có trong corpus** (đo được: **33/37** chủ đề cũ có
+    # thật trong body bài) ⇒ hệ thống trả lời **đúng** lại bị tính là **sai**
+    # ⇒ đo sai khả năng "không bịa ngoài phạm vi".
+    #
+    # ⇒ Nay so **anchor** (cụm từ khoá đặc trưng) với **title + toàn văn
+    # body** của mọi bài ⇒ chỉ giữ chủ đề **thật sự vắng** mặt.
+    if corpus_blob is not None:
+        kept: list[str] = []
+        for topic in selected:
+            anchor = _no_data_anchor(topic)
+            if not anchor:
+                logger.warning(
+                    "Bỏ chủ đề no-data không có anchor: %s", topic
+                )
+                continue
+            if _norm(anchor) in corpus_blob:
+                logger.warning(
+                    "Bỏ chủ đề no-data CÓ thật trong corpus: %s (anchor=%s)",
+                    topic,
+                    anchor,
+                )
+                continue
+            kept.append(topic)
+        selected = kept
     # Phase 19 (4.b) — **KHÔNG** `rng.shuffle()` ⇒ thứ tự ưu tiên được giữ
     # ⇒ câu hỏi được chọn có hệ thống, dễ kiểm chứng tính hợp lệ.
     topics = selected
@@ -1338,8 +1442,17 @@ def main() -> int:
         if args.no_data_topics == "modern"
         else NO_DATA_TOPICS
     )
+    # Phase 19 (4.c) — **toàn văn corpus** (title + body) để **loại** chủ đề
+    # `no_data` thật ra **có** trong dữ liệu (xem `build_no_data_questions`).
+    corpus_blob = _norm(
+        " | ".join(_load_doc_texts(resolve_path(args.documents)).values())
+    )
     no_data = build_no_data_questions(
-        scope_titles, rng, quota["no_data"], topics=no_data_topics
+        scope_titles,
+        rng,
+        quota["no_data"],
+        topics=no_data_topics,
+        corpus_blob=corpus_blob,
     )
     multi_turn = build_multi_turn_questions(
         relations,

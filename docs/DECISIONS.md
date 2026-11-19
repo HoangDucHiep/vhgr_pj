@@ -2816,3 +2816,38 @@ thống).
 lượt** ⇒ mọi arm đều có cùng lịch sử hội thoại.
 
 **Cập nhật file:** `src/evaluation/evaluate_rag.py`, `tests/test_phase19_grounded.py`.
+
+---
+
+## D-148 — Nhóm `no_data` phải **thật sự vắng trong corpus** (loại bằng anchor + toàn văn body)
+
+**Ngày:** 19/11/2026 · **Phase:** 19
+
+**Bối cảnh.** D-142 đổi nhóm `no_data` sang *"lịch sử hậu-1945 có thật"* (Genève 1954,
+Trường Sa 1988…) với giả định corpus chỉ phủ 9 triều đại. **Giả định này SAI.**
+Đo thật trên `data/interim/documents_clean.jsonl` + `chunks.jsonl`:
+
+| Kiểm tra | Kết quả |
+|---|---|
+| Số bài trong corpus | **2 441** |
+| Năm lớn nhất xuất hiện trong corpus | **2026** ⇒ corpus phủ **toàn bộ** lịch sử VN |
+| Chủ đề `no_data` cũ **có thật** trong corpus (title **hoặc** body) | **33/37** ❌ |
+
+⇒ VD: bài "Genève" (`doc_16599`) có đoạn *"Ngày 8 tháng 5 năm 1954, hội nghị Geneva bắt
+đầu họp…"* ⇒ hệ thống trả lời **đúng** lại bị tính là **sai** ⇒ đo **sai** khả năng
+"không bịa ngoài phạm vi" ⇒ `no_data_accuracy` **không** đo được gì.
+
+**Quyết định.**
+
+1. Bộ chủ đề `no_data` mới (`NO_DATA_TOPICS_MODERN_HISTORY`): **10** chủ đề lịch sử
+   hậu-1945 **có thật** (đã kiểm chứng có bài Wikipedia live) + **30** chủ đề đời
+   thường/kỹ thuật — tất cả **thật sự vắng** trong corpus.
+2. Builder **tự động loại** chủ đề có thật trong corpus: so **anchor** (cụm từ khoá
+   đặc trưng, `_no_data_anchor()`) với **toàn văn corpus** (title + body) ⇒ không
+   thể lọt chủ đề đã có trong dữ liệu ⇒ **có ghi nhận** (`logger.warning`) chứ
+   không xoá âm thầm.
+3. Sinh `data/eval/qa_rag_250_v3.jsonl`: **246** câu, **chỉ 30 câu `no_data` khác**
+   ⇒ **216 câu còn lại giữ nguyên** so với v2 ⇒ checkpoint đang chạy **vẫn dùng
+   được**.
+
+**Cập nhật file:** `src/evaluation/build_qa_set.py`, `data/eval/qa_rag_250_v3.jsonl`.
