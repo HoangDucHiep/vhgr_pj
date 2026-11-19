@@ -140,6 +140,16 @@ cho thấy **cả 4 là false negative của chính script** (D-146):
 
 ⇒ Mọi cờ "bịa" phải được **đối chiếu thủ công** với nguồn trước khi tin.
 
+### 4.6 Bài học mới: **giả định về phạm vi corpus phải được đo**
+
+D-142 giả định "corpus chỉ phủ 9 triều đại ⇒ chủ đề hậu-1945 chắc chắn ngoài
+phạm vi". **Giả định này sai**: corpus phủ **toàn bộ** lịch sử VN (đến 2026) ⇒
+**33/37** chủ đề `no_data` của bộ v2 thực ra **có** trong corpus ⇒ đo sai khả năng
+"không bịa ngoài phạm vi".
+
+⇒ Bộ v3 thay 30 câu `no_data` (216 câu còn lại giữ nguyên) + builder tự động loại
+chủ đề trùng corpus (D-148).
+
 ## 5. Sai ở đâu (bài học)
 
 1. **Số liệu đảo chiều giữa 2 lần chấm = dấu hiệu artefact, không phải nhiễu

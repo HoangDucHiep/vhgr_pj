@@ -107,6 +107,18 @@ Lệnh: `python scripts/verify_answers_online.py --qa-set data/eval/qa_rag_250_v
 ⇒ **Không** loại câu hỏi nào vì lý do phạm vi (D-142) ⇒ mọi câu hỏi trong bộ eval
 đều **có thật** và **trả lời được từ corpus**.
 
+> ⚠️ **Bộ v3** (`data/eval/qa_rag_250_v3.jsonl`) — D-148: sau khi kiểm chứng
+> online, phát hiện **33/37** chủ đề `no_data` của bộ v2 thực ra **có trong corpus**
+> (corpus phủ **toàn bộ** lịch sử VN, đến năm 2026 — không chỉ 9 triều đại) ⇒
+> hệ thống trả lời **đúng** lại bị tính là **sai** ⇒ `no_data_accuracy` của bộ v2
+> **không** đo được gì. Bộ v3 thay **30 câu `no_data`** bằng chủ đề **thật sự vắng**
+> trong corpus (10 chủ đề lịch sử hậu-1945 có thật — đã kiểm chứng có bài Wikipedia
+> live — + 20 chủ đề đời thường/kỹ thuật); builder **tự động loại** chủ đề có
+> thật trong corpus (so **anchor** với **toàn văn body**) ⇒ **có ghi nhận**, không
+> xoá âm thầm.
+>
+> ⇒ **216/246 câu giữ nguyên** so với v2 ⇒ checkpoint đang chạy **vẫn dùng được**.
+
 ### 3.3 G19-6 — kiểm chứng câu trả lời (checkpoint đang chạy)
 
 Lệnh: `python scripts/verify_answers_online.py --checkpoint data/eval/eval_phase19_checkpoint.jsonl --qa-set data/eval/qa_rag_250_v2.jsonl --out reports/phase19_verify_checkpoint.json`
@@ -172,6 +184,25 @@ mọi nguồn đã trích dẫn**. Có test hồi quy (`tests/test_phase19_groun
 ⇒ **Bài học**: công cụ kiểm chứng phải được kiểm chứng **ngược lại** — mọi cờ "bịa"
 phải đối chiếu thủ công với nguồn trước khi tin.
 
+### 3.7 Nhóm `no_data`: phát hiện bộ v2 đo **sai** (D-148)
+
+Đo thật trên corpus:
+
+| Kiểm tra | Kết quả |
+|---|---|
+| Số bài trong corpus | **2 441** |
+| Năm lớn nhất xuất hiện trong corpus | **2026** ⇒ corpus phủ **toàn bộ** lịch sử VN |
+| Chủ đề `no_data` của bộ v2 **có thật** trong corpus (title **hoặc** body) | **33/37** ❌ |
+
+⇒ VD: bài "Genève" (`doc_16599`) có đoạn *"Ngày 8 tháng 5 năm 1954, hội nghị Geneva
+bắt đầu họp…"* ⇒ hệ thống trả lời **đúng** lại bị tính là **sai** ⇒ `no_data_accuracy`
+của bộ v2 **không** đo được gì.
+
+⇒ Bộ v3: 30 chủ đề `no_data` mới — **10** chủ đề lịch sử hậu-1945 **có thật** (đã
+kiểm chứng có bài Wikipedia live) + **20** chủ đề đời thường/kỹ thuật — tất cả
+**thật sự vắng** trong corpus; builder **tự động loại** chủ đề trùng corpus (so
+**anchor** với **toàn văn body**) ⇒ **có ghi nhận**, không xoá âm thầm.
+
 ### 3.6 Sửa `context_has_gold` (không có `evidence_doc_id`)
 
 Trước đây `context_has_gold` trả `True` sớm khi không có `evidence_doc_id` ⇒ **mọi**
@@ -226,6 +257,8 @@ thật.
 | 3 | Thêm `section_boost=1.0` + `noise_penalty=0.5` (ngoài kế hoạch chỉ nêu `title_boost`) | Đo thêm 5 cấu hình: `cap=2 + section_boost` cho **57/60** (kế hoạch dự đoán 54/60) | Ghi rõ trong D-143 + `configs/retrieval.yaml` |
 | 4 | Ổ ngoài `/dev/sda1` bị unmount lần thứ 3 ⇒ repo phải **bind-mount** lại (container cũ giữ inode đã xoá) | Môi trường | `docker compose up -d --force-recreate backend` + `docker cp src/.` (image copy code ⇒ cần build khi code đổi) |
 | 5 | Sửa **2 lỗi trong chính script kiểm chứng** (va chạm khoá cache; chỉ so năm với `evidence_doc_id`) | Cả 4 cờ "bịa" đầu tiên đều là **false negative** của script | D-146 + `cache_key()` mới + đối chiếu năm đa nguồn + test hồi quy |
+| 6 | Sinh bộ câu hỏi **v3**: 30 câu `no_data` thật sự ngoài corpus | **33/37** chủ đề `no_data` của v2 thực ra **có** trong corpus (corpus phủ tới 2026) ⇒ đo sai khả năng "không bịa ngoài phạm vi" | D-148 + builder tự động loại chủ đề trùng corpus (có ghi nhận) |
+| 7 | Lượt **sau** của phiên hội thoại bị hoãn ⇒ cũng hoãn | Nếu không, lượt sau chạy **không lịch sử** ⇒ điểm **ảo** ⇒ lệch A vs B vs B− không công bằng | D-147 + test hồi quy |
 
 ## 7. Lệnh đã chạy
 

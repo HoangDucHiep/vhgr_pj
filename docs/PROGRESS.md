@@ -443,6 +443,7 @@ Kết quả Phase 5 đã chốt:
 | RAG — câu lỗi hạ tầng | 0 | **0** (cả 3 arm) |
 | RAG — gold section trong top-8 (narrative) | ≥ 55/60 | **55/60** ✅ (Phase 19; trước **46/60**) |
 | RAG — câu hỏi eval hợp lệ (kiểm chứng live) | 100 % | **246/246** ✅ (0 câu không hợp lệ — G19-7; 98 mệnh đề Wikidata khớp) |
+| RAG — chủ đề `no_data` thật sự vắng trong corpus | 30/30 | ✅ **30/30** (bộ v3 — D-148; bộ v2 chỉ **4/37** ⇒ đo sai) |
 | RAG — câu trả lời bịa số năm (kiểm chứng live) | 0 | **0/336** ✅ (G19-6; sau khi sửa 2 lỗi false negative của script — D-146) |
 | RAG — `abstain_with_evidence` (nói "không có" khi context có gold) | 0 | ✅ **0** trên `narrative` (cả 3 arm, n=52); 4/1/4 trên `relational` (đang đo) |
 | RAG — `not_in_data` của A trên `narrative` | ≤ 6/60 | ✅ **2/52** (D-124: 16/60) — G19-1 |
