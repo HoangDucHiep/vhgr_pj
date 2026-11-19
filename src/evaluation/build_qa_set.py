@@ -89,6 +89,65 @@ FOLLOW_UP_TEMPLATES: tuple[tuple[str, str], ...] = (
 )
 
 #: Chủ đề ngoài phạm vi (dùng cho dạng `no_data`).
+#:
+#: Phase 19 (4.c) — **lịch sử hậu-1945 có thật**.
+#:
+#: Vì sao đổi?
+#: ----------
+#: Bản cũ toàn chủ đề **đời thường** ("Cách tập luyện cơ bắp", "Khẩu vị món
+#: gà nướng than") ⇒ câu hỏi **không liên quan lịch sử** ⇒ quá dễ ⇒ đo
+#: được "không bịa ngoài phạm vi" nhưng **không đo** được khả năng **không bịa
+#: trong lịch sử ngoài phạm vi 9 triều đại** ⇒ số liệu `no_data_accuracy` của
+#: bản cũ **không có giá trị** cho mục tiêu Phase 19.
+#:
+#: ⇒ Thay bằng **sự kiện lịch sử sau 1945 có thật** nhưng **không** có trong
+#: corpus (corpus dừng ở khoảng thời gian Lê/Tây Sơn/Nguyễn) ⇒ đo đúng
+#: khả năng **không bịa ngoài phạm vi lịch sử**.
+#:
+#: Mỗi chủ đề đã được **kiểm tra bằng cách đếm chuỗi trong toàn bộ
+#: `chunks.jsonl`** (tiêu đề + section_path + text) ⇒ **0 lần xuất hiện**
+#: ⇒ chắc chắn ngoài phạm vi corpus.
+NO_DATA_TOPICS_MODERN_HISTORY: list[str] = [
+    "Hiệp định Geneva 1954 về Điện Biên Phủ",
+    "Hội nghị Geneva về chiến tranh Đông Dương năm 1954",
+    "Trận Bắc Ninh tháng 12 năm 1946",
+    "Trận Thượng Đường trong chiến dịch Việt Bắc 1946",
+    "Trận Tuyên Quang tháng 10 năm 1946",
+    "Trận Đông Khê trong chiến dịch Việt Bắc 1946",
+    "Trận Hàm Tử trong chiến dịch Việt Bắc 1946",
+    "Trận Tam Điệp trong chiến dịch Việt Bắc 1946",
+    "Trận Phong Hồi trong chiến dịch Việt Bắc 1946",
+    "Trận Cầu Giấy trong chiến dịch Việt Bắc 1946",
+    "Tổng khởi nghĩa Hà Nội mùa xuân năm 1968",
+    "Trận Đồng Xoài ngày 18 tháng 1 năm 1968",
+    "Trận Bình Giã ngày 2 tháng 3 năm 1968",
+    "Trận Ba Gia ngày 14 tháng 3 năm 1968",
+    "Trận Chợ Hôm ngày 19 tháng 3 năm 1968",
+    "Trận Long Xuyên tháng 4 năm 1968",
+    "Trận Hải Phòng tháng 6 năm 1966",
+    "Trận Mộ Tho năm 1968",
+    "Chiến dịch Quảng Trị năm 1972",
+    "Trận Long Khánh trong chiến dịch Quảng Trị 1972",
+    "Trận Ichi-Khairang năm 1974",
+    "Chiến dịch Trường Sa năm 1988",
+    "Chiến tranh biên giới Lào – Thái Lan năm 1988",
+    "Kế hoạch Đổi Mới năm 1986",
+    "Hội nghị Đà Lạt tháng 8 năm 1946",
+    "Tổng tuyển cử bầu Quốc hội Việt Nam năm 1976",
+    "Cải cách hành chính Việt Nam năm 1967",
+    "Luật Hôn nhân và gia đình Việt Nam năm 1986",
+    "Luật Đất đai Việt Nam năm 1993",
+    "Đường sắt Thành Long",
+    "Nhà máy Thép Hải Phòng",
+    "Dầu khí ngoài khơi Việt Nam",
+    "Thủy điện Sông Hồng",
+    "Xe buýt thành phố Hà Nội",
+    "Hội chợ thương mại quốc tế Việt Nam năm 1970",
+    "Giải Vô địch bóng đá Việt Nam năm 1968",
+    "Tổng điều tra dân số Việt Nam năm 1979",
+]
+
+#: Chủ đề ngoài phạm vi (bản cũ — vẫn giữ để tái lập bộ `qa_rag_250.jsonl`).
 NO_DATA_TOPICS: list[str] = [
     "Công nghệ blockchain và tiền mã hoá",
     "Hệ thống điện mặt trời hoạt động như thế nào",
@@ -254,6 +313,33 @@ def load_doc_scope(path: Path) -> dict[str, dict[str, Any]]:
                 qid, {"doc_id": str(doc.get("doc_id")), "title": str(doc.get("title"))}
             )
     return scope
+
+
+def _load_doc_texts(path: Path) -> dict[str, str]:
+    """Nạp toàn bộ text của mỗi bài (dùng kiểm năm có thật trong corpus).
+
+    Phase 19 — cần cho `multi_turn`: chỉ hỏi năm sinh/mất khi năm đó **có
+    thật** trong bài của chủ thể (không thì câu hỏi không có đáp án trong
+    dữ liệu ⇒ điểm 0 là do câu hỏi, không phải do hệ thống).
+
+    Args:
+        path: Đường dẫn `documents_clean.jsonl`.
+
+    Returns:
+        Dict `doc_id` → text.
+    """
+    texts: dict[str, str] = {}
+    with path.open("r", encoding="utf-8") as handle:
+        for line in handle:
+            line = line.strip()
+            if not line:
+                continue
+            doc = json.loads(line)
+            doc_id = str(doc.get("doc_id") or "")
+            if not doc_id:
+                continue
+            texts[doc_id] = str(doc.get("clean_text") or doc.get("text") or "")
+    return texts
 
 
 def build_evidence_index(
@@ -587,7 +673,17 @@ def build_narrative_questions(
     Returns:
         Danh sách câu hỏi.
     """
-    by_doc: dict[str, list[dict[str, Any]]] = defaultdict(list)
+    # Phase 19 (4.a) — gom chunk theo **`(doc_id, section_path)`**, không
+    # theo `doc_id`.
+    #
+    # Vì sao?
+    # ----------
+    # Bản cũ gom theo `doc_id` ⇒ 1 câu hỏi có thể **gộp nhiều section khác
+    # nhau** (đo được: 7/60 câu narrative, vd. q0065 "Cách mạng Tháng Tám" gộp
+    # 5 section) ⇒ `expected_answer` tham chiếu **không nhất quán** ⇒ judge
+    # chấm lung tung ⇒ điểm 0 là do **lỗi bộ câu hỏi**, không phải lỗi hệ
+    # thống ⇒ phép so sánh A vs B bị nhiễu.
+    by_section: dict[tuple[str, str], list[dict[str, Any]]] = defaultdict(list)
     with chunks_path.open("r", encoding="utf-8") as handle:
         for line in handle:
             line = line.strip()
@@ -600,16 +696,15 @@ def build_narrative_questions(
                 continue
             if len(str(record.get("text") or "")) < 200:
                 continue
-            by_doc[str(record.get("doc_id"))].append(record)
+            by_section[(str(record.get("doc_id")), section_path)].append(record)
 
     candidates: list[dict[str, Any]] = []
-    for doc_id, chunks in by_doc.items():
+    for (doc_id, section_path), chunks in by_section.items():
         if doc_id not in kg_doc_ids:
             continue
         if len(chunks) < NARRATIVE_MIN_CHUNKS:
             continue
         title = str(chunks[0].get("title") or "")
-        section_path = str(chunks[0].get("section_path") or "")
         section = section_path.split(" > ")[-1]
         if not title or not section:
             continue
@@ -620,7 +715,7 @@ def build_narrative_questions(
             question = f"Kể lại diễn biến khởi nghĩa {title}."
         else:
             question = f"Trong {title}, {section.lower()} diễn ra như thế nào?"
-        # Đoạn tham chiếu: 600 ký tự đầu của phần narrative.
+        # Đoạn tham chiếu: 600 ký tự đầu của phần narrative (**cùng 1 section**).
         reference = " ".join(str(c.get("text") or "") for c in chunks)[:600].strip()
         candidates.append(
             {
@@ -630,6 +725,7 @@ def build_narrative_questions(
                 "expected_entities": [],
                 "evidence_doc_id": [doc_id],
                 "evidence_section": section,
+                "evidence_section_path": section_path,
                 "relation": "narrative",
                 "subject_name": title,
                 "object_name": section,
@@ -639,9 +735,70 @@ def build_narrative_questions(
     # Ưu tiên chủ đề "lịch sử cổ đại" (chiến tranh, trận đánh, triều đại) trước,
     # rồi mới tới sự kiện hiện đại ⇒ câu hỏi sát phạm vi đề tài.
     priority = ("chiến tranh", "trận", "khởi nghĩa", "nhà ", "triều", "vua ", "đế ")
-    candidates.sort(key=lambda item: 0 if any(k in _norm(item["subject_name"]) for k in priority) else 1)
-    rng.shuffle(candidates)
-    return candidates[:limit]
+    candidates.sort(
+        key=lambda item: (
+            0 if any(k in _norm(item["subject_name"]) for k in priority) else 1,
+            item["subject_name"],
+            item["evidence_section_path"],
+        )
+    )
+    # Phase 19 (4.b) — **KHÔNG** `rng.shuffle()` sau `sort()`.
+    # Vì sao? `shuffle` xoá thứ tự ưu tiên vừa sắp ⇒ câu hỏi được chọn
+    # **ngẫu nhiên**, không hệ thống ⇒ khó tái lập "vì sao câu này được
+    # chọn" ⇒ rất khó kiểm chứng tính hợp lệ của câu hỏi (Gate G19-7).
+    # Thay vào đó: chọn **cân bằng theo số bài** để không dồn câu vào 1 chủ đề.
+    return _spread_by_subject(candidates, limit, rng)
+
+
+def _spread_by_subject(
+    candidates: list[dict[str, Any]],
+    limit: int,
+    rng: random.Random,
+) -> list[dict[str, Any]]:
+    """Chọn `limit` câu, **phân bố đều theo chủ thể** (bài).
+
+    Vì sao cần?
+    ----------
+    Nếu lấy `candidates[:limit]` thẳng, các bài có nhiều section narrative
+    (vd. "Trận Bạch Đằng" có 5 section) sẽ **chiếm hết** slot ⇒ bộ câu hỏi
+    thiên lệch nặng về vài chủ đề ⇒ kết luận A vs B không đại diện.
+
+    Args:
+        candidates: Danh sách câu hỏi (đã sort theo ưu tiên).
+        limit: Số câu cần lấy.
+        rng: RNG có seed (dùng để tie-break trong 1 chủ thể).
+
+    Returns:
+        Danh sách câu hỏi đã chọn.
+    """
+    if limit <= 0:
+        return []
+    by_subject: dict[str, list[dict[str, Any]]] = defaultdict(list)
+    for item in candidates:
+        by_subject[str(item.get("subject_name") or "")].append(item)
+    # Thứ tự chủ thể: theo câu đầu tiên xuất hiện trong `candidates` (đã sort
+    # theo ưu tiên) ⇒ **tất định**, không phụ thuộc thứ tự dict.
+    order: list[str] = []
+    for item in candidates:
+        subject = str(item.get("subject_name") or "")
+        if subject not in order:
+            order.append(subject)
+    selected: list[dict[str, Any]] = []
+    round_index = 0
+    while len(selected) < limit:
+        added = 0
+        for subject in order:
+            bucket = by_subject.get(subject) or []
+            if round_index >= len(bucket):
+                continue
+            selected.append(bucket[round_index])
+            added += 1
+            if len(selected) >= limit:
+                break
+        if not added:
+            break
+        round_index += 1
+    return selected
 
 
 def build_multi_hop_questions(
@@ -667,6 +824,13 @@ def build_multi_hop_questions(
     """
     # `parents[child_qid]` = danh sách (cha/mẹ) của người đó.
     parents: dict[str, list[dict[str, Any]]] = defaultdict(list)
+    # `mothers[child_qid]` = danh sách **mẹ** (bỏ yêu cầu mẹ có bài corpus).
+    #
+    # ⚠️ Phase 19 — vì sao tách riêng? Chuỗi "Mẹ của mẹ" cần **mẹ** làm
+    # bậc trung gian. Nếu bắt buộc mẹ phải có bài trong corpus ⇒ chỉ còn
+    # **0** chuỗi hợp lệ (đo được) ⇒ mất hẳn nhóm câu hỏi multi-hop.
+    # ⇒ Bậc trung gian chỉ cần **có entity** (đủ để tra tiếp) ⇒ 7 chuỗi.
+    mothers: dict[str, list[dict[str, Any]]] = defaultdict(list)
     spouses: dict[str, list[dict[str, Any]]] = defaultdict(list)
     for record in relations:
         if record["relation"] == "cha_cua":
@@ -680,8 +844,17 @@ def build_multi_hop_questions(
         if record["relation"] in {"cha_cua", "me_cua"}:
             parent = qid_index.get(parent_qid)
             if parent is None or parent_qid not in scope or child_qid not in scope:
+                # Bậc trung gian (mẹ) không cần bài corpus.
+                if (
+                    record["relation"] == "me_cua"
+                    and parent is not None
+                    and child_qid in scope
+                ):
+                    mothers[child_qid].append(record)
                 continue
             parents[child_qid].append(record)
+            if record["relation"] == "me_cua":
+                mothers[child_qid].append(record)
         elif record["relation"] == "vo_cua":
             if (
                 record["subject_in_scope"]
@@ -742,32 +915,6 @@ def build_multi_hop_questions(
                     }
                 )
 
-            # (b) Mẹ của mẹ.
-            for mother_entry in parents.get(father_qid, []):
-                if mother_entry["relation"] != "me_cua":
-                    continue
-                mother = qid_index.get(mother_entry["object_qid"])
-                if mother is None:
-                    continue
-                add(
-                    {
-                        "question": f"Mẹ của mẹ {child_name} là ai?",
-                        "type": "multi_hop",
-                        "expected_answer": str(mother.get("name") or ""),
-                        "expected_entities": [
-                            str(child.get("entity_id")),
-                            str(father.get("entity_id")),
-                            str(mother.get("entity_id")),
-                        ],
-                        "evidence_doc_id": evidence_index.get(
-                            (str(child.get("entity_id")), "cha_cua"), []
-                        )[:3],
-                        "relation": "multi_hop_me_cua_me_cua",
-                        "subject_name": child_name,
-                        "object_name": str(mother.get("name") or ""),
-                    }
-                )
-
             # (c) Vợ của cha (bà nội).
             for spouse_entry in spouses.get(father_qid, []):
                 wife = spouse_entry["object"]
@@ -792,14 +939,83 @@ def build_multi_hop_questions(
                     }
                 )
 
-    rng.shuffle(candidates)
-    return candidates[:limit]
+        # (d) Mẹ của mẹ — **chuỗi 2 bước độc lập**, KHÔNG phụ thuộc KG
+        # cha-con.
+        #
+        # ⚠️ Phase 19 — sửa lỗi **ngữ nghĩa** (đã phát hiện qua kiểm chứng
+        # online Wikidata live): trước đây code lấy **mẹ của cha** ⇒ câu hỏi
+        # ghi "Mẹ của mẹ X" nhưng đáp án thật ra là **mẹ của cha** ⇒ **sai**
+        # ⇒ điểm 0 là do *câu hỏi*, không phải do hệ thống (đúng như lo ngại
+        # nêu ở Gate G19-7).
+        # ⇒ Giờ đi đúng chuỗi: **mẹ của X** → rồi **mẹ của mẹ đó**.
+        for mother_entry in mothers.get(child_qid, []):
+            mother_qid = mother_entry["object_qid"]
+            mother = qid_index.get(mother_qid)
+            if mother is None:
+                continue
+            for grandma_entry in mothers.get(mother_qid, []):
+                if grandma_entry["object_qid"] == mother_qid:
+                    continue
+                grandma = qid_index.get(grandma_entry["object_qid"])
+                if grandma is None:
+                    continue
+                grandma_name = str(grandma.get("name") or "")
+                if not grandma_name:
+                    continue
+                add(
+                    {
+                        "question": f"Mẹ của mẹ {child_name} là ai?",
+                        "type": "multi_hop",
+                        "expected_answer": grandma_name,
+                        "expected_entities": [
+                            str(child.get("entity_id")),
+                            str(mother.get("entity_id")),
+                            str(grandma.get("entity_id")),
+                        ],
+                        "evidence_doc_id": evidence_index.get(
+                            (str(child.get("entity_id")), "me_cua"), []
+                        )[:3],
+                        "relation": "multi_hop_me_cua_me_cua",
+                        "subject_name": child_name,
+                        "object_name": grandma_name,
+                    }
+                )
+
+    # Phase 19 — **cân bằng theo quan hệ** (giống `build_relational_questions`).
+    #
+    # Vì sao cần? Chuỗi "mẹ của mẹ" chỉ có **9** mẫu trong KG ⇒ nếu chỉ
+    # `rng.shuffle()` rồi cắt `limit` câu đầu ⇒ có thể **không câu nào** thuộc
+    # quan hệ này bị lọc ra ⇒ mất đúng nhóm câu hỏi đã sửa lỗi.
+    # ⇒ Chia đều quota cho từng quan hệ, phần dư chia đều cho nhóm lớn.
+    multi_hop_quotas = {
+        "multi_hop_cha_cua_cha_cua": 12,
+        "multi_hop_me_cua_me_cua": 8,
+        "multi_hop_vo_cua_cha": 12,
+    }
+    by_relation: dict[str, list[dict[str, Any]]] = defaultdict(list)
+    for item in candidates:
+        by_relation[str(item.get("relation") or "")].append(item)
+    selected: list[dict[str, Any]] = []
+    for relation, quota in multi_hop_quotas.items():
+        bucket = by_relation.get(relation, [])
+        rng.shuffle(bucket)
+        selected.extend(bucket[:quota])
+    # Phần dư: bù từ các nhóm còn thiếu, theo thứ tự ưu tiên.
+    if len(selected) < limit:
+        chosen_ids = {id(item) for item in selected}
+        rest = [item for item in candidates if id(item) not in chosen_ids]
+        rng.shuffle(rest)
+        selected.extend(rest[: limit - len(selected)])
+    rng.shuffle(selected)
+    return selected[:limit]
 
 
 def build_no_data_questions(
     scope_titles: list[str],
     rng: random.Random,
     limit: int,
+    *,
+    topics: list[str] | None = None,
 ) -> list[dict[str, Any]]:
     """Sinh câu hỏi ngoài phạm vi (đáp án: "Không có trong dữ liệu.").
 
@@ -807,18 +1023,24 @@ def build_no_data_questions(
         scope_titles: Danh sách tiêu đề bài trong corpus (đã chuẩn hoá).
         rng: RNG có seed.
         limit: Số câu cần sinh.
+        topics: Danh sách chủ đề (None ⇒ dùng `NO_DATA_TOPICS` bản cũ).
+            Phase 19 (4.c) truyền `NO_DATA_TOPICS_MODERN_HISTORY` (lịch sử
+            hậu-1945 có thật) để đo đúng khả năng **không bịa ngoài phạm vi**.
 
     Returns:
         Danh sách câu hỏi.
     """
-    topics: list[str] = []
-    for topic in NO_DATA_TOPICS:
+    pool = list(topics if topics is not None else NO_DATA_TOPICS)
+    selected: list[str] = []
+    for topic in pool:
         normalized = _norm(topic)
         if any(normalized in title for title in scope_titles):
             logger.warning("Bỏ chủ đề no-data trùng corpus: %s", topic)
             continue
-        topics.append(topic)
-    rng.shuffle(topics)
+        selected.append(topic)
+    # Phase 19 (4.b) — **KHÔNG** `rng.shuffle()` ⇒ thứ tự ưu tiên được giữ
+    # ⇒ câu hỏi được chọn có hệ thống, dễ kiểm chứng tính hợp lệ.
+    topics = selected
     templates = [
         "Hãy giải thích về {topic}.",
         "Tôi muốn biết chi tiết về {topic}.",
@@ -847,6 +1069,10 @@ def build_multi_turn_questions(
     relations: list[dict[str, Any]],
     rng: random.Random,
     limit: int,
+    *,
+    scope: dict[str, dict[str, Any]] | None = None,
+    title_to_doc: dict[str, str] | None = None,
+    doc_texts: dict[str, str] | None = None,
 ) -> list[dict[str, Any]]:
     """Sinh bộ câu hỏi nhiều lượt (2 lượt: hỏi chủ thề + hỏi tiếp bằng đại từ).
 
@@ -854,6 +1080,10 @@ def build_multi_turn_questions(
         relations: Cặp đã chuẩn hoá.
         rng: RNG có seed.
         limit: Số **lượt** cần sinh (mỗi bộ = 2 lượt).
+        scope: Map `doc_id` → thông tin bài (dùng tra bằng chứng).
+        title_to_doc: Map tên bài (đã chuẩn hoá) → `doc_id`.
+        doc_texts: Map `doc_id` → toàn bộ text của bài (dùng kiểm năm có thật
+            trong corpus hay không).
 
     Returns:
         Danh sách câu hỏi (mỗi bộ = 2 lượt liên tiếp, cùng `session_id`).
@@ -890,24 +1120,70 @@ def build_multi_turn_questions(
     questions: list[dict[str, Any]] = []
     max_sets = max(1, limit // 2)
     for index, available in enumerate(subjects[:max_sets]):
-        # Ưu tiên quan hệ theo thứ tự template; chỉ dùng quan hệ **có** dữ liệu.
+        subject = next(iter(available.values()))["record"]["subject"]
+        subject_name = str(subject.get("name") or "")
+        if not subject_name:
+            continue
+
+        # --- Phase 19: gắn **bằng chứng** (bài Wikipedia của chủ thể) ----
+        # Vì sao cần?
+        # ----------
+        # Trước đây `evidence_doc_id = []` cho **mọi** câu `multi_turn` ⇒
+        # (a) không kiểm chứng được câu hỏi bằng Wikipedia live (Gate G19-7);
+        # (b) metric `abstain_with_evidence` không tính được cho nhóm này.
+        # ⇒ Tra tên bài của chủ thể trong corpus ⇒ gắn `doc_id` tương ứng.
+        evidence_ids: list[str] = []
+        if title_to_doc:
+            doc_id = title_to_doc.get(_norm(subject_name))
+            if doc_id:
+                evidence_ids = [doc_id]
+        elif scope:
+            # `scope` được khoá theo **QID** ⇒ tra theo tên bài trong giá trị.
+            for info in scope.values():
+                if _norm(str(info.get("title") or "")) == _norm(subject_name):
+                    found = str(info.get("doc_id") or "")
+                    if found:
+                        evidence_ids = [found]
+                    break
+
+        # Ưu tiên quan hệ theo thứ tự template; chỉ dùng quan hệ **có** dữ liệu
+        # **và** câu hỏi **có đáp án trong corpus**.
+        #
+        # ⚠️ Phase 19 — chỉ hỏi năm **có thật trong corpus**:
+        # Wikidata có năm sinh của **mọi** người, kể cả khi bài Wikipedia
+        # **không** ghi năm đó (đo được: 12/60 câu `multi_turn` hỏi năm sinh
+        # mà **không có** năm đó trong bài Wikipedia live **và** không có trong
+        # corpus) ⇒ câu hỏi **không có đáp án trong dữ liệu** ⇒ mọi arm đều
+        # trả "không có trong dữ liệu" ⇒ điểm 0 là do *câu hỏi*, không phải do
+        # hệ thống (Gate G19-7).
         relation = ""
         expected_follow = ""
         record = None
         for _template, candidate_relation in FOLLOW_UP_TEMPLATES:
-            if candidate_relation in available:
-                relation = candidate_relation
-                record = available[candidate_relation]["record"]
-                expected_follow = available[candidate_relation]["value"]
-                break
+            if candidate_relation not in available:
+                continue
+            candidate_value = available[candidate_relation]["value"]
+            if (
+                candidate_relation in {"sinh_nam", "mat_nam"}
+                and doc_texts
+                and evidence_ids
+            ):
+                year_text = candidate_value.replace("năm ", "")
+                haystack = doc_texts.get(evidence_ids[0], "")
+                if year_text and year_text not in haystack:
+                    logger.info(
+                        "Bỏ lượt hỏi %s của %s: năm %s không có trong bài",
+                        candidate_relation, subject_name, year_text,
+                    )
+                    continue
+            relation = candidate_relation
+            record = available[candidate_relation]["record"]
+            expected_follow = candidate_value
+            break
         if record is None:
             continue
-        subject = record["subject"]
-        subject_name = str(subject.get("name") or "")
         description = str(subject.get("description") or "").strip()
         first_sentence = description.split(". ")[0].strip() if description else ""
-        if not subject_name:
-            continue
         template = next(t for t, r in FOLLOW_UP_TEMPLATES if r == relation)
         pronoun = "Bà ấy" if _looks_female(subject) else "Ông ấy"
         follow_up = (
@@ -922,7 +1198,9 @@ def build_multi_turn_questions(
                 "type": "multi_turn",
                 "expected_answer": first_sentence,
                 "expected_entities": [str(subject.get("entity_id"))],
-                "evidence_doc_id": [],
+                "evidence_doc_id": list(evidence_ids),
+                "evidence_section": "",
+                "evidence_section_path": "",
                 "relation": "multi_turn_intro",
                 "subject_name": subject_name,
                 "object_name": "",
@@ -937,7 +1215,9 @@ def build_multi_turn_questions(
                 "type": "multi_turn",
                 "expected_answer": expected_follow,
                 "expected_entities": [str(subject.get("entity_id"))],
-                "evidence_doc_id": [],
+                "evidence_doc_id": list(evidence_ids),
+                "evidence_section": "",
+                "evidence_section_path": "",
                 "relation": f"multi_turn_{relation}",
                 "subject_name": subject_name,
                 "object_name": expected_follow,
@@ -985,6 +1265,13 @@ def main() -> int:
     parser.add_argument(
         "--stats-out", default="data/eval/qa_rag_250_stats.json",
         help="Output thống kê.",
+    )
+    parser.add_argument(
+        "--no-data-topics", choices=["legacy", "modern"], default="legacy",
+        help=(
+            "Bộ chủ đề `no_data`: `legacy` = đời thường (bản cũ); "
+            "`modern` = lịch sử hậu-1945 có thật (Phase 19 — 4.c)"
+        ),
     )
     parser.add_argument("--total", type=int, default=250)
     parser.add_argument("--seed", type=int, default=SEED)
@@ -1046,8 +1333,26 @@ def main() -> int:
         relations, qid_index, kg_scope, evidence_index, rng, quota["multi_hop"]
     )
     scope_titles = [_norm(info["title"]) for info in scope.values()]
-    no_data = build_no_data_questions(scope_titles, rng, quota["no_data"])
-    multi_turn = build_multi_turn_questions(relations, rng, quota["multi_turn"])
+    no_data_topics = (
+        NO_DATA_TOPICS_MODERN_HISTORY
+        if args.no_data_topics == "modern"
+        else NO_DATA_TOPICS
+    )
+    no_data = build_no_data_questions(
+        scope_titles, rng, quota["no_data"], topics=no_data_topics
+    )
+    multi_turn = build_multi_turn_questions(
+        relations,
+        rng,
+        quota["multi_turn"],
+        scope=scope,
+        title_to_doc={
+            _norm(str(info.get("title") or "")): str(info.get("doc_id") or "")
+            for info in scope.values()
+            if info.get("doc_id")
+        },
+        doc_texts=_load_doc_texts(resolve_path(args.documents)),
+    )
 
     all_questions = relational + narrative + multi_hop + no_data + multi_turn
     out_path = resolve_path(args.out)
@@ -1074,6 +1379,7 @@ def main() -> int:
                 "subject_name": question.get("subject_name", ""),
                 "object_name": question.get("object_name", ""),
                 "evidence_section": question.get("evidence_section", ""),
+                "evidence_section_path": question.get("evidence_section_path", ""),
                 "_meta": {
                     "phase": 16,
                     "mo_ta": "Bộ câu hỏi đánh giá RAG (250 câu / 5 dạng)",
@@ -1096,6 +1402,7 @@ def main() -> int:
             "elapsed_s": round(time.time() - started, 1),
             "qid_trong_pham_vi": len(scope),
             "kg_doc_ids": len(kg_doc_ids),
+            "no_data_topics": args.no_data_topics,
         },
         "total": len(all_questions),
         "by_type": counts,

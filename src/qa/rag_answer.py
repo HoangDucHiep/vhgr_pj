@@ -56,6 +56,21 @@ Hãy viết lại: **mỗi mệnh đề** chứa thông tin phải kèm `[n]` tr
 "{no_data}"
 """
 
+#: Lời nhắc khi LLM trả "không có trong dữ liệu" **dù context có dữ liệu**
+#: (Phase 19 — sửa lỗi `abstain_with_evidence`).
+NO_DATA_RETRY_SUFFIX = """
+
+## CẢNH BÁO (bắt buộc tuân thủ)
+Câu trả lời trước nói "{no_data}" — nhưng CONTEXT **có chứa dữ liệu** về chủ đề
+này. Đây là lỗi: hãy **đọc kỹ CONTEXT** và trả lời dựa **hoàn toàn** vào CONTEXT.
+
+Yêu cầu:
+- Mỗi mệnh đề chứa thông tin phải kèm trích dẫn `[n]` trỏ tới đoạn CONTEXT đã dùng.
+- Chỉ dùng thông tin có trong CONTEXT; không bổ sung gì từ trí nhớ.
+- Nếu CONTEXT thật sự không có câu trả lời, trả đúng chuỗi "{no_data}" — nhưng
+  hãy cân nhắc kỹ trước khi kết luận điều đó.
+"""
+
 
 def load_prompt() -> str:
     """Đọc prompt sinh câu trả lời.
@@ -243,6 +258,7 @@ class RagAnswerer:
                 "context_chars": 0,
                 "faithfulness_ok": None,
                 "retries": 0,
+                "no_data_retried": False,
                 "elapsed_ms": int((time.time() - started) * 1000),
             }
 
@@ -292,7 +308,10 @@ class RagAnswerer:
             )
             answer = (raw or "").strip()
             cited = extract_citations(answer)
-            if cited or is_no_data(answer):
+            # ⚠️ Phase 19 — câu trả lời **rỗng** cũng phải retry (không chỉ
+            # câu thiếu trích dẫn). Vì sao? Câu rỗng (lỗi hạ tầng) bị quy về
+            # "Không có trong dữ liệu." ⇒ điểm 0 **ảo** cho cả 3 arm (D-118).
+            if cited or is_no_data(answer) or not answer:
                 break
             if attempt < max_retry:
                 retries += 1
@@ -300,6 +319,48 @@ class RagAnswerer:
                     "Câu trả lời thiếu trích dẫn [n] — retry %d/%d",
                     attempt + 1, max_retry,
                 )
+
+        # --- Phase 19 — retry khi nói "không có" **dù context có dữ liệu** --
+        # Vì sao?
+        # -------
+        # Đo được trên checkpoint D-124: arm A trả "Không có trong dữ liệu" ở
+        # **16/60** câu narrative, trong đó **7/16** câu **gold section vẫn có
+        # trong top-8 context** ⇒ lỗi nằm ở **tầng sinh**, không phải tầng
+        # truy xuất ⇒ phải ép LLM trả lời thay vì trả thẳng "không có".
+        max_nodata_retry = (
+            int(generation.get("max_no_data_retry", 1))
+            if generation.get("no_data_retry", True)
+            else 0
+        )
+        no_data_retried = False
+        for attempt in range(max_nodata_retry):
+            current = (raw or "").strip()
+            # ⚠️ Phase 19 — sửa lỗi: LLM trả về **rỗng** (lỗi hạ tầng) cũng
+            # phải được retry, không chỉ LLM nói "không có".
+            #
+            # Vì sao? Trước đây điều kiện `if not is_no_data(raw): break` ⇒
+            # `is_no_data("")` là ``False`` ⇒ **thoát vòng lặp ngay** ⇒ câu
+            # rỗng bị quy về "Không có trong dữ liệu." **mà không retry** ⇒
+            # `no_data_retried = False` ⇒ điểm 0 **ảo** cho cả 3 arm (D-118
+            # chỉ chuyển câu rỗng thành "không có", chưa sửa tận gốc).
+            # ⇒ Retry khi câu trả lời **rỗng** hoặc nói "không có".
+            if current and not is_no_data(current):
+                break
+            if not results:
+                # Không có context ⇒ "không có" là **đúng** ⇒ không retry.
+                break
+            no_data_retried = True
+            retries += 1
+            logger.warning(
+                "LLM trả về %s dù context có %d chunk — retry ép trả lời %d/%d",
+                "câu rỗng" if not current else "'không có'",
+                len(results), attempt + 1, max_nodata_retry,
+            )
+            raw = self.client.complete(
+                prompt + NO_DATA_RETRY_SUFFIX.format(no_data=NO_DATA_ANSWER),
+                temperature=float(generation.get("temperature", 0.0)),
+                max_tokens=int(generation.get("max_tokens", 900)),
+            )
 
         answer = (raw or "").strip()
         cited = extract_citations(answer)
@@ -337,6 +398,7 @@ class RagAnswerer:
             "context_chars": len(context),
             "faithfulness_ok": bool(cited) or status == "not_in_data",
             "retries": retries,
+            "no_data_retried": no_data_retried,
             "rewritten_question": rewritten,
             "elapsed_ms": int((time.time() - started) * 1000),
         }

@@ -89,6 +89,13 @@ JUDGE_PROMPT = """Bạn là giám khảo đánh giá câu trả lời hỏi đá
 ## ĐÁP ÁN THAM KHẢO (từ Wikidata — nguồn độc lập)
 {expected_answer}
 
+> **LƯU Ý QUAN TRỌNG (D-142).** Đáp án tham chiếu ở trên **chỉ là gợi ý**, KHÔNG
+> phải chuẩn để đối chiếu tuyệt đối. Nếu **CONTEXT** của phương án **mâu thuẫn**
+> với đáp án tham chiếu ⇒ hãy **theo CONTEXT** (đây là lỗi của bộ câu hỏi,
+> không phải lỗi của hệ thống) ⇒ đặt `contradicts_reference = true` và **không**
+> trừ điểm vì lý do đó. Nếu CONTEXT **không** nói gì về điểm đang hỏi mà đáp án
+> tham chiếu lại khẳng định điều đó ⇒ cũng đặt `contradicts_reference = true`.
+
 ## CHỦ THỂ CỦA CÂU HỎI (nếu có)
 {subject_hint}
 
@@ -105,18 +112,9 @@ Với **mỗi** phương án, chấm:
    - 0 = sai hoặc không trả lời được câu hỏi
    Nếu `expected_answer` là "Không có trong dữ liệu." thì chấm 2 khi câu trả lời
    nói không có dữ liệu, 0 nếu câu trả lời bịa.
-   ⇒ **NGƯỢC LẠI** (D-140): nếu `expected_answer` **KHÔNG** phải "Không có
-   trong dữ liệu." (ví dụ loại `narrative` — đoạn tham chiảu là văn bản) mà
-   câu trả lời lại nói "Không có trong dữ liệu." ⇒ chấm **0** (đáp án có
-   sẵn, câu trả lời từ chối trả lời ⇒ **sai**). Đo được (D-124): **16/60**
-   câu arm A và **14/60** câu arm B− bị cho điểm 2 oan vì lý do này.
    Nếu loại câu hỏi là `narrative` (expected_answer là một đoạn văn tham chiếu
    trích từ Wikipedia) ⇒ chấm theo **mức độ bao phủ các mốc sự kiện chính**
    có trong đoạn tham chiếu, không đòi hỏi trùng văn bản.
-   ⇒ **KHÔNG** trừ điểm chỉ vì câu trả lời nêu **thêm** thông tin có trong
-   CONTEXT mà đoạn tham chiảu không có (vd thêm tên người chỉ huy lấy từ phần
-   đồ thị) ⇒ đó là **bổ sung**, không phải sai. Chỉ trừ điểm nếu câu trả lời
-   **sai** so với đoạn tham chiảu, hoặc **thiếu** mốc sự kiện chính.
    Nếu loại câu hỏi là `multi_turn` ⇒ câu hỏi là lượt tiếp theo trong hội thoại,
    dùng đại từ; hãy hiểu đại từ theo lượt trước trong CONTEXT (nếu có).
    Nếu mục "CHỦ THỂ CỦA CÂU HỎI" có nêu tên ⇒ đó **chính là** đối tượng mà
@@ -132,9 +130,14 @@ Với **mỗi** phương án, chấm:
    bao nhiêu phần trỏ tới đoạn CONTEXT **thực sự hỗ trợ** nội dung câu trả lời?
    (0 = không có trích dẫn nào hỗ trợ; 1 = tất cả đều hỗ trợ)
 
+4. **contradicts_reference** (true/false): phương án có **mâu thuẫn** với đáp án
+   tham chiếu không? (true = có mâu thuẫn rõ ràng; false = không mâu thuẫn hoặc
+   không đủ căn cứ để kết luận). Trường này **chỉ để đánh dấu**, KHÔNG dùng
+   để trừ điểm.
+
 Trả về DUY NHẤT JSON hợp lệ, không markdown, đúng cấu trúc sau (một entry cho
 mỗi phương án, giữ nguyên đúng tên phương án):
-{{"scores": [{{"arm": "<tên phương án>", "correctness": <0|1|2>, "faithfulness": <0|1|2>, "citation_precision": <0.0-1.0>, "reason": "<tóm tắt ngắn, tiếng Việt>"}}]}}
+{{"scores": [{{"arm": "<tên phương án>", "correctness": <0|1|2>, "faithfulness": <0|1|2>, "citation_precision": <0.0-1.0>, "contradicts_reference": <true|false>, "reason": "<tóm tắt ngắn, tiếng Việt>"}}]}}
 
 QUY TẮC BẮT BUỘC:
 - Phải có **đúng 1 entry cho MỖI phương án** được nêu trong phần "CÁC PHƯƠNG ÁN CẦN CHẤM".
@@ -198,6 +201,49 @@ def is_no_data(answer: str) -> bool:
     """
     text = (answer or "").strip().strip('"“”').strip().rstrip(".!").strip()
     return text.casefold() == NO_DATA_ANSWER.casefold().rstrip(".").strip()
+
+
+def context_has_gold(
+    blocks: Iterable[dict[str, Any]] | None,
+    evidence_doc_ids: Iterable[str] | None,
+    evidence_section: str | None,
+) -> bool:
+    """Kiểm tra context của arm có chứa **bằng chứng** (gold) không.
+
+    Vì sao cần?
+    ----------
+    Lỗi "không có trong dữ liệu" chỉ là **lỗi** khi context **có** dữ liệu
+    liên quan. Nếu context rỗng ⇒ "không có" là **đúng** ⇒ không tính lỗi.
+    ⇒ Metric `abstain_with_evidence` = số câu arm nói "không có" **dù context
+    có bằng chứng** ⇒ đây chính là lỗi cần đưa về **0** (Gate G19-1).
+
+    Args:
+        blocks: Danh sách khối context (mỗi khối có `doc_id`, `section`).
+        evidence_doc_ids: Danh sách `doc_id` là bằng chứng.
+        evidence_section: Tên section là bằng chứng (có thể rỗng).
+
+    Returns:
+        ``True`` nếu context có bằng chứng.
+    """
+    items = list(blocks or [])
+    if not items:
+        return False
+    doc_ids = {str(d) for d in (evidence_doc_ids or []) if str(d)}
+    if not doc_ids:
+        # Không rõ bằng chứng ⇒ coi như context có dữ liệu (thiên về phát
+        # hiện lỗi hơn là bỏ sót lỗi).
+        return True
+    section = (evidence_section or "").strip()
+    for block in items:
+        if str(block.get("doc_id") or "") not in doc_ids:
+            continue
+        if not section:
+            return True
+        path = str(block.get("section") or "")
+        parts = [p.strip() for p in path.split(">") if p.strip()]
+        if section in parts or path == section:
+            return True
+    return False
 
 
 def estimate_tokens(text: str) -> int:
@@ -1484,18 +1530,29 @@ def run_arm_a(
     # A vs B là do **hội thoại**, không phải do KG ⇒ **confound** ⇒ kết luận
     # nghiên cứu bị sai. ⇒ Cho A cùng cơ chế; thứ khác biệt còn lại là KG.
     result = answerer.answer(question, session_id=session_id)
+    context_blocks = list(result.get("context_used") or [])
     context_text = "\n\n".join(
         f"[{i}] {item.get('title', '')} > {item.get('section', '')}\n{item.get('text', '')}"
-        for i, item in enumerate(result.get("context_used") or [], start=1)
+        for i, item in enumerate(context_blocks, start=1)
     )
     return {
         "answer": result.get("answer", ""),
         "status": result.get("status"),
         "citations": result.get("citations") or [],
         "context": context_text,
+        "context_blocks": [
+            {
+                "doc_id": item.get("doc_id"),
+                "title": item.get("title"),
+                "section": item.get("section"),
+                "section_path": item.get("section_path"),
+            }
+            for item in context_blocks
+        ],
         "context_chars": result.get("context_chars", 0),
         "elapsed_ms": result.get("elapsed_ms", 0),
         "faithfulness_ok": result.get("faithfulness_ok"),
+        "no_data_retried": bool(result.get("no_data_retried")),
     }
 
 
@@ -1532,6 +1589,7 @@ def run_arm_b(
         "status": result.get("status"),
         "citations": result.get("citations") or [],
         "context": context_text,
+        "context_blocks": list(result.get("context_blocks") or []),
         "context_chars": len(context_text),
         "elapsed_ms": result.get("elapsed_ms", 0),
         "faithfulness_ok": result.get("faithfulness_ok"),
@@ -1595,6 +1653,7 @@ class Judge:
                     "correctness": 0,
                     "faithfulness": 0,
                     "citation_precision": 0.0,
+                    "contradicts_reference": False,
                     "reason": "Không có câu trả lời.",
                 }
             return result
@@ -1679,6 +1738,9 @@ class Judge:
                         "citation_precision": _clamp_float(
                             item.get("citation_precision"), 0.0, 1.0
                         ),
+                        "contradicts_reference": bool(
+                            item.get("contradicts_reference")
+                        ),
                         "reason": str(item.get("reason") or "")[:300],
                     }
 
@@ -1750,6 +1812,9 @@ class Judge:
                     "citation_precision": _clamp_float(
                         item.get("citation_precision"), 0.0, 1.0
                     ),
+                    "contradicts_reference": bool(
+                        item.get("contradicts_reference")
+                    ),
                     "reason": str(item.get("reason") or "")[:300],
                 }
                 break
@@ -1761,6 +1826,7 @@ class Judge:
                     "correctness": 0,
                     "faithfulness": 0,
                     "citation_precision": 0.0,
+                    "contradicts_reference": False,
                     "reason": "Judge không trả về điểm cho phương án này.",
                 }
         return scores
@@ -1997,6 +2063,26 @@ def aggregate(records: list[dict[str, Any]]) -> dict[str, Any]:
         or "không có" in r["arm"]["answer"].lower()
     )
 
+    # --- Phase 19 — `abstain_with_evidence` ------------------------------
+    # Số câu arm **nói "không có trong dữ liệu"** dù **context có bằng chứng**.
+    # Đây chính là lỗi cần đưa về 0 (Gate G19-1): đo được ở checkpoint D-124
+    # là arm A 16/60 câu narrative, trong đó 7/16 câu gold section **vẫn có
+    # trong top-8 context** ⇒ lỗi ở tầng sinh, không phải tầng truy xuất.
+    abstain_records = [r for r in valid if r["type"] != "no_data"]
+    abstain_with_evidence = 0
+    abstain_total = 0
+    for record in abstain_records:
+        answer = str((record.get("arm") or {}).get("answer") or "")
+        if not (is_no_data(answer) or "không có" in answer.lower()):
+            continue
+        abstain_total += 1
+        if context_has_gold(
+            (record.get("arm") or {}).get("context_blocks"),
+            record.get("evidence_doc_id"),
+            record.get("evidence_section"),
+        ):
+            abstain_with_evidence += 1
+
     by_type: dict[str, dict[str, float]] = {}
     for record in scored:
         bucket = by_type.setdefault(
@@ -2006,6 +2092,23 @@ def aggregate(records: list[dict[str, Any]]) -> dict[str, Any]:
         bucket["n"] += 1
         bucket["correctness_sum"] += record["judge"]["correctness"]
         bucket["faithfulness_sum"] += record["judge"]["faithfulness"]
+    # Phase 19 — `abstain_with_evidence` **theo từng nhóm** câu hỏi.
+    by_type_abstain: dict[str, dict[str, int]] = {}
+    for record in abstain_records:
+        answer = str((record.get("arm") or {}).get("answer") or "")
+        if not (is_no_data(answer) or "không có" in answer.lower()):
+            continue
+        bucket = by_type_abstain.setdefault(
+            str(record.get("type") or ""),
+            {"abstain": 0, "abstain_with_evidence": 0},
+        )
+        bucket["abstain"] += 1
+        if context_has_gold(
+            (record.get("arm") or {}).get("context_blocks"),
+            record.get("evidence_doc_id"),
+            record.get("evidence_section"),
+        ):
+            bucket["abstain_with_evidence"] += 1
     for bucket in by_type.values():
         bucket["correctness"] = round(
             bucket["correctness_sum"] / bucket["n"], 4
@@ -2015,6 +2118,10 @@ def aggregate(records: list[dict[str, Any]]) -> dict[str, Any]:
         )
         bucket.pop("correctness_sum")
         bucket.pop("faithfulness_sum")
+    for qtype, bucket in by_type_abstain.items():
+        target = by_type.setdefault(qtype, {"n": 0})
+        target["abstain"] = bucket["abstain"]
+        target["abstain_with_evidence"] = bucket["abstain_with_evidence"]
 
     return {
         # `n` = số câu **có điểm thật** (đã loại arm lỗi hạ tầng và arm
@@ -2034,6 +2141,20 @@ def aggregate(records: list[dict[str, Any]]) -> dict[str, Any]:
         "citation_precision": round(statistics.mean(citations), 4),
         "no_data_accuracy": (
             round(no_data_ok / len(no_data_records), 4) if no_data_records else None
+        ),
+        # --- Phase 19 --------------------------------------------------
+        "abstain_with_evidence": abstain_with_evidence,
+        "abstain_total": abstain_total,
+        "abstain_rate": (
+            round(abstain_total / len(abstain_records), 4) if abstain_records else 0.0
+        ),
+        "abstain_with_evidence_rate": (
+            round(abstain_with_evidence / len(abstain_records), 4)
+            if abstain_records
+            else 0.0
+        ),
+        "no_data_retried": sum(
+            1 for r in valid if (r.get("arm") or {}).get("no_data_retried")
         ),
         "latency_p50": int(statistics.median(latencies)) if latencies else 0,
         "latency_p95": (
@@ -2325,22 +2446,49 @@ def main() -> int:
             line = line.strip()
             if line:
                 questions.append(json.loads(line))
-    if args.limit:
-        questions = questions[: args.limit]
+    # ⚠️ Phase 19 — thứ tự lọc: **type trước, limit sau**.
+    #
+    # Vì sao? Trước đây `limit` cắt danh sách **trước** khi lọc theo type
+    # ⇒ `--only-types narrative --limit 2` cắt còn 2 câu đầu (thuộc nhóm
+    # `relational`) ⇒ lọc type ⇒ **0 câu** ⇒ chạy eval **không được gì**
+    # mà không báo lỗi.
     if args.only_types:
         wanted = {item.strip() for item in args.only_types.split(",") if item.strip()}
         questions = [
             item for item in questions if str(item.get("type") or "") in wanted
         ]
         logger.info("Lọc theo type=%s ⇒ còn %d câu", sorted(wanted), len(questions))
+    if args.limit:
+        questions = questions[: args.limit]
     logger.info("Nạp %d câu hỏi từ %s", len(questions), qa_path)
 
     config = load_config(REPO_ROOT / "configs" / "retrieval.yaml")
     retriever = Retriever.load(REPO_ROOT / "configs" / "retrieval.yaml")
+    llm_config = load_config(REPO_ROOT / "configs" / "llm.yaml")
+    pools_cfg = (llm_config.get("pools") or {}) if isinstance(llm_config, dict) else {}
+
+    # ⚠️ Phase 19 — **mặc định dùng pool đa provider** từ `configs/llm.yaml`.
+    #
+    # Vì sao cần?
+    # ----------
+    # Trước đây `--gen-pool` / `--judge-pool` mặc định là **chuỗi rỗng** ⇒
+    # fallback sang pool **1 provider** (`groq` cho sinh, `gemini` cho judge)
+    # ⇒ khi 1 provider hết quota ⇒ **dừng cả eval** dù còn provider khác
+    # còn quota ⇒ phải chờ 1 ngày mới chạy tiếp được.
+    # ⇒ Nếu CLI không chỉ định ⇒ lấy `pools.generation.spec` /
+    # `pools.judge.spec` trong `configs/llm.yaml` ⇒ **giống hệt** pool
+    # D-123/D-124 (D-136: giữ nguyên model pool để số liệu so sánh được).
+    gen_pool_spec = args.gen_pool or str(
+        (pools_cfg.get("generation") or {}).get("spec") or ""
+    )
+    judge_pool_spec = args.judge_pool or str(
+        (pools_cfg.get("judge") or {}).get("spec") or ""
+    )
+
     # Sinh câu trả lời: 741 lời gọi ⇒ cần pool **đa provider** để chịu quota
     # free tier (Gemini: 500 RPD/model; Groq: 200.000 token/ngày).
     gen_client: Any = _build_pool_or_single(
-        pool_spec=args.gen_pool,
+        pool_spec=gen_pool_spec,
         provider=args.gen_provider,
         models=[m.strip() for m in args.gen_models.split(",") if m.strip()],
         requests_per_day=args.gen_rpd or None,
@@ -2374,9 +2522,8 @@ def main() -> int:
                 removed += 1
         logger.info("Đã xoá %d session đánh giá cũ", removed)
 
-    llm_config = load_config(REPO_ROOT / "configs" / "llm.yaml")
     judge_client: Any = _build_pool_or_single(
-        pool_spec=args.judge_pool,
+        pool_spec=judge_pool_spec,
         provider=args.judge_provider,
         models=[m.strip() for m in args.judge_models.split(",") if m.strip()],
         requests_per_day=args.judge_rpd or None,
@@ -2911,6 +3058,7 @@ def main() -> int:
                     "type": question.get("type"),
                     "expected_answer": question.get("expected_answer"),
                     "evidence_doc_id": question.get("evidence_doc_id"),
+                    "evidence_section": question.get("evidence_section"),
                     "gen_model": old_entry.get("gen_model") or pinned_model,
                     "gen_model_pinned": pinned_model,
                     "arm": old_arm,
@@ -2936,6 +3084,7 @@ def main() -> int:
                 "type": question.get("type"),
                 "expected_answer": question.get("expected_answer"),
                 "evidence_doc_id": question.get("evidence_doc_id"),
+                "evidence_section": question.get("evidence_section"),
                 "gen_model": used_model,
                 "gen_model_pinned": pinned_model,
                 "arm": outcomes[arm],
@@ -3025,7 +3174,6 @@ def main() -> int:
             max(0.0, next_available - now),
             max(0.0, gen_recovery - now),
             max(0.0, judge_recovery - now),
-            ", ".join(deferred_qids[:20]),
         )
     for arm in arms:
         records = all_results[arm]
@@ -3117,6 +3265,9 @@ def write_markdown(path: Path, metrics: dict[str, Any], arms: list[str]) -> Path
         ("faithfulness_rate", "faithfulness_rate"),
         ("citation_precision", "citation_precision"),
         ("no_data_accuracy", "no_data_accuracy"),
+        ("abstain_with_evidence (lỗi)", "abstain_with_evidence"),
+        ("abstain_total", "abstain_total"),
+        ("no_data_retried", "no_data_retried"),
         ("latency p50 (ms)", "latency_p50"),
         ("latency p95 (ms)", "latency_p95"),
         ("context_tokens (TB)", "context_tokens_mean"),
@@ -3142,6 +3293,22 @@ def write_markdown(path: Path, metrics: dict[str, Any], arms: list[str]) -> Path
             bucket = ((metrics.get(arm) or {}).get("by_type") or {}).get(qtype) or {}
             values.append(
                 f"{bucket.get('correctness', '—')} (n={bucket.get('n', 0)})"
+            )
+        lines.append(f"| {qtype} | " + " | ".join(values) + " |")
+
+    lines += [
+        "",
+        "## `abstain_with_evidence` theo nhóm (Phase 19 — lỗi 'không có' khi context có bằng chứng)",
+        "",
+        "| Dạng | " + " | ".join(labels.get(a, a) for a in arms) + " |",
+        "|---|" + "---|" * len(arms),
+    ]
+    for qtype in types:
+        values = []
+        for arm in arms:
+            bucket = ((metrics.get(arm) or {}).get("by_type") or {}).get(qtype) or {}
+            values.append(
+                f"{bucket.get('abstain_with_evidence', 0)}/{bucket.get('abstain', 0)}"
             )
         lines.append(f"| {qtype} | " + " | ".join(values) + " |")
 

@@ -1,0 +1,110 @@
+{
+  "_meta": {
+    "phase": 19,
+    "ten_phase": "Trả lời đúng & có căn cứ, rồi đo lại A vs B vs B−",
+    "ngay": "2026-11-19",
+    "nguon": "Đo offline bằng `scripts/measure_gold_hit_rate.py` (không tốn quota LLM) + kiểm chứng live bằng `scripts/verify_answers_online.py` (Wikipedia/Wikidata).",
+    "lich": "2026-11-19",
+    "trang_thai": "Đang chạy — eval 246 câu × 3 arm chạy nền theo quota Gemini (RPD 500/model/ngày)."
+  },
+  "gate": {
+    "G19-1": {
+      "mo_ta": "not_in_data của arm A trên narrative: 16/60 → ≤ 6/60; 0 câu 'không có' khi gold có trong context",
+      "trang_thai": "chua_chot",
+      "ly_do": "eval chưa đủ 60 câu narrative"
+    },
+    "G19-2": {
+      "mo_ta": "≥ 55/60 câu narrative có gold section trong top-8 context",
+      "trang_thai": "dat",
+      "ket_qua": "55/60 (91.7%)",
+      "truoc": "46/60 (76.7%)"
+    },
+    "G19-3": {
+      "mo_ta": "faithfulness_mean của cả 3 arm ≥ 1.90",
+      "trang_thai": "chua_chot"
+    },
+    "G19-4": {
+      "mo_ta": "Bảng 4 nhóm + no_data + latency p50/p95 theo arm",
+      "trang_thai": "chua_chot",
+      "cong_cu": "scripts/summarize_eval.py"
+    },
+    "G19-5": {
+      "mo_ta": "Kết luận A vs B vs B− viết bằng số, kèm phần 'không kết luận được'",
+      "trang_thai": "chua_chot"
+    },
+    "G19-6": {
+      "mo_ta": "100% câu trả lời có nội dung không có mệnh đề nào bị bác bỏ bởi kiểm chứng online",
+      "trang_thai": "dat_tam",
+      "ket_qua": "0 câu có năm không có trong Wikipedia live; 0 vi phạm no_data"
+    },
+    "G19-7": {
+      "mo_ta": "100% câu hỏi trong bộ eval hợp lệ (có thật trong Wikipedia live)",
+      "trang_thai": "dat",
+      "ket_qua": "0/118 câu hỏi không hợp lệ; không loại câu hỏi nào"
+    }
+  },
+  "hit_rate_gold_section_top8": {
+    "bo_cau_hoi": "data/eval/qa_rag_250_v2.jsonl",
+    "top_k": 8,
+    "narrative": { "n": 60, "hit": 55, "hit_rate": 0.9167 },
+    "multi_hop": { "n": 40, "hit": 34, "hit_rate": 0.85 },
+    "relational": { "n": 58, "hit": 43, "hit_rate": 0.7414 },
+    "multi_turn": { "n": 58, "hit": 24, "hit_rate": 0.4138 },
+    "no_data": { "n": 30, "hit": 0, "hit_rate": 0.0 },
+    "mean_distinct_sections_in_topk": 3.064,
+    "ghi_chu": "multi_turn thấp là do câu hỏi lượt sau là đại từ ('Ông ấy sinh năm nào?') => cần query rewriting, không phải lỗi retrieval. no_data = 0 là đúng kỳ vọng (ngoài corpus)."
+  },
+  "cau_hinh_retrieval_phase19": {
+    "max_chunks_per_section": 2,
+    "max_chunks_per_doc": 5,
+    "title_boost": 1.0,
+    "title_boost_mode": "subset",
+    "title_boost_min_tokens": 2,
+    "section_boost": 1.0,
+    "noise_penalty": 0.5,
+    "so_sanh_offline_60_cau_narrative": {
+      "cap8_khong_boost": "43/60",
+      "cap2_khong_boost": "49/60",
+      "cap2_title_boost": "53/60",
+      "cap2_title_boost_section_boost": "57/60",
+      "cap2_title_boost_section_boost_noise": "57/60"
+    }
+  },
+  "bocauhoi": {
+    "file": "data/eval/qa_rag_250_v2.jsonl",
+    "so_cau": 246,
+    "nhom": {
+      "narrative": 60,
+      "relational": 58,
+      "multi_turn": 58,
+      "multi_hop": 40,
+      "no_data": 30
+    }
+  },
+  "kiem_chung_online_cau_hoi": {
+    "file": "reports/phase19_verify_questions_v2.json",
+    "n_questions_checked": 118,
+    "n_questions_invalid": 0
+  },
+  "kiem_chung_online_cau_tra_loi": {
+    "file": "reports/phase19_verify_checkpoint.json",
+    "n_answers_checked": 42,
+    "n_answers_with_unsupported_years": 0,
+    "n_no_data_violations": 0,
+    "n_contradicts_reference": 3,
+    "ghi_chu": "3 mâu thuẫn tham chiếu: q0006 (arm A, B−: không đưa năm), q0008 (arm B−) — là mâu thuẫn với ĐÁP ÁN THAM CHIẾU, không phải với nguồn live; theo D-145 judge chỉ đánh dấu, không trừ điểm mù."
+  },
+  "eval_checkpoint": {
+    "file": "data/eval/eval_phase19_checkpoint.jsonl",
+    "so_cau_choi": 15,
+    "tong": 246,
+    "driver": "scripts/run_phase19_eval_loop.sh all 60",
+    "ly_do_cham_cham": "Quota Gemini RPD 500/model/ngày; 6 model trong pool => ~2-3 ngày"
+  },
+  "ket_qua_tam_thoi_15_cau": {
+    "A": { "correctness": 1.133, "faithfulness": 1.8, "citation_precision": 0.733, "grounding_code": 1.0, "latency_p50_ms": 2434, "latency_p95_ms": 8002 },
+    "B": { "correctness": 1.8, "faithfulness": 1.8, "citation_precision": 0.867, "grounding_code": 0.9444, "latency_p50_ms": 4845, "latency_p95_ms": 35635 },
+    "B-": { "correctness": 1.0, "faithfulness": 1.733, "citation_precision": 0.733, "grounding_code": 1.0, "latency_p50_ms": 17388, "latency_p95_ms": 37922 },
+    "canh_bao": "CHƯA đủ bằng chứng để kết luận — n = 15/246 và chỉ gồm nhóm relational."
+  }
+}

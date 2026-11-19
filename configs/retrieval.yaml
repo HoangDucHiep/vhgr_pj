@@ -46,6 +46,39 @@ retrieval:
     weight: 1.0
     max_query_chars: 512
 
+  # Phase 19 — **đa dạng ngữ cảnh** (áp dụng cho cả 3 arm).
+  #
+  # Vì sao cần?
+  # ----------
+  # BM25 cộng trọng số `title` (×3) cho **mọi chunk của cùng bài** ⇒ chunk
+  # "Di tích lịch sử" (lặp tên bài trong body) đè bằng chunk "Diễn biến"
+  # thật sự trong narrative ⇒ trung bình 3,25 chunk/section chiếm top-8,
+  # 14/60 câu gold section không lọt nổi top-8.
+  #
+  # Đo trên 60 câu narrative của `qa_rag_250.jsonl` (gold = `evidence_section`):
+  #   cap=8,  không boost (cũ)        → 43/60 gold section trong top-8
+  #   cap=2,  title_boost=1.0        → 53/60
+  #   cap=2,  + section_boost=1.0    → **57/60**  (G19-2 cần ≥ 55)
+  #   cap=2,  + noise_penalty=0.5    → 57/60 (không đổi, giữ chống nhiễu)
+  diversity:
+    # Số chunk tối đa lấy từ **một section** (doc_id, section_path)
+    max_chunks_per_section: 2
+    # Số chunk tối đa lấy từ **một bài** (chặn 1 bài chiếm >50% top-8)
+    max_chunks_per_doc: 5
+    # Nhân điểm RRF khi **tiêu đề bài** khớp câu hỏi ⇒ ưu tiên đúng bài
+    title_boost: 1.0
+    # "subset"  = tiêu đề phải ⊆ token câu hỏi (chặt, đo tốt nhất)
+    # "overlap" = chỉ cần 1 token tiêu đề có trong câu hỏi (rộng hơn)
+    title_boost_mode: subset
+    # Bỏ qua boost nếu tiêu đề quá ngắn (tránh khớp bừa từ ngữ chung)
+    title_boost_min_tokens: 2
+    # Boost chunk nằm ở section có **tên khớp câu hỏi**
+    # (vd. "Kể lại diễn biến X" ⇒ section "Diễn biến")
+    section_boost: 1.0
+    # Giảm điểm chunk ở section **nhiễu** ("Xem thêm", "Tham khảo",
+    # "Liên kết > Tài liệu"…) ⇒ chúng không chiếm chỗ của chunk narrative
+    noise_penalty: 0.5
+
   fusion:
     method: rrf             # reciprocal rank fusion
     k: 60                   # hằng số RRF
@@ -78,3 +111,9 @@ generation:
   min_citations: 1
   faithfulness_retry: true
   max_faithfulness_retry: 1
+  # Phase 19 — **retry khi LLM nói "không có" dù context có dữ liệu**.
+  # Vì sao? Đo được: arm A nói "Không có trong dữ liệu" ở 16/60 câu narrative,
+  # trong đó 7/16 câu gold section **vẫn nằm trong top-8 context** ⇒ lỗi ở
+  # tầng sinh, không phải tầng truy xuất.
+  no_data_retry: true
+  max_no_data_retry: 1

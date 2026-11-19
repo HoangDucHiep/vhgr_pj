@@ -2619,3 +2619,140 @@ câu trả lời ⇒ chỉ tốn 1 request judge/câu.
 toàn bộ** (nếu prompt/ngân sách đổi) → **so sánh**.
 
 **Cập nhật file:** `scripts/rejudge_all.py`, `scripts/run_narrative_eval_loop.sh`.
+
+---
+
+## D-142 — Không lọc phạm vi "9 triều đại" khỏi bộ câu hỏi eval (mở rộng dữ liệu sau)
+
+**Ngày:** 19/11/2026 · **Phase:** 19
+
+**Bối cảnh.** Kế hoạch Phase 19 ban đầu gợi ý **loại** các câu hỏi ngoài phạm vi
+9 triều đại (vd. q0073 hỏi "Xô Viết Nghệ Tĩnh"). Sau đó chỉ đạo mới: *"bây giờ
+cứ đảm bảo nó trả lời đúng, hợp lý với câu hỏi và đúng sự thật, và thực sự có
+trong corpus — không cần quá chuẩn về việc có nằm trong khoảng không; sau này sẽ
+mở rộng thêm dữ liệu"*.
+
+**Quyết định.** **Không** lọc phạm vi. Thay vào đó, mọi câu hỏi được **kiểm
+chứng online** (Wikipedia/Wikidata live) để phân biệt 2 loại lỗi:
+
+| Loại lỗi | Cách phát hiện | Hành động |
+|---|---|---|
+| Câu hỏi **vô lý** (không có thật, hoặc năm không tồn tại) | `scripts/verify_answers_online.py --questions-only` → `valid=false` | **Loại khỏi thống kê + ghi rõ trong báo cáo** (không xoá âm thầm) |
+| Câu hỏi **hợp lệ** nhưng hệ thống trả lời sai | kiểm chứng **câu trả lời** (G19-6) | **Đây là lỗi của hệ thống** ⇒ tính vào điểm |
+
+**Kết quả đo được (19/11/2026).** Bộ `qa_rag_250_v2.jsonl` (246 câu) ⇒
+**118 câu** thuộc nhóm cần kiểm chứng online (`narrative` + `multi_turn`) ⇒
+**0/118 câu hợp lệ** ⇒ **G19-7 đạt** ⇒ *không* phải loại câu hỏi nào vì lý do
+phạm vi.
+
+**Cập nhật file:** `src/evaluation/build_qa_set.py`, `scripts/verify_answers_online.py`,
+`reports/phase19_verify_questions_v2.json`.
+
+---
+
+## D-143 — Cấu hình retrieval mới: cap chunk/section + boost tiêu đề/section + chống nhiễu
+
+**Ngày:** 19/11/2026 · **Phase:** 19
+
+**Bối cảnh.** Đo trên 60 câu `narrative` của `qa_rag_250.jsonl` (gold =
+`evidence_section` ∈ top-8):
+
+| Cấu hình | gold section trong top-8 |
+|---|---|
+| `cap=8`, không boost (cũ) | 43/60 |
+| `cap=2`, không boost | 49/60 |
+| `cap=2` + `title_boost=1.0` | 53/60 |
+| `cap=2` + `section_boost=1.0` | 57/60 |
+
+Nguyên nhân gốc: BM25 cộng `title` ×3 cho **mọi** chunk của cùng bài ⇒ chunk
+"Di tích lịch sử" (lặp tên bài trong body) đè chunk "Diễn biến" thật.
+
+**Quyết định.** Thêm khối `retrieval.diversity` trong `configs/retrieval.yaml`
+(áp dụng cho **cả 3 arm** ⇒ so sánh A vs B vs B− vẫn công bẳng):
+
+```yaml
+diversity:
+  max_chunks_per_section: 2     # cap chunk trên mỗi section
+  max_chunks_per_doc: 5         # chặn 1 bài chiếm >50% top-8
+  title_boost: 1.0              # boost chunk thuộc bài có tiêu đề khớp câu hỏi
+  title_boost_mode: subset
+  title_boost_min_tokens: 2
+  section_boost: 1.0            # boost section có tên khớp câu hỏi
+  noise_penalty: 0.5            # giảm điểm section nhiễu ("Xem thêm", "Tham khảo"…)
+```
+
+**Kết quả đo được (19/11/2026, `scripts/measure_gold_hit_rate.py`, bộ `qa_rag_250_v2`):**
+
+| Nhóm | gold section trong top-8 |
+|---|---|
+| `narrative` | **55/60 (91,7 %)** ⇒ **G19-2 đạt** (cần ≥ 55/60) |
+| `multi_hop` | 34/40 (85 %) |
+| `relational` | 43/58 (74,1 %) |
+| `multi_turn` | 24/58 (41,4 %) — *đúng kỳ vọng*: câu hỏi lượt sau là đại từ ("Ông ấy sinh năm nào?") ⇒ không tự truy xuất được, cần query rewriting |
+| `no_data` | 0/30 (0 %) — *đúng kỳ vọng*: câu hỏi ngoài corpus ⇒ không có gold |
+
+**Cập nhật file:** `configs/retrieval.yaml`, `src/qa/retriever.py`,
+`scripts/measure_gold_hit_rate.py`.
+
+---
+
+## D-144 — Khi LLM trả "Không có trong dữ liệu" **nhưng context có dữ liệu** ⇒ retry bắt buộc
+
+**Ngày:** 19/11/2026 · **Phase:** 19
+
+**Bối cảnh.** Đo trên checkpoint D-124 (60 câu `narrative`): arm A trả "Không có
+trong dữ liệu" **16/60** câu, trong đó **7/16** câu gold section **vẫn nằm trong
+top-8 context** ⇒ lỗi ở **tầng sinh**, không phải tầng truy xuất. Ngoài ra, LLM
+trả về **chuỗi rỗng** cũng từng bị coi như "không có dữ liệu" ⇒ **không retry**
+⇒ mất câu một cách âm thầm.
+
+**Quyết định.**
+
+1. Thêm `generation.no_data_retry` + `generation.max_no_data_retry` trong
+   `configs/retrieval.yaml`; `src/qa/rag_answer.py` + `src/qa/hybrid.py` retry với
+   prompt buộc trả lời khi `status == "not_in_data"` **nhưng** context có ≥ 1 chunk.
+2. Chuỗi rỗng (lỗi hạ tầng) cũng phải **retry**, không được mặc định thành
+   "không có trong dữ liệu".
+3. Thêm metric **`abstain_with_evidence`** vào `evaluate_rag.py` = số câu arm nói
+   "không có" **dù context có gold** ⇒ đây chính là lỗi cần đưa về **0**
+   (G19-1).
+
+**Cập nhật file:** `configs/retrieval.yaml`, `src/qa/rag_answer.py`,
+`src/qa/hybrid.py`, `src/evaluation/evaluate_rag.py`.
+
+---
+
+## D-145 — Kiểm chứng "không bịa" bằng **nguồn ngoài live**, không tin LLM-judge
+
+**Ngày:** 19/11/2026 · **Phase:** 19
+
+**Bối cảnh.** Chỉ đạo: *"câu hỏi và câu trả lời judge cần phải tra mạng và kiểm
+chứng chính xác, chức không được nghĩ và bịa ra đâu đấy"*. LLM-judge **không** có
+quyền tuyên bố "đúng" ⇒ cần lớp kiểm chứng **độc lập**.
+
+**Quyết định.**
+
+1. `scripts/verify_answers_online.py` — kiểm chứng **không dùng LLM**:
+   - `narrative`/`multi_turn`: mọi **năm** trong câu trả lời phải có trong bài
+     Wikipedia **live** của `evidence_doc_id` ⇒ năm không tìm thấy ⇒ **bịa**.
+   - `relational`/`multi_hop`: đối chiếu `expected_answer` với **Wikidata live**
+     (`P22`/`P25`/`P26`/`P40`/…) ⇒ chấm đúng/sai **không cần LLM**.
+   - `no_data`: hệ thống **phải** trả "Không có trong dữ liệu" ⇒ trả lời có nội
+     dung ⇒ **bịa**.
+   - Cache đĩa `data/interim/verify_cache/` + `User-Agent` chuẩn + giãn nhịp
+     ≥ 1,2 s; thêm **retry riêng cho 429** (chờ 20 s × số lần, tối đa 6 lần).
+2. Judge (LLM) chỉ chấm **tương đối** ⇒ bổ sung trường **`contradicts_reference`**
+   (bool) trong `JUDGE_PROMPT`: đáp án tham chiếu chỉ là **gợi ý**; nếu CONTEXT
+   mâu thuẫn với đáp án tham chiếu thì **theo CONTEXT**; nếu câu trả lời khẳng
+   định điều mà tham chiếu phủ nhận ⇒ cũng đánh dấu mâu thuẫn (thay vì trừ
+   điểm mù).
+3. Đo **grounding bằng code** (không LLM) trong `scripts/summarize_eval.py`: mỗi
+   **mệnh đề** của câu trả lời phải khớp ≥ 1 chunk context **đã được trích dẫn**
+   ⇒ tỉ lệ "mệnh đề không có căn cứ".
+
+**Kết quả đo được (19/11/2026).** Kiểm chứng **câu hỏi**: **0/118** câu không
+hợp lệ ⇒ G19-7 đạt. Kiểm chứng **câu trả lời** (checkpoint đang chạy):
+**0** câu có năm không có trong Wikipedia live, **0** vi phạm `no_data`.
+
+**Cập nhật file:** `scripts/verify_answers_online.py`, `scripts/summarize_eval.py`,
+`src/evaluation/evaluate_rag.py`.

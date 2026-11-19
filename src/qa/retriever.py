@@ -519,10 +519,20 @@ class RetrievedChunk:
     chunk: Chunk
     index: int
     rrf_score: float = 0.0
+    title_boost: float = 1.0
     bm25_rank: int | None = None
     dense_rank: int | None = None
     bm25_score: float = 0.0
     dense_score: float = 0.0
+
+    @property
+    def score(self) -> float:
+        """Điểm cuối cùng dùng để xếp hạng (RRF × boost tiêu đề).
+
+        Returns:
+            Điểm quyết định thứ tự.
+        """
+        return self.rrf_score * self.title_boost
 
     def to_dict(self) -> dict[str, Any]:
         """Chuyển sang dict (serialize).
@@ -540,6 +550,7 @@ class RetrievedChunk:
             "source_url": self.chunk.source_url,
             "entity_ids": list(self.chunk.entity_ids),
             "rrf_score": round(self.rrf_score, 6),
+            "title_boost": round(self.title_boost, 3),
             "bm25_rank": self.bm25_rank,
             "dense_rank": self.dense_rank,
             "bm25_score": round(self.bm25_score, 4),
@@ -758,20 +769,223 @@ class Retriever:
             item.dense_score = score
             item.rrf_score += 1.0 / (rrf_k + rank)
 
-        results = sorted(merged.values(), key=lambda item: -item.rrf_score)
+        results = sorted(merged.values(), key=lambda item: -item.score)
+
+        # --- Phase 19 — boost chunk thuộc bài có tiêu đề khớp câu hỏi ----
+        diversity = retrieval.get("diversity") or {}
+        query_tokens = set(tokens)
+        self._apply_score_adjustments(results, diversity, query_tokens)
 
         min_score = float(fusion.get("min_rrf_score", 0.005))
         floor_ratio = float(fusion.get("relative_score_floor", 0.35))
-        results = [item for item in results if item.rrf_score >= min_score]
+        results = [item for item in results if item.score >= min_score]
         if results:
-            floor = results[0].rrf_score * floor_ratio
-            results = [item for item in results if item.rrf_score >= floor]
-        results = results[:top_k]
+            floor = results[0].score * floor_ratio
+            results = [item for item in results if item.score >= floor]
+        # --- Phase 19 — cap chunk/section + chunk/doc (đa dạng ngữ cảnh) ---
+        results = self._apply_diversity(results, diversity, top_k=top_k)
         # D-122: **mở rộng ngữ cảnh cha** (parent expansion).
         parent_cfg = retrieval.get("parent_expansion") or {}
         if parent_cfg.get("enabled", False):
             results = self._expand_parents(results, parent_cfg)
         return results
+
+    # ------------------------------------------------------------------
+    # Diversity (Phase 19)
+    # ------------------------------------------------------------------
+
+    #: Các section **nhiễu** (không mang nội dung trả lời) — bài Wikipedia
+    #: tiếng Việt hay có "Xem thêm", "Tham khảo", "Liên kết", "Tài liệu"…
+    #: Chúng lặp tên bài ⇒ BM25 (title×3) đẩy chúng lên top ⇒ chiếm chỗ
+    #: của chunk narrative thật sự.
+    NOISE_SECTION_TOKENS = frozenset(
+        {
+            "xem them",
+            "tham khao",
+            "lien ket",
+            "tai lieu",
+            "chu thich",
+            "nguon",
+            "xuat ban",
+            "ghi chu",
+            "thu vien",
+            "ban tin",
+            "the loai",
+            "chu de",
+            "ban do",
+        }
+    )
+
+    def _apply_score_adjustments(
+        self,
+        results: list[RetrievedChunk],
+        diversity: dict[str, Any],
+        query_tokens: set[str],
+    ) -> None:
+        """Điều chỉnh điểm RRF theo tiêu đề / section / nhiễu (Phase 19).
+
+        Ba cơ chế (tất cả cấu hình được, không hard-code):
+
+        1. **title_boost** — chunk thuộc bài mà **tiêu đề khớp câu hỏi** được
+           nhân điểm ⇒ ưu tiên đúng bài (vd. hỏi về "Đỗ Khuyển" ⇒ chunk bài
+           "Đỗ Khuyển").
+        2. **section_boost** — chunk nằm ở **section có tên khớp câu hỏi**
+           (vd. câu "Kể lại **diễn biến** X" ⇒ section "Diễn biến").
+        3. **noise_penalty** — chunk ở section **nhiễu** ("Xem thêm",
+           "Tham khảo", "Liên kết"…) bị giảm điểm ⇒ không chiếm chỗ.
+
+        Args:
+            results: Danh sách chunk (được sửa tại chỗ).
+            diversity: Cấu hình ``retrieval.diversity``.
+            query_tokens: Tập token của câu hỏi.
+        """
+        title_boost = float(diversity.get("title_boost", 0.0))
+        section_boost = float(diversity.get("section_boost", 0.0))
+        noise_penalty = float(diversity.get("noise_penalty", 0.0))
+        if title_boost <= 0.0 and section_boost <= 0.0 and noise_penalty <= 0.0:
+            return
+
+        min_title_tokens = int(diversity.get("title_boost_min_tokens", 2))
+        mode = str(diversity.get("title_boost_mode", "subset"))
+        for item in results:
+            if title_boost > 0.0 and self._title_matches(
+                item.chunk.title,
+                query_tokens,
+                mode=mode,
+                min_tokens=min_title_tokens,
+            ):
+                item.title_boost *= 1.0 + title_boost
+            if section_boost > 0.0 and self._section_matches(
+                item.chunk, query_tokens
+            ):
+                item.title_boost *= 1.0 + section_boost
+            if noise_penalty > 0.0 and self._is_noise_section(item.chunk):
+                item.title_boost *= max(0.0, 1.0 - noise_penalty)
+        results.sort(key=lambda item: -item.score)
+
+    @classmethod
+    def _is_noise_section(cls, chunk: Chunk) -> bool:
+        """Chunk nằm ở section nhiễu không?
+
+        Args:
+            chunk: Chunk cần kiểm tra.
+
+        Returns:
+            ``True`` nếu section là loại nhiễu.
+        """
+        path = (chunk.section_path or chunk.section or "")
+        if not path:
+            return False
+        parts = [
+            p.strip()
+            for p in strip_accents(path).lower().split(">")
+            if p.strip()
+        ]
+        if not parts:
+            return False
+        leaf = parts[-1]
+        if leaf in cls.NOISE_SECTION_TOKENS:
+            return True
+        # "Liên kết > Tài liệu" ⇒ mọi phần tử đều là nhiễu ⇒ nhiễu.
+        return all(p in cls.NOISE_SECTION_TOKENS for p in parts)
+
+    @staticmethod
+    def _section_matches(chunk: Chunk, query_tokens: set[str]) -> bool:
+        """Section của chunk có **tên khớp** câu hỏi không?
+
+        Args:
+            chunk: Chunk cần kiểm tra.
+            query_tokens: Tập token của câu hỏi.
+
+        Returns:
+            ``True`` nếu tên section (hoặc phần cuối của đường dẫn section)
+            xuất hiện trong câu hỏi.
+        """
+        path = chunk.section_path or chunk.section or ""
+        if not path:
+            return False
+        parts = [p.strip() for p in path.split(">") if p.strip()]
+        if not parts:
+            return False
+        leaf_tokens = set(tokenize(parts[-1]))
+        if not leaf_tokens:
+            return False
+        return leaf_tokens.issubset(query_tokens)
+
+    @staticmethod
+    def _title_matches(
+        title: str,
+        query_tokens: set[str],
+        *,
+        mode: str = "subset",
+        min_tokens: int = 2,
+    ) -> bool:
+        """Kiểm tra tiêu đề bài có khớp câu hỏi hay không.
+
+        Args:
+            title: Tiêu đề bài.
+            query_tokens: Tập token của câu hỏi.
+            mode: ``"subset"`` ⇒ tiêu đề phải ⊆ token câu hỏi;
+                ``"overlap"`` ⇒ chỉ cần ≥1 token tiêu đề có trong câu hỏi.
+            min_tokens: Số token tối thiểu của tiêu đề để được xét.
+
+        Returns:
+            ``True`` nếu tiêu đề khớp.
+        """
+        title_tokens = set(tokenize(title or ""))
+        if len(title_tokens) < max(1, min_tokens):
+            return False
+        if mode == "overlap":
+            return bool(title_tokens & query_tokens)
+        return title_tokens.issubset(query_tokens)
+
+    def _apply_diversity(
+        self,
+        results: list[RetrievedChunk],
+        diversity: dict[str, Any],
+        *,
+        top_k: int,
+    ) -> list[RetrievedChunk]:
+        """Giới hạn số chunk mỗi section / mỗi bài.
+
+        Vì sao cần?
+        ----------
+        BM25 cộng trọng số ``title`` (×3) cho **mọi chunk của cùng bài** ⇒
+        các chunk kiểu "Di tích lịch sử" (lặp tên bài trong body) chiếm
+        chỗ trong top-k, đẩy chunk narrative thật sự ra ngoài. Đo trên 60 câu
+        narrative: trung bình 3,25 chunk/section ⇒ 14/60 câu mất gold section.
+
+        Args:
+            results: Chunk đã xếp hạng (điểm giảm dần).
+            diversity: Cấu hình ``retrieval.diversity``.
+            top_k: Số chunk tối đa.
+
+        Returns:
+            Danh sách chunk sau khi áp cap.
+        """
+        max_section = int(diversity.get("max_chunks_per_section", 0) or 0)
+        max_doc = int(diversity.get("max_chunks_per_doc", 0) or 0)
+        if max_section <= 0 and max_doc <= 0:
+            return results[:top_k]
+
+        per_section: dict[tuple[str, str], int] = {}
+        per_doc: dict[str, int] = {}
+        out: list[RetrievedChunk] = []
+        for item in results:
+            section_key = (
+                item.chunk.doc_id,
+                item.chunk.section_path or item.chunk.section or "",
+            )
+            if max_section > 0 and per_section.get(section_key, 0) >= max_section:
+                continue
+            if max_doc > 0 and per_doc.get(item.chunk.doc_id, 0) >= max_doc:
+                continue
+            per_section[section_key] = per_section.get(section_key, 0) + 1
+            per_doc[item.chunk.doc_id] = per_doc.get(item.chunk.doc_id, 0) + 1
+            out.append(item)
+            if len(out) >= top_k:
+                break
+        return out
 
     # ------------------------------------------------------------------
     # Parent expansion (D-122)

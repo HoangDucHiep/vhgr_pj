@@ -43,6 +43,8 @@ docs/10-nhat-ky/
 | [`phase-15.md`](phase-15.md) | 15 — Hybrid GraphRAG: template Cypher + ý định + fusion + hội thoại | 17/11/2026 | 6 template · 6 ý định · **không gian trích dẫn `[1..N]` liên tục** · bài Bạch Đằng 30 entity → 60 cạnh / 0,11 s |
 | [`phase-16.md`](phase-16.md) | 16 — Đánh giá A vs B vs B− (LLM-judge) | 17/11/2026 | 247 câu × 3 arm · judge gộp 3 arm/câu + hoán vị thứ tự · **thang so sánh A / B / B−** · top-20 câu sai |
 | [`phase-17.md`](phase-17.md) | 17 — Giao diện so sánh, demo, đóng gói | 17/11/2026 | Toggle A/B/B− · citation click-to-source · đồ thị 1-hop Cytoscape · docker compose 3 service |
+| [`phase-19.md`](phase-19.md) | 19 — Trả lời đúng & có căn cứ, rồi đo lại A vs B vs B− | 19/11/2026 | 3 artefact làm sai lệch phép so sánh (retrieval · tầng sinh · bộ câu hỏi) · gold section trong top-8 **46/60 → 55/60** · **kiểm chứng live**: 0/118 câu hỏi vô lý, 0 câu trả lời bịa năm · **chưa kết luận được** A vs B vs B− |
+| [`so-lieu/phase-19-grounded-eval.json`](so-lieu/phase-19-grounded-eval.json) | 19 | — | Số liệu Phase 19: 7 Gate · hit-rate gold section theo 5 nhóm · **thang so sánh 5 cấu hình retrieval** · số liệu kiểm chứng online |
 | [`so-lieu/phase-13-chat-luong-kien-thuc.json`](so-lieu/phase-13-chat-luong-kien-thuc.json) | 13 | — | Số liệu Phase 13: chỉ số entity linking trước/sau · **thang so sánh 3 phương án lọc cạnh nhiễu** · số liệu guard chống bịa |
 | [`so-lieu/phase-16-eval-rag.json`](so-lieu/phase-16-eval-rag.json) | 16 | — | Số liệu Phase 16: chỉ số 3 arm · **chênh lệch A/B/B−** · phân rã theo 5 dạng câu hỏi |
 | [`so-lieu/phase-00-mo-truong.json`](so-lieu/phase-00-mo-truong.json) | 0 | — | Phiên bản thư viện, cấu hình hạ tầng, so sánh phương án bảo vệ DB |

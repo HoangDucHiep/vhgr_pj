@@ -1,0 +1,27 @@
+{
+  "_meta": {
+    "phase": 16,
+    "mo_ta": "Thống kê bộ câu hỏi đánh giá",
+    "seed": 42,
+    "ngay_do": "2026-11-18T22:42:45+0700",
+    "elapsed_s": 5.0,
+    "qid_trong_pham_vi": 2375,
+    "kg_doc_ids": 1667,
+    "no_data_topics": "modern"
+  },
+  "total": 246,
+  "by_type": {
+    "relational": 58,
+    "narrative": 60,
+    "multi_hop": 40,
+    "no_data": 30,
+    "multi_turn": 58
+  },
+  "quota": {
+    "relational": 60,
+    "narrative": 60,
+    "multi_hop": 40,
+    "no_data": 30,
+    "multi_turn": 60
+  }
+}

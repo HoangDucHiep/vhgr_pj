@@ -347,6 +347,15 @@ class HybridAnswerer:
             "answer": answer_text,
             "citations": fused.citations,
             "context_used": [block["text"] for block in fused.text_blocks],
+            "context_blocks": [
+                {
+                    "doc_id": block.get("doc_id"),
+                    "title": block.get("title"),
+                    "section": block.get("section"),
+                    "section_path": block.get("section"),
+                }
+                for block in fused.text_blocks
+            ],
             "kg_used": [block["text"] for block in fused.kg_blocks],
             "context_text": fused.to_text(),
             "intent": intent.to_dict(),
@@ -521,11 +530,44 @@ class HybridAnswerer:
                 or ""
             ).strip()
             cited = extract_citations(answer)
-            if cited or is_no_data(answer):
+            # ⚠️ Phase 19 — câu trả lời **rỗng** cũng phải retry (xem giải
+            # thích ở `src/qa/rag_answer.py`).
+            if cited or is_no_data(answer) or not answer:
                 break
             if attempt < max_retry:
                 retries += 1
                 logger.warning("Hybrid: thiếu trích dẫn [n] — retry %d", attempt + 1)
+
+        # --- Phase 19 — retry khi nói "không có" **dù context có dữ liệu** --
+        # Xem giải thích ở `src/qa/rag_answer.py` (cùng lý do, cùng cách sửa).
+        max_nodata_retry = (
+            int(generation.get("max_no_data_retry", 1))
+            if generation.get("no_data_retry", True)
+            else 0
+        )
+        for attempt in range(max_nodata_retry):
+            # ⚠️ Phase 19 — sửa lỗi: LLM trả về **rỗng** cũng phải retry
+            # (xem giải thích chi tiết ở `src/qa/rag_answer.py`).
+            if answer and not is_no_data(answer):
+                break
+            if fused.is_empty():
+                break
+            retries += 1
+            logger.warning(
+                "Hybrid: nói 'không có' dù context có dữ liệu — retry ép trả lời %d/%d",
+                attempt + 1, max_nodata_retry,
+            )
+            from src.qa.rag_answer import NO_DATA_RETRY_SUFFIX
+
+            answer = (
+                self.client.complete(
+                    prompt + NO_DATA_RETRY_SUFFIX.format(no_data=NO_DATA_ANSWER),
+                    temperature=float(generation.get("temperature", 0.0)),
+                    max_tokens=int(generation.get("max_tokens", 900)),
+                )
+                or ""
+            ).strip()
+            cited = extract_citations(answer)
 
         status = "not_in_data" if is_no_data(answer) else "found"
         if not answer:

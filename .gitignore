@@ -72,3 +72,12 @@ data/eval/eval_d122_narrative_*.jsonl
 data/eval/eval_d123_checkpoint.jsonl
 data/eval/eval_d123_checkpoint.*.json
 data/eval/eval_d123_narrative_*.jsonl
+# ---- Checkpoint eval trung gian Phase 19 (tái tạo bằng scripts/run_phase19_eval_loop.sh) ----
+# Giữ lại checkpoint KẾT QUẢI CUỐI (eval_phase19_checkpoint.jsonl) để tái lập kết quả báo cáo.
+data/eval/eval_phase19_A.jsonl
+data/eval/eval_phase19_B.jsonl
+data/eval/eval_phase19_B-.jsonl
+data/eval/eval_phase19_checkpoint.*.json
+data/eval/eval_phase19_smoke_*.jsonl
+data/eval/eval_phase19_smoke_*.json
+data/eval/_stale/

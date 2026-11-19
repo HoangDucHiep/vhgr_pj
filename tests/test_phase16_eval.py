@@ -335,7 +335,8 @@ class TestAggregateJudgeMissing:
         record["judge"]["reason"] = "Judge không trả về điểm cho phương án này."
         metrics = aggregate([record, _record("q2", 1)])
         assert metrics["n_judge_missing"] == 1
-        assert metrics["n"] == 2
+        # D-127: arm bị judge bỏ sót **không** tính vào mẫu số (điểm 0 giả).
+        assert metrics["n"] == 1
 
 
 class TestInfraErrorResume:
