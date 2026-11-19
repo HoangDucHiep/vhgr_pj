@@ -438,7 +438,7 @@ Kết quả Phase 5 đã chốt:
 | RAG — arm bị judge bỏ sót | 0 | **0** (cả 3 arm) |
 | RAG — câu lỗi hạ tầng | 0 | **0** (cả 3 arm) |
 | RAG — gold section trong top-8 (narrative) | ≥ 55/60 | **55/60** ✅ (Phase 19; trước **46/60**) |
-| RAG — câu hỏi eval hợp lệ (kiểm chứng live) | 100 % | **118/118** ✅ (0 câu không hợp lệ — G19-7) |
+| RAG — câu hỏi eval hợp lệ (kiểm chứng live) | 100 % | **246/246** ✅ (0 câu không hợp lệ — G19-7; 98 mệnh đề Wikidata khớp) |
 | RAG — câu trả lời bịa số năm (kiểm chứng live) | 0 | **0** ✅ (G19-6, checkpoint đang chạy) |
 | RAG — `abstain_with_evidence` (nói "không có" khi context có gold) | 0 | 🟡 đang chờ eval đủ (metric đã có trong `evaluate_rag.py`) |
 | Faithfulness (không bịa) | ≥ 0.90 | — |

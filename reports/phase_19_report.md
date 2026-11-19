@@ -91,14 +91,18 @@ TB số **section khác nhau** trong top-8: **3,06** (trước: 3,25 chunk/secti
 
 ### 3.2 G19-7 — 100 % câu hỏi hợp lệ (kiểm chứng online)
 
-Lệnh: `python scripts/verify_answers_online.py --qa-set data/eval/qa_rag_250_v2.jsonl --questions-only --out reports/phase19_verify_questions_v2.json`
+Lệnh: `python scripts/verify_answers_online.py --qa-set data/eval/qa_rag_250_v2.jsonl --questions-only --out reports/phase19_verify_questions_all.json`
 
 | Chỉ số | Kỳ vọng | Thực tế |
 |---|---|---|
-| Số câu hỏi được kiểm chứng | 118 (`narrative` 60 + `multi_turn` 58) | **118** |
+| Tổng số câu hỏi trong bộ | 246 | **246** |
 | Số câu hỏi **không hợp lệ** | **0** | **0** ✅ |
 | — `narrative` hợp lệ | 60 | **60** ✅ |
 | — `multi_turn` hợp lệ | 58 | **58** ✅ |
+| — `relational` hợp lệ (Wikidata live) | 58 | **58** ✅ |
+| — `multi_hop` hợp lệ (Wikidata live) | 40 | **40** ✅ |
+| — `no_data` hợp lệ (ngoài phạm vi corpus) | 30 | **30** ✅ |
+| Số mệnh đề quan hệ kiểm chứng qua `Special:EntityData/<QID>.json` | 98 | **98**, 0 sai |
 
 ⇒ **Không** loại câu hỏi nào vì lý do phạm vi (D-142) ⇒ mọi câu hỏi trong bộ eval
 đều **có thật** và **trả lời được từ corpus**.
@@ -134,7 +138,7 @@ Lệnh: `python scripts/verify_answers_online.py --checkpoint data/eval/eval_pha
 | **G19-4** | Bảng 4 nhóm + `no_data` + latency p50/p95 theo arm | script `summarize_eval.py` đã có; đang chờ dữ liệu | 🟡 |
 | **G19-5** | Kết luận A vs B vs B− **viết bằng số**, kèm phần "không kết luận được" | §5 | 🟡 |
 | **G19-6** | 100 % câu trả lời có nội dung **không có mệnh đề nào** bị bác bỏ online | **0** năm sai, **0** vi phạm `no_data` (checkpoint đang chạy) | ✅ (tạm) |
-| **G19-7** | 100 % câu hỏi hợp lệ; câu hỏi vô lý phải bị loại **có ghi nhận** | **0/118** không hợp lệ; **không** loại câu nào | ✅ |
+| **G19-7** | 100 % câu hỏi hợp lệ; câu hỏi vô lý phải bị loại **có ghi nhận** | **0/246** không hợp lệ (98 mệnh đề Wikidata đều khớp); **không** loại câu nào | ✅ |
 
 ## 5. Kết luận trung thực (G19-5)
 
@@ -180,8 +184,8 @@ python scripts/measure_gold_hit_rate.py \
 # --- Kiểm chứng câu hỏi online (G19-7) ---
 python scripts/verify_answers_online.py \
   --qa-set data/eval/qa_rag_250_v2.jsonl --questions-only \
-  --out reports/phase19_verify_questions_v2.json
-→ n_questions_checked 118 · n_questions_invalid 0 ✅
+  --out reports/phase19_verify_questions_all.json
+→ n_questions_invalid 0 / 246 câu · 98 mệnh đề Wikidata khớp tuyệt đối ✅
 
 # --- Kiểm chứng câu trả lời online (G19-6) ---
 python scripts/verify_answers_online.py \

@@ -95,8 +95,18 @@ TB số section khác nhau trong top-8: **3,06**.
 
 ### 4.2 G19-7 — câu hỏi hợp lệ (kiểm chứng live)
 
-**0/118** câu hỏi (`narrative` 60 + `multi_turn` 58) không hợp lệ ⇒ **không** loại
-câu hỏi nào vì lý do phạm vi.
+**0/246** câu hỏi không hợp lệ (kiểm chứng **toàn bộ** bộ eval, không chỉ
+`narrative` + `multi_turn`) ⇒ **không** loại câu hỏi nào vì lý do phạm vi.
+
+| Nhóm | Số câu | Kiểm chứng | Kết quả |
+|---|---|---|---|
+| `narrative` | 60 | mọi năm trong `expected_answer` phải có trong Wikipedia live | 60/60 ✅ |
+| `multi_turn` | 58 | như trên | 58/58 ✅ |
+| `relational` | 58 | `Special:EntityData/<QID>.json` (Wikidata live) | 58/58 ✅ |
+| `multi_hop` | 40 | như trên | 40/40 ✅ |
+| `no_data` | 30 | ngoài phạm vi corpus (hậu-1945) | 30/30 ✅ |
+
+Tổng **98 mệnh đề quan hệ** được đối chiếu trực tiếp với Wikidata live ⇒ 0 sai.
 
 ### 4.3 G19-6 — câu trả lời không bịa
 
@@ -130,7 +140,7 @@ chạy được 15/246 câu (quota Gemini RPD 500/model/ngày).
 - **"Trước khi nói KG hay không KG, phải sửa retrieval và sửa tầng sinh."**
 - Sửa retrieval: gold section trong top-8 **46/60 → 55/60**; thêm retry "không
   có" khi context có dữ liệu.
-- **Kiểm chứng bằng nguồn ngoài live**: **0/118** câu hỏi vô lý; **0** câu trả lời
-  bịa số năm.
+- **Kiểm chứng bằng nguồn ngoài live**: **0/246** câu hỏi vô lý (98 mệnh đề Wikidata
+  đối chiếu khớp tuyệt đối); **0** câu trả lời bịa số năm.
 - Số liệu A vs B vs B− **chốt sau** khi eval đủ 246 câu — hiện **không kết luận
   được**, và đó là kết luận trung thực.
