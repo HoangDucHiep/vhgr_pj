@@ -579,10 +579,9 @@ def test_aggregate_reports_abstain_with_evidence() -> None:
             "question": "câu hỏi",
             "expected_answer": "đáp án",
             "evidence_doc_id": ["doc_1"],
-            "evidence_section": "Diễn biến",
-            "arm": {
+            "evidence_section": "Diễn biến",            "arm": {
                 "answer": answer,
-                "context": "[1] A > Diễn biến\nnội dung",
+                "context": "[1] A > Diễn biến\nnội dung có đáp án",
                 "context_blocks": blocks,
                 "elapsed_ms": 10,
                 "infrastructure_error": False,
@@ -909,3 +908,39 @@ def test_measure_gold_hit_rate_script_exists() -> None:
     source = script.read_text(encoding="utf-8")
     assert "evidence_doc_id" in source
     assert "evidence_section" in source
+
+
+def test_context_has_gold_requires_answer_in_context() -> None:
+    """⚠️ `abstain_with_evidence` phải kiểm tra **đáp án có trong context**, không chỉ `doc_id`.
+
+    Vì sao? Câu hỏi "Gioan Baotixita Nguyễn Thần Đồng mất năm nào?" có
+    `evidence_doc_id = doc_7598948`; context **có** đúng bài nhưng các chunk lấy
+    về nằm ở section **khác** ⇒ **không** có câu trả lời ⇒ "Không có trong dữ
+    liệu" là **đúng** ⇒ đếm là lỗi là **sai** (đo được 13/13 câu bị đếm oan
+    trước khi sửa).
+    """
+    from src.evaluation.evaluate_rag import context_has_gold
+
+    blocks = [
+        {"doc_id": "doc_1", "section": "Bị bắt và đày ra Côn Đảo"},
+        {"doc_id": "doc_1", "section": "Thân thế và con đường tu học"},
+    ]
+
+    # Đáp án **có** trong context ⇒ tính là lỗi (abstain oan).
+    assert context_has_gold(
+        blocks, ["doc_1"], "", "[1] ... sinh năm Bính Dần (1866) ...", "năm 1866"
+    ) is True
+    # Đáp án **không** có trong context ⇒ "không có" là **đúng** ⇒ không lỗi.
+    assert context_has_gold(
+        blocks, ["doc_1"], "", "[1] ... sinh năm Bính Dần (1866) ...", "năm 1944"
+    ) is False
+    # Đáp án là **tên** không có trong context ⇒ không lỗi.
+    assert context_has_gold(
+        blocks, ["doc_1"], "", "[1] Nguyễn Phúc Nguyên ...", "Gia Long"
+    ) is False
+    # Tên **có** trong context ⇒ lỗi.
+    assert context_has_gold(
+        blocks, ["doc_1"], "", "[1] Nguyễn Phúc Nguyên ...", "Nguyễn Phúc Nguyên"
+    ) is True
+    # Không có `evidence_doc_id` ⇒ coi như có dữ liệu (thiên về phát hiện lỗi).
+    assert context_has_gold(blocks, [], "", "bất kỳ", "bất kỳ") is True

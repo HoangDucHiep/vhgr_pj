@@ -207,6 +207,8 @@ def context_has_gold(
     blocks: Iterable[dict[str, Any]] | None,
     evidence_doc_ids: Iterable[str] | None,
     evidence_section: str | None,
+    context_text: str | None = None,
+    expected_answer: str | None = None,
 ) -> bool:
     """Kiểm tra context của arm có chứa **bằng chứng** (gold) không.
 
@@ -217,13 +219,23 @@ def context_has_gold(
     ⇒ Metric `abstain_with_evidence` = số câu arm nói "không có" **dù context
     có bằng chứng** ⇒ đây chính là lỗi cần đưa về **0** (Gate G19-1).
 
+    ⚠️ Phase 19 — **không** được chỉ kiểm tra `doc_id` khớp.
+    Lý do? Với câu hỏi `relational` (vd. "Gioan Baotixita Nguyễn Thần Đồng mất
+    năm nào?"), context có **đúng bài** nhưng các chunk lấy về lại nằm ở
+    section **khác** ("Bị bắt và đày ra Côn Đảo") ⇒ **không** có câu trả lời
+    ⇒ "không có trong dữ liệu" là **đúng** ⇒ đếm là lỗi là **sai**.
+    ⇒ Với câu hỏi **quan hệ/năm** (đáp án là **tên** hoặc **năm**), phải kiểm
+    tra thêm: **đáp án có thật sự xuất hiện trong context** không.
+
     Args:
         blocks: Danh sách khối context (mỗi khối có `doc_id`, `section`).
         evidence_doc_ids: Danh sách `doc_id` là bằng chứng.
         evidence_section: Tên section là bằng chứng (có thể rỗng).
+        context_text: Toàn văn context (dùng để kiểm tra đáp án có trong đó).
+        expected_answer: Đáp án tham chiếu (tên hoặc năm).
 
     Returns:
-        ``True`` nếu context có bằng chứng.
+        ``True`` nếu context có bằng chứng **thực sự** chứa đáp án.
     """
     items = list(blocks or [])
     if not items:
@@ -234,16 +246,65 @@ def context_has_gold(
         # hiện lỗi hơn là bỏ sót lỗi).
         return True
     section = (evidence_section or "").strip()
+    matched_doc = False
     for block in items:
         if str(block.get("doc_id") or "") not in doc_ids:
             continue
+        matched_doc = True
         if not section:
-            return True
+            break
         path = str(block.get("section") or "")
         parts = [p.strip() for p in path.split(">") if p.strip()]
         if section in parts or path == section:
-            return True
-    return False
+            break
+    else:
+        matched_doc = False
+    if not matched_doc:
+        return False
+
+    # --- Kiểm tra thêm: đáp án (tên/năm) có **trong context** không? --------
+    answer = str(expected_answer or "").strip()
+    haystack = str(context_text or "")
+    if answer and haystack:
+        years = _extract_years(answer)
+        if years:
+            # Câu hỏi về **năm** ⇒ năm phải xuất hiện trong context.
+            return all(year in haystack for year in years)
+        # Câu hỏi về **tên** ⇒ kiểm tra tên có trong context không
+        # (bỏ qua ngoặc/vế sau như "Lê Tuân (An vương)").
+        for token in _answer_tokens(answer):
+            if token and token.casefold() in haystack.casefold():
+                return True
+        return False
+    return True
+
+
+def _extract_years(text: str) -> list[str]:
+    """Trích các **năm** (4 chữ số 1000–2099) trong chuỗi.
+
+    Args:
+        text: Chuỗi cần quét.
+
+    Returns:
+        Danh sách năm (chuỗi), theo thứ tự xuất hiện, bỏ trùng.
+    """
+    return list(dict.fromkeys(re.findall(r"(?<![\d,])((?:1[0-9]|20[0-9])\d{2})(?![\d,])", text or "")))
+
+
+def _answer_tokens(answer: str) -> list[str]:
+    """Tách đáp án tham chiếu thành các **tên** để đối chiếu với context.
+
+    Args:
+        answer: Đáp án tham chiếu (vd. "Lê Tuân (An vương)").
+
+    Returns:
+        Danh sách token (phần trước dấu ngoặc, và các tên trong ngoặc).
+    """
+    base = answer.split("(")[0].strip()
+    tokens = [base] if base else []
+    inner = re.findall(r"\(([^)]*)\)", answer)
+    tokens.extend(part.strip() for part in inner)
+    return [token for token in tokens if len(token) >= 2]
 
 
 def estimate_tokens(text: str) -> int:
@@ -2080,6 +2141,8 @@ def aggregate(records: list[dict[str, Any]]) -> dict[str, Any]:
             (record.get("arm") or {}).get("context_blocks"),
             record.get("evidence_doc_id"),
             record.get("evidence_section"),
+            (record.get("arm") or {}).get("context"),
+            record.get("expected_answer"),
         ):
             abstain_with_evidence += 1
 
@@ -2107,6 +2170,8 @@ def aggregate(records: list[dict[str, Any]]) -> dict[str, Any]:
             (record.get("arm") or {}).get("context_blocks"),
             record.get("evidence_doc_id"),
             record.get("evidence_section"),
+            (record.get("arm") or {}).get("context"),
+            record.get("expected_answer"),
         ):
             bucket["abstain_with_evidence"] += 1
     for bucket in by_type.values():

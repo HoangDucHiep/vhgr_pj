@@ -42,6 +42,17 @@ if [ "$GROUP" != "all" ]; then
 fi
 
 for round in $(seq 1 "$MAX_ROUNDS"); do
+    # ⚠️ Phase 19 — vòng đầu chạy **nhóm `narrative` trước**.
+    # Vì sao? G19-1 (not_in_data của A) và G19-3 (faithfulness) đều gắn với
+    # nhóm `narrative` (60 câu) ⇒ chạy nhóm này trước để **chốt sớm** 2 Gate
+    # đó; các nhóm còn lại chạy sau (checkpoint `--resume` ⇒ không tốn lại
+    # quota cho câu đã chạy).
+    ONLY_TYPES_ARG_THIS_ROUND="$ONLY_TYPES_ARG"
+    if [ "$GROUP" = "all" ] && [ "$round" -eq 1 ]; then
+        ONLY_TYPES_ARG_THIS_ROUND="--only-types narrative"
+        echo "    ⇒ vòng 1 chỉ chạy nhóm 'narrative' (chốt G19-1/G19-3 sớm)" >> "$LOG"
+    fi
+
     done_count=$(wc -l < "$CHECKPOINT" 2>/dev/null || echo 0)
     echo "" >> "$LOG"
     echo "=== Vòng ${round}/${MAX_ROUNDS} — đã có ${done_count} câu ($(date '+%F %T')) ===" >> "$LOG"
@@ -54,7 +65,7 @@ for round in $(seq 1 "$MAX_ROUNDS"); do
     # `--resume` đọc checkpoint ⇒ bỏ qua câu đã xử lý.
     docker compose exec -T backend python -u -m src.evaluation.evaluate_rag \
         --qa-set "$QA_SET" \
-        $ONLY_TYPES_ARG \
+        $ONLY_TYPES_ARG_THIS_ROUND \
         --arms A,B,B- \
         --checkpoint "$CHECKPOINT" \
         --out-prefix "eval_phase19" \
