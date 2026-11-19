@@ -115,8 +115,30 @@ vi phạm `no_data`.
 
 ### 4.4 A vs B vs B−
 
-Xem `reports/phase_19_report.md` §3.4. **Hiện CHƯA kết luận được** — eval mới mới
-chạy được 15/246 câu (quota Gemini RPD 500/model/ngày).
+Xem `reports/phase_19_report.md` §3.4. Checkpoint đang chạy: **131/246** câu.
+
+| Nhóm | A | B | B− | Ghi chú |
+|---|---|---|---|---|
+| `narrative` (n=52) | **1,942** | 1,904 | **1,942** | KG **không** tạo lợi thế |
+| `relational` (n=57) | 1,404 | **1,807** | 1,298 | KG rõ ràng có ích |
+| `multi_hop` (n=22) | 1,091 | **1,545** | 1,273 | KG có ích |
+
+**G19-1 đạt trên `narrative`**: `not_in_data` của A: **16/60 → 2/52**;
+`abstain_with_evidence` = **0** (cả 3 arm) ⇒ không câu nào nói "không có" khi
+context thật sự có đáp án.
+
+**Hiện CHƯA kết luận được** trên `narrative` — còn thiếu 8 câu `narrative`, toàn bộ
+`multi_turn` (58) và `no_data` (30) (quota Gemini RPD 500/model/ngày).
+
+### 4.5 Bài học mới: **công cụ kiểm chứng cũng phải được kiểm chứng**
+
+Lần chạy đầu của `verify_answers_online.py` báo 4 câu trả lời "bịa số năm". Điều tra
+cho thấy **cả 4 là false negative của chính script** (D-146):
+
+1. Khoá cache dùng `_norm()` (bỏ dấu) ⇒ "Lê Hiển Tông" va chạm "Lê Hiến Tông".
+2. Chỉ so năm với `evidence_doc_id`, bỏ qua các nguồn đã trích dẫn (KG/text).
+
+⇒ Mọi cờ "bịa" phải được **đối chiếu thủ công** với nguồn trước khi tin.
 
 ## 5. Sai ở đâu (bài học)
 
@@ -134,6 +156,8 @@ chạy được 15/246 câu (quota Gemini RPD 500/model/ngày).
 6. **Bind-mount container giữ inode cũ** ⇒ sau khi repo di chuyển, container vẫn
    ghi vào thư mục **đã bị xoá** ⇒ phải `--force-recreate` + đồng bộ code (image
    `COPY` code ⇒ cần `build` khi code đổi).
+7. **Công cụ kiểm chứng cũng có bug** ⇒ mọi cờ "bịa" phải đối chiếu thủ công với
+   nguồn trước khi tin (xem §4.5).
 
 ## 6. Kết luận lấy vào slide
 
@@ -144,3 +168,6 @@ chạy được 15/246 câu (quota Gemini RPD 500/model/ngày).
   đối chiếu khớp tuyệt đối); **0** câu trả lời bịa số năm.
 - Số liệu A vs B vs B− **chốt sau** khi eval đủ 246 câu — hiện **không kết luận
   được**, và đó là kết luận trung thực.
+- **Tạm thời** (131/246 câu): KG **có ích rõ** trên `relational` (1,807 vs 1,404 vs
+  1,298) và `multi_hop` (1,545 vs 1,091 vs 1,273); **không** thấy lợi thế trên
+  `narrative` (1,942 ≈ 1,904 ≈ 1,942).
