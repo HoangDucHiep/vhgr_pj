@@ -106,7 +106,34 @@ MULTI_HOP_CHAIN: dict[str, list[tuple[str, str]]] = {
     "multi_hop_vo_cua_cha": [("P22", "out"), ("P26", "out")],
 }
 
+#: Property trả về **người** ⇒ chỉ xét entity `type == "person"`.
+PERSON_PROPERTIES: frozenset[str] = frozenset({"P22", "P25", "P26", "P40"})
+
+#: Property trả về **địa điểm** ⇒ chỉ xét entity `type` địa điểm.
+PLACE_PROPERTIES: frozenset[str] = frozenset({"P19", "P20"})
+
+#: Quan hệ (hỏi về chủ thể S) → property **ngược** của **người được trả lời**
+#: phải trỏ **về** S. Dùng để **bác bỏ** mệnh đề: nếu property này của người
+#: được trả lời **không rỗng** mà **không chứa** S ⇒ mệnh đề sai.
+SUBJECT_SIDE_PROPERTY: dict[str, str] = {
+    "cha_cua": "P22",
+    "inverse_cha_cua": "P22",
+    "me_cua": "P25",
+    "inverse_me_cua": "P25",
+    "vo_cua": "P26",
+}
+
 _last_request_ts: float = 0.0
+
+#: Tên **rác** thường xuất hiện trong KG (danh xưng, đại từ, số) ⇒ không thể
+#: dùng để kết luận "mệnh đề bị bác bỏ" ⇒ bỏ qua khi kiểm chứng.
+_GENERIC_ENTITY_NAMES: frozenset[str] = frozenset({
+    "ông", "bà", "anh", "chị", "ông ấy", "bà ấy", "ai", "đó", "này",
+    "anh trai", "chị gái", "em trai", "em gái", "vợ", "chồng", "con",
+    "cha", "mẹ", "ông vua", "hoàng hậu", "vua", "hoàng tử", "công chúa",
+    "thái tử", "thái hậu", "tướng", "quân", "lính", "người", "nhà",
+    "a", "an", "ai", "ao", "áo", "ba", "bac", "12", "1", "2", "3", "4", "5",
+})
 
 
 # ----------------------------------------------------------------------
@@ -493,6 +520,27 @@ def entity_index_by_name(entities: dict[str, dict[str, Any]]) -> dict[str, list[
     return index
 
 
+def entity_index_by_qid(entities: dict[str, dict[str, Any]]) -> dict[str, list[dict]]:
+    """Index entity theo QID Wikidata.
+
+    Vì sao cần? Wikidata và KG nội bộ thường ghi **cùng một người** bằng
+    **hai nhãn khác nhau** ("Lê Thị Phất Ngân" vs "Lập Giáo Hoàng hậu") ⇒
+    cần tra cứu tên nội bộ theo QID để bổ sung bí danh khi so khớp (D-149).
+
+    Args:
+        entities: Dict `entity_id` → entity.
+
+    Returns:
+        Dict QID → danh sách entity.
+    """
+    index: dict[str, list[dict[str, Any]]] = {}
+    for entity in entities.values():
+        qid = str(entity.get("wikidata_qid") or "")
+        if qid:
+            index.setdefault(qid, []).append(entity)
+    return index
+
+
 # ----------------------------------------------------------------------
 # Kiểm chứng
 # ----------------------------------------------------------------------
@@ -553,6 +601,98 @@ def verify_question(
         result["valid"] = False
         result["reason"] = f"năm không có trong Wikipedia live: {missing}"
     return result
+
+
+def _contains_phrase(haystack: str, needle: str) -> bool:
+    """Kiểm tra `needle` có xuất hiện trong `haystack` **đúng ranh giới từ**.
+
+    Vì sao cần? So khớp bằng `in` thuần sẽ khớp **chuỗi con** ⇒ "Hà Nội"
+    khớp trong "Hà Nam", "Nguyễn Phúc" khớp trong "Nguyễn Phúc Miên Tông" ⇒
+    báo sai (false positive) ⇒ mất niềm tin vào bộ kiểm chứng.
+
+    Args:
+        haystack: Chuỗi lớn (đã chuẩn hoá).
+        needle: Chuỗi cần tìm (đã chuẩn hoá).
+
+    Returns:
+        ``True`` nếu `needle` xuất hiện đúng ranh giới từ.
+    """
+    if not needle or not haystack:
+        return False
+    pattern = r"(?<!\w)" + re.escape(needle) + r"(?!\w)"
+    return bool(re.search(pattern, haystack))
+
+
+def _fuzzy_match(name: str, candidates: list[str]) -> bool:
+    """So khớp **mờ** tên Việt (chịu khác biệt chính tả).
+
+    Vì sao cần? Cùng một người có thể được ghi:
+    - KG nội bộ: "Nguyễn Phúc Miên Tông"
+    - Wikidata live: "Nguyễn Phước Miên Tông" (bí danh), "Nguyễn Phúc Miên Tống"
+
+    ⇒ so khớp **chính xác** báo sai (false positive) ⇒ mất niềm tin vào bộ
+    kiểm chứng. ⇒ Dùng độ tương đồng token (không phân biệt hoa/thường,
+    bỏ dấu) để coi là cùng một người.
+
+    Args:
+        name: Tên cần so.
+        candidates: Danh sách tên đích.
+
+    Returns:
+        ``True`` nếu có tên đích tương đồng.
+    """
+    if not name or not candidates:
+        return False
+    key_tokens = set(_norm(name).split())
+    if not key_tokens:
+        return False
+    for candidate in candidates:
+        tokens = set(_norm(candidate).split())
+        if not tokens:
+            continue
+        if key_tokens == tokens:
+            return True
+        # Cho phép lệch 1 ký tự trên mỗi token (Phúc↔Phước, Tông↔Tống).
+        unmatched = list(key_tokens)
+        for token in tokens:
+            for other in list(unmatched):
+                if _edit_distance_at_most(other, token, 1):
+                    unmatched.remove(other)
+                    break
+        if not unmatched:
+            return True
+    return False
+
+
+def _edit_distance_at_most(a: str, b: str, limit: int) -> bool:
+    """Khoảng cách sửa đổi giữa `a` và `b` có ≤ `limit` không.
+
+    Args:
+        a: Chuỗi 1.
+        b: Chuỗi 2.
+        limit: Ngưỡng cho phép.
+
+    Returns:
+        ``True`` nếu khoảng cách ≤ `limit`.
+    """
+    if abs(len(a) - len(b)) > limit:
+        return False
+    previous = list(range(len(b) + 1))
+    for i, ca in enumerate(a, start=1):
+        current = [i]
+        for j, cb in enumerate(b, start=1):
+            cost = 0 if ca == cb else 1
+            current.append(
+                min(
+                    previous[j] + 1,
+                    current[j - 1] + 1,
+                    previous[j - 1] + cost,
+                )
+            )
+        if min(current) > limit:
+            return False
+        previous = current
+    return previous[-1] <= limit
 
 
 def _name_keys(name: str) -> set[str]:
@@ -671,6 +811,7 @@ def verify_relational_online(
     row: dict[str, Any],
     entities: dict[str, dict[str, Any]],
     by_name: dict[str, list[dict[str, Any]]],
+    by_qid: dict[str, list[dict[str, Any]]] | None = None,
 ) -> dict[str, Any]:
     """Kiểm chứng quan hệ bằng **Wikidata live** (không cần LLM).
 
@@ -678,6 +819,7 @@ def verify_relational_online(
         row: Bản ghi câu hỏi.
         entities: Dict `entity_id` → entity.
         by_name: Index entity theo tên chuẩn hoá.
+        by_qid: Index entity theo QID (bổ sung bí danh nội bộ — D-149).
 
     Returns:
         Dict kết quả (`verified`, `method`, `detail`).
@@ -759,6 +901,20 @@ def verify_relational_online(
     target_keys: set[str] = set()
     for qid in current:
         target_keys |= wikidata_name_keys(qid)
+    # ⚠️ Phase 19 (D-149) — bổ sung **tên trong KG nội bộ** của các QID đích.
+    #
+    # Vì sao cần? Wikidata và KG nội bộ thường ghi **cùng một người** bằng
+    # **hai nhãn khác nhau**: Wikidata vi "Lê Thị Phất Ngân" (Q10787856) còn
+    # KG nội bộ vi "Lập Giáo Hoàng hậu" ⇒ nếu chỉ so tên **live** ⇒ đáp án
+    # hợp lệ bị báo sai (false negative) ⇒ Gate G19-7 tự bị bằng chứng.
+    # ⇒ Dùng KG nội bộ để **bổ sung** bí danh, nhưng **không** thay thế nguồn
+    # live (tập QID đích vẫn lấy từ Wikidata live).
+    target_qids = set(current)
+    for qid in target_qids:
+        for entity in (by_qid or {}).get(qid) or []:
+            name = str(entity.get("name") or "")
+            if name:
+                target_keys |= _name_keys(name)
 
     # Đáp án có thể **nhiều tên** (vd. "Ai là con của X?" ⇒ "A, B, C")
     # ⇒ **mọi** tên trong danh sách đều phải có trong tập đích.
@@ -767,7 +923,6 @@ def verify_relational_online(
     # "Lập Giáo Hoàng hậu" còn Wikidata chỉ ghi "Lê Long Đĩnh" ⇒ so tên thô
     # ⇒ **báo sai** (false negative). ⇒ Tra QID của từng tên trong KG nội bộ
     # rồi so với tập QID đích **lấy từ Wikidata live**.
-    target_qids = set(current)
     expected_names = _split_expected_names(expected, target_keys)
 
     def _matches(name: str) -> bool:
@@ -839,11 +994,275 @@ def _incoming(qid: str, prop: str) -> list[str]:
     return out
 
 
+def _relation_chain_for(row: dict[str, Any]) -> list[tuple[str, str]] | None:
+    """Chuỗi property Wikidata tương ứng với quan hệ của câu hỏi.
+
+    Args:
+        row: Bản ghi câu hỏi.
+
+    Returns:
+        Danh sách `(prop, hướng)`, hoặc `None` nếu quan hệ không có bảng tra.
+    """
+    relation = str(row.get("relation") or "")
+    if relation in MULTI_HOP_CHAIN:
+        return MULTI_HOP_CHAIN[relation]
+    if relation in RELATION_PROPERTY:
+        return [RELATION_PROPERTY[relation]]
+    return None
+
+
+def _live_relation_chain_qids(
+    row: dict[str, Any],
+    by_name: dict[str, list[dict[str, Any]]],
+) -> tuple[str, list[str], list[str]]:
+    """Tra **chuỗi QID** của quan hệ (chủ thể → hop-1 → hop-2) từ Wikidata live.
+
+    Args:
+        row: Bản ghi câu hỏi.
+        by_name: Index entity theo tên chuẩn hoá.
+
+    Returns:
+        Tuple `(QID chủ thể, QID hop-1, QID hop-2)`.
+    """
+    chain = _relation_chain_for(row)
+    subject_name = str(row.get("subject_name") or "")
+    subject_qid = ""
+    for entity in by_name.get(_norm(subject_name)) or []:
+        qid = str(entity.get("wikidata_qid") or "")
+        if qid:
+            subject_qid = qid
+            break
+    if not subject_qid or not chain:
+        return "", [], []
+    hops: list[list[str]] = []
+    current = [subject_qid]
+    for prop, direction in chain:
+        if prop in {"P569", "P570"}:
+            break
+        nxt: list[str] = []
+        for qid in current:
+            targets = wikidata_property_targets(qid, prop)
+            if direction == "out":
+                nxt.extend(targets)
+            else:
+                nxt.extend(_incoming(qid, prop))
+        current = nxt
+        if not current:
+            break
+        hops.append(list(current))
+    hop1 = hops[0] if hops else []
+    hop2 = hops[1] if len(hops) > 1 else []
+    return subject_qid, hop1, hop2
+
+
+def verify_answer_relation_online(
+    answer: str,
+    row: dict[str, Any],
+    entities: dict[str, dict[str, Any]],
+    by_name: dict[str, list[dict[str, Any]]],
+    by_qid: dict[str, list[dict[str, Any]]] | None = None,
+) -> dict[str, Any]:
+    """Kiểm chứng **mệnh đề quan hệ** trong câu trả lời bằng Wikidata live.
+
+    Vì sao cần?
+    -----------
+    G19-6 yêu cầu **100 %** câu trả lời phải **không có mệnh đề nào bị bác bỏ**
+    bởi kiểm chứng online. Trước đây nhóm `relational`/`multi_hop` **chỉ** được
+    so **số năm** ⇒ một câu trả lời kiểu *"Cha của Thiệu Trị là Minh Mạng, Tự
+    Đức, hoặc Hồ Thị Hoa"* (3 người, chỉ 1 đúng) **không** bị phát hiện.
+
+    ⇒ Nay: với mỗi **tên người** mà hệ thống khẳng định trong câu trả lời,
+    tra Wikidata live ⇒ tách 3 nhóm:
+
+    - **confirmed**: tên **có** trong tập QID đích của quan hệ (Wikidata live
+      xác nhận) ⇒ mệnh đề **đúng**.
+    - **unconfirmed**: tên **không** có trong tập QID đích ⇒ **không** được
+      Wikidata live xác nhận. ⚠️ KHÔNG coi là "bịa": property của Wikidata
+      (`P22`/`P26`/`P40`) **không đầy đủ** ⇒ thiếu ≠ sai.
+    - Chủ thể + node trung gian được **loại** khỏi kiểm tra (hợp lệ theo
+      cấu trúc chuỗi, không phải mệnh đề trả lời).
+
+    ⇒ Gate G19-6 dùng tiêu chí **có ít nhất 1 mệnh đề được Wikidata live xác
+    nhận** cho câu trả lời có nội dung của nhóm `relational`/`multi_hop`.
+
+    Args:
+        answer: Câu trả lời của hệ thống.
+        row: Bản ghi câu hỏi (dùng `relation` + `subject_name`).
+        entities: Dict `entity_id` → entity.
+        by_name: Index entity theo tên chuẩn hoá.
+        by_qid: Index entity theo QID (bổ sung bí danh nội bộ — D-149).
+
+    Returns:
+        Dict kết quả (`checked`, `confirmed_names`, `unconfirmed_names`, `ok`).
+    """
+    chain = _relation_chain_for(row)
+    if not chain or chain[0][0] in {"P569", "P570"}:
+        return {"checked": False, "detail": "quan hệ không dùng QID đích"}
+    subject_qid, hop1, hop2 = _live_relation_chain_qids(row, by_name)
+    if not subject_qid or not hop1:
+        return {"checked": False, "detail": "Wikidata live không có chuỗi quan hệ"}
+
+    target_qids = set(hop2 or hop1)
+    allowed_qids = set(hop1) | set(hop2) | {subject_qid}
+    target_keys: set[str] = set()
+    target_name_list: list[str] = []
+    for qid in target_qids:
+        keys = wikidata_name_keys(qid)
+        target_keys |= keys
+        target_name_list.extend(keys)
+    for qid in target_qids:
+        for entity in (by_qid or {}).get(qid) or []:
+            name = str(entity.get("name") or "")
+            if name:
+                target_keys |= _name_keys(name)
+                target_name_list.extend(_name_keys(name))
+    allowed_keys: set[str] = set()
+    for qid in allowed_qids:
+        allowed_keys |= wikidata_name_keys(qid)
+
+    # ⚠️ Chỉ xét **câu đầu tiên** của câu trả lời — nơi hệ thống *khẳng
+    # định* quan hệ ("Mẹ của X là Y"). Các câu sau chỉ mô tả bối cảnh
+    # ("...thuộc Giáo phận Hà Nội") ⇒ tên ở đó **không phải** mệnh đề trả lời
+    # ⇒ nếu quét cả bài ⇒ báo sai (false positive).
+    full_answer = _norm(answer)
+    normalized_answer = re.split(r"(?<=[.!?])\s+", full_answer.strip())[0]
+    confirmed: list[str] = []
+    unconfirmed: list[str] = []
+    variants: list[str] = []
+    # Chỉ xét entity **cùng loại** với property của quan hệ:
+    # `P22`/`P25`/`P26`/`P40` ⇒ người; `P19`/`P20` ⇒ địa điểm.
+    # ⇒ tránh báo "Hà Nội" (địa điểm) là mệnh đề sai cho câu hỏi về **người**.
+    allowed_types: set[str] = set()
+    for prop, _direction in chain:
+        if prop in PERSON_PROPERTIES:
+            allowed_types.add("person")
+        elif prop in PLACE_PROPERTIES:
+            allowed_types.add("place")
+
+    # --- Bước 1: thu thập mọi tên xuất hiện trong câu trả lời (kèm vị trí) --
+    matches: list[tuple[str, str, int, int]] = []
+    for entity in entities.values():
+        name = str(entity.get("name") or "")
+        qid = str(entity.get("wikidata_qid") or "")
+        if not name or not qid:
+            continue
+        if allowed_types and str(entity.get("type") or "") not in allowed_types:
+            continue
+        # ⚠️ Bỏ qua **tên rác / danh xưng** — KG có node tên "ông", "Gia",
+        # "Binh" (sinh ra từ coref) ⇒ không thể kết luận "mệnh đề bị bác bỏ"
+        # từ chúng. Tiêu chí: tên phải có **≥ 2 từ** (tên đầy đủ kiểu Việt)
+        # ⇒ loại mọi tên đơn âm / danh xưng.
+        if _norm(name) in _GENERIC_ENTITY_NAMES:
+            continue
+        if len(_norm(name).split()) < 2:
+            continue
+        for key in _name_keys(name):
+            for match in re.finditer(
+                r"(?<!\w)" + re.escape(key) + r"(?!\w)", normalized_answer
+            ):
+                matches.append((name, qid, match.start(), match.end()))
+                break
+
+    # --- Bước 2: giữ lại **span tối đa** -------------------------------------
+    #
+    # Vì sao cần? "Lê Hy" (entity riêng) xuất hiện **bên trong** "Lê Hy Tông"
+    # ⇒ nếu không lọc ⇒ "Lê Hy" bị coi là một mệnh đề riêng ⇒ báo sai.
+    # ⇒ Giữ match có span **dài nhất** khi các span chồng lấn.
+    matches.sort(key=lambda item: (-(item[3] - item[2]), item[2]))
+    kept: list[tuple[str, str, int, int]] = []
+    for name, qid, start, end in matches:
+        if any(start < k_end and k_start < end for _n, _q, k_start, k_end in kept):
+            continue
+        kept.append((name, qid, start, end))
+
+    for name, qid, _start, _end in kept:
+        keys = _name_keys(name)
+        # Ưu tiên so khớp theo **QID** (chuẩn, D-149): nếu QID của entity
+        # nằm trong tập đích live ⇒ mệnh đề **đúng** (kể cả nhãn khác).
+        if qid in target_qids:
+            confirmed.append(name)
+        elif keys & target_keys:
+            confirmed.append(name)
+        elif _fuzzy_match(name, target_name_list):
+            # ⚠️ Trùng **tên** nhưng **khác QID** (vd. "Nguyễn Phúc Miên
+            # Tông" — con của Thiệu Trị — vs bí danh "Nguyễn Phước Miên Tông"
+            # của chính Thiệu Trị) ⇒ **không** kết luận được ⇒ tách riêng.
+            variants.append(name)
+        elif keys & allowed_keys:
+            # Chủ thể / node trung gian ⇒ không phải mệnh đề trả lời.
+            continue
+        else:
+            unconfirmed.append(name)
+
+    # --- Bước 3: phép thử **âm bảo** — mệnh đề có bị Wikidata **bác bỏ**? ---
+    #
+    # Vì sao cần? "Không có trong tập đích" ≠ "sai" (Wikidata **không đầy
+    # đủ**). ⇒ Chỉ kết luận **bị bác bỏ** khi Wikidata **tường minh** mâu
+    # thuẫn: người được trả lời **có** quan hệ đó trong Wikidata nhưng
+    # quan hệ đó **không trỏ** về chủ thể (hoặc về node trung gian).
+    #
+    # ⚠️ Phải so **đúng chiều**:
+    #   - "Ai là **cha/mẹ** của S?" ⇒ đáp án A ⇒ kiểm tra `A.P40` (con) có S?
+    #   - "Ai là **con** của S?"     ⇒ đáp án A ⇒ kiểm tra `A.P22`/`A.P25` có S?
+    #   - "Ai là **vợ/chồng** của S?" ⇒ đáp án A ⇒ kiểm tra `A.P26` có S?
+    refuted: list[str] = []
+    refuted_detail: list[dict[str, Any]] = []
+    last_prop, _last_dir = chain[-1]
+    counterparts = set(hop1) if len(chain) > 1 else {subject_qid}
+    #: Property **đối xứng** để kiểm tra âm bảo.
+    reverse_props: tuple[str, ...] = {
+        "P22": ("P40",),
+        "P25": ("P40",),
+        "P26": ("P26",),
+        "P40": ("P22", "P25"),
+    }.get(last_prop, ())
+    if reverse_props and counterparts:
+        for name, qid, _start, _end in kept:
+            if qid in target_qids or name in confirmed:
+                continue
+            if qid in allowed_qids:
+                # Chủ thể / node trung gian ⇒ **không** phải mệnh đề trả lời.
+                continue
+            claims: set[str] = set()
+            for prop in reverse_props:
+                claims |= set(wikidata_property_targets(qid, prop))
+            if not claims:
+                # Wikidata không ghi quan hệ này cho người đó ⇒ **không** kết
+                # luận được (thiếu dữ liệu ≠ sai).
+                continue
+            if not (claims & counterparts):
+                refuted.append(name)
+                # Ghi lại **giá trị thay thế** mà Wikidata live đưa ra ⇒ để
+                # đối chiếu **bằng tay** (kiểm chứng mệnh đề bị bác bỏ).
+                replacement = sorted(claims)[:6]
+                labels_alt = wikidata_labels(replacement)
+                refuted_detail.append(
+                    {
+                        "name": name,
+                        "qid": qid,
+                        "live_relation_values": labels_alt,
+                        "expected_counterpart": sorted(counterparts)[:6],
+                    }
+                )
+
+    return {
+        "checked": True,
+        "n_confirmed": len(confirmed),
+        "confirmed_names": confirmed[:8],
+        "unconfirmed_names": unconfirmed[:8],
+        "variant_names": variants[:8],
+        "refuted_names": refuted[:8],
+        "refuted_detail": refuted_detail[:8],
+        "ok": not refuted,
+    }
+
+
 def verify_answer_against_wikipedia(
     answer: str,
     doc_ids: list[str],
     doc_titles: dict[str, str],
     extra_titles: Iterable[str] | None = None,
+    context: str = "",
 ) -> dict[str, Any]:
     """Kiểm chứng **số năm** trong câu trả lời bằng Wikipedia live.
 
@@ -890,10 +1309,24 @@ def verify_answer_against_wikipedia(
             "detail": "không tải được Wikipedia live",
         }
     unsupported = [year for year in years if str(year) not in haystack]
+    # ⚠️ Phase 19 (D-158) — phân biệt **bịa** với **sai lệch nguồn**.
+    #
+    # Năm không có trong Wikipedia live **không** đồng nghĩa với bịa: năm đó có
+    # thể nằm trong **context mà hệ thống đọc** (KG infobox, văn bản corpus) —
+    # Wikipedia đã sửa/đổi sau khi corpus được xây ⇒ đó là **sai lệch nguồn**,
+    # không phải bịa. Ví dụ thật:
+    #   * "Lê Chất (1769 – 1826)" — corpus (Wikipedia cũ), live đã sửa thành 1774.
+    #   * "Ngày sinh: 15 tháng 2 năm 1899" — KG infobox (conf 0,97), live 1890.
+    #   * "Phong trào giải phóng dân tộc Việt Nam (1885–1945)" — **tên sự kiện**,
+    #     không phải năm sinh ⇒ không hề là mệnh đề sai.
+    in_context = [year for year in unsupported if str(year) in context]
+    fabricated = [year for year in unsupported if str(year) not in context]
     return {
         "n_years": len(years),
         "unsupported_years": unsupported,
-        "ok": not unsupported,
+        "fabricated_years": fabricated,
+        "source_mismatch_years": in_context,
+        "ok": not fabricated,
     }
 
 
@@ -936,6 +1369,7 @@ def main() -> int:
     doc_titles = load_doc_titles(REPO_ROOT / args.documents)
     entities = load_entity_qids(REPO_ROOT / args.entities)
     by_name = entity_index_by_name(entities)
+    by_qid = entity_index_by_qid(entities)
 
     checkpoint: dict[str, dict[str, Any]] = {}
     if args.checkpoint and not args.questions_only:
@@ -967,7 +1401,7 @@ def main() -> int:
             if not check.get("valid"):
                 n_invalid += 1
         if check.get("type") in {"relational", "multi_hop"}:
-            check["wikidata"] = verify_relational_online(row, entities, by_name)
+            check["wikidata"] = verify_relational_online(row, entities, by_name, by_qid)
         report["questions"][qid] = check
         print(
             f"[Q] {qid} ({check['type']}): "
@@ -978,6 +1412,9 @@ def main() -> int:
     n_unsupported = 0
     n_no_data_violations = 0
     n_contradictions = 0
+    n_refuted = 0
+    n_rel_checked = 0
+    n_source_mismatch = 0
     for qid, record in checkpoint.items():
         row = next((r for r in qa_rows if str(r.get("qid")) == qid), None)
         if row is None:
@@ -1011,12 +1448,32 @@ def main() -> int:
                     if str(citation.get("title") or "")
                 ]
                 verdict = verify_answer_against_wikipedia(
-                    answer, doc_ids, doc_titles, extra_titles
+                    answer,
+                    doc_ids,
+                    doc_titles,
+                    extra_titles,
+                    context=str((arm_data.get("arm") or {}).get("context") or ""),
                 )
                 entry.update(verdict)
                 n_answers += 1
                 if verdict.get("ok") is False:
                     n_unsupported += 1
+                elif verdict.get("unsupported_years"):
+                    # Năm có trong context nhưng không có ở Wikipedia live
+                    # ⇒ **sai lệch nguồn**, không phải bịa (D-158).
+                    n_source_mismatch += 1
+                # ⚠️ Phase 19 — kiểm chứng **mệnh đề quan hệ** bằng
+                # Wikidata live cho nhóm `relational`/`multi_hop`
+                # (G19-6: không được để mệnh đề sai trôi qua).
+                if row.get("type") in {"relational", "multi_hop"}:
+                    rel_verdict = verify_answer_relation_online(
+                        answer, row, entities, by_name, by_qid
+                    )
+                    entry["relation_check"] = rel_verdict
+                    if rel_verdict.get("checked"):
+                        n_rel_checked += 1
+                    if rel_verdict.get("checked") and not rel_verdict.get("ok"):
+                        n_refuted += 1
             report["answers"].setdefault(qid, {})[arm] = entry
 
     # Số câu có mâu thuẫn với đáp án tham chiếu (D-142) — tính nếu có judge.
@@ -1034,8 +1491,11 @@ def main() -> int:
         "n_questions_invalid": n_invalid,
         "n_answers_checked": n_answers,
         "n_answers_with_unsupported_years": n_unsupported,
+        "n_answers_with_source_mismatch_years": n_source_mismatch,
         "n_no_data_violations": n_no_data_violations,
         "n_contradicts_reference": n_contradictions,
+        "n_relation_checked": n_rel_checked,
+        "n_answers_with_refuted_relation": n_refuted,
     }
     text = json.dumps(report, ensure_ascii=False, indent=2)
     print("\n=== Tổng kết ===")

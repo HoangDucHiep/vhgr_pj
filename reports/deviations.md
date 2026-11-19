@@ -2407,3 +2407,31 @@ nhau** không, (2) phần context bị **cắt mất** không, (3) judge có **�
 - Ảnh hưởng: G19-6 đạt **0/336** câu trả lời bịa (thay vì 4/336 do lỗi script); nhóm `multi_turn` đo được công bằng giữa 3 arm.
 - Xử lý: Ghi **D-146** (khoá cache + đối chiếu đa nguồn) và **D-147** (giữ thứ tự lượt) trong `docs/DECISIONS.md`; thêm test hồi quy trong `tests/test_phase19_grounded.py`.
 - Cập nhật file: `scripts/verify_answers_online.py`, `src/evaluation/evaluate_rag.py`, `tests/test_phase19_grounded.py`, `docs/DECISIONS.md`.
+
+---
+
+## D-144 — Sinh bộ câu hỏi **v3** + sửa **false negative thứ 3** của bộ kiểm chứng (so theo QID)
+
+- Ngày: 2026-11-19
+- Phase: 19
+- Loại: kỹ thuật
+- Kế hoạch: §4 sinh `qa_rag_250_v2.jsonl`; §7 kiểm chứng bằng Wikipedia/Wikidata live.
+- Thực tế: (1) Kiểm chứng online cho thấy **33/37** chủ đề `no_data` của bộ v2 thực ra **có trong corpus** (corpus phủ **toàn bộ** lịch sử VN, tới năm 2026 — không chỉ 9 triều đại) ⇒ hệ thống trả lời **đúng** lại bị tính **sai** ⇒ `no_data_accuracy` của bộ v2 **không** đo được gì. (2) Chạy lại kiểm chứng trên bộ v3 ⇒ còn **1** câu (`q0010`) bị báo sai: đáp án dùng nhãn **KG nội bộ** ("Lập Giáo Hoàng hậu") còn Wikidata ghi nhãn khác ("Lê Thị Phất Ngân") cho **cùng QID** `Q10787856`.
+- Lý do: (1) Giả định "corpus chỉ phủ 9 triều đại" **sai** ⇒ phải đo thay vì giả định. (2) Cùng một người có thể có **nhiều nhãn** ⇒ so khớp phải theo **QID** (chuẩn), tên chỉ là **bí danh**.
+- Ảnh hưởng: Bộ v3 đo đúng khả năng "không bịa ngoài phạm vi"; G19-7 không bị bằng chứng bởi chính bộ kiểm chứng (98/98 câu quan hệ verify OK).
+- Xử lý: D-148 (bộ v3 + `_no_data_anchor()` lọc theo toàn văn body) + D-149 (`entity_index_by_qid()` bổ sung nhãn nội bộ) trong `docs/DECISIONS.md`; test hồi quy trong `tests/test_phase19_grounded.py`.
+- Cập nhật file: `src/evaluation/build_qa_set.py`, `data/eval/qa_rag_250_v3.jsonl`, `scripts/verify_answers_online.py`, `tests/test_phase19_grounded.py`.
+
+---
+
+## D-145 — Driver eval **ngủ theo quota** thay vì probe lại mỗi 5 phút (ngoài kế hoạch)
+
+- Ngày: 2026-11-19
+- Phase: 19
+- Loại: kỹ thuật
+- Kế hoạch: §5 "driver sẵn có, tự lặp theo quota" — không nêu chiến lược chờ.
+- Thực tế: Driver cũ **luôn** ngủ 300s rồi probe lại ⇒ mỗi lần probe tốn **1 request bị tính** vào quota ⇒ **tự làm cạn thêm** ⇒ 60 vòng × 5 phút ≈ 5 giờ ⇒ driver hết vòng lúc ~21h, **trước** lúc quota hồi (Gemini reset 8h sáng) ⇒ **mất cả đêm** mà không thêm câu nào.
+- Lý do: Hạn mức free tier reset **theo ngày** ⇒ "thử lại thường xuyên" là **chiến lược sai** khi quota đã cạn.
+- Ảnh hưởng: Không có ảnh hưởng tới số liệu, nhưng **kéo dài** thời gian hoàn tất eval tới nhiều ngày.
+- Xử lý: Driver nay so `new_count` với `done_count`: **có** tiến triển ⇒ ngủ 300s; **không** ⇒ ngủ tới **mốc reset ngày gần nhất** (8h05 sáng hôm sau, tối thiểu 10 phút).
+- Cập nhật file: `scripts/run_phase19_eval_loop.sh`, `docs/DECISIONS.md` (D-150).

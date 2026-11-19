@@ -81,3 +81,6 @@ data/eval/eval_phase19_checkpoint.*.json
 data/eval/eval_phase19_smoke_*.jsonl
 data/eval/eval_phase19_smoke_*.json
 data/eval/_stale/
+
+# Phase 19 — marker file của watcher (tạm, xoá khi chạy lại)
+reports/.phase19_watch_done

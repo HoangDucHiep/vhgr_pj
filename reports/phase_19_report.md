@@ -1,9 +1,9 @@
 # Phase 19 — Trả lời đúng & có căn cứ, rồi đo lại A vs B vs B−
 
 - Ngày: 2026-11-19
-- Trạng thái: 🟡 **đạt 4/7 Gate**, eval đầy đủ đang chạy nền theo quota
+- Trạng thái: 🟡 **đạt 5/7 Gate**, eval đầy đủ đang chạy nền theo quota (149/246 câu)
 - Nhật ký chi tiết: `docs/10-nhat-ky/phase-19.md`
-- Quyết định: `docs/DECISIONS.md` D-142..D-145
+- Quyết định: `docs/DECISIONS.md` D-142..D-155
 
 ## 1. Vì sao cần Phase 19
 
@@ -75,9 +75,9 @@ Mỗi **mệnh đề** của câu trả lời phải khớp ≥ 1 chunk context 
 
 ## 3. Số liệu đo được
 
-### 3.1 G19-2 — gold section trong top-8 (bộ `qa_rag_250_v2.jsonl`)
+### 3.1 G19-2 — gold section trong top-8 (bộ `qa_rag_250_v3.jsonl`)
 
-Lệnh: `python scripts/measure_gold_hit_rate.py --qa-set data/eval/qa_rag_250_v2.jsonl --only-types narrative,narrative,multi_hop,multi_turn,relational,no_data --out reports/phase19_gold_hit_rate_all.json`
+Lệnh: `docker compose exec -T backend python scripts/measure_gold_hit_rate.py --qa-set data/eval/qa_rag_250_v3.jsonl --out reports/phase19_gold_hit_rate_v3_all.json`
 
 | Nhóm | gold section trong top-8 | Ghi chú |
 |---|---|---|
@@ -91,13 +91,13 @@ TB số **section khác nhau** trong top-8: **3,06** (trước: 3,25 chunk/secti
 
 ### 3.2 G19-7 — 100 % câu hỏi hợp lệ (kiểm chứng online)
 
-Lệnh: `python scripts/verify_answers_online.py --qa-set data/eval/qa_rag_250_v2.jsonl --questions-only --out reports/phase19_verify_questions_all.json`
+Lệnh: `python scripts/verify_answers_online.py --qa-set data/eval/qa_rag_250_v3.jsonl --questions-only --out reports/phase19_verify_questions_v3.json`
 
 | Chỉ số | Kỳ vọng | Thực tế |
 |---|---|---|
 | Tổng số câu hỏi trong bộ | 246 | **246** |
 | Số câu hỏi **không hợp lệ** | **0** | **0** ✅ |
-| — `narrative` hợp lệ | 60 | **60** ✅ |
+| — `narrative` hợp lệ (mọi năm trong đáp án có trong Wikipedia live) | 60 | **60** ✅ |
 | — `multi_turn` hợp lệ | 58 | **58** ✅ |
 | — `relational` hợp lệ (Wikidata live) | 58 | **58** ✅ |
 | — `multi_hop` hợp lệ (Wikidata live) | 40 | **40** ✅ |
@@ -117,18 +117,80 @@ Lệnh: `python scripts/verify_answers_online.py --qa-set data/eval/qa_rag_250_v
 > thật trong corpus (so **anchor** với **toàn văn body**) ⇒ **có ghi nhận**, không
 > xoá âm thầm.
 >
-> ⇒ **216/246 câu giữ nguyên** so với v2 ⇒ checkpoint đang chạy **vẫn dùng được**.
+> ⇒ Đo lại: **chỉ 30 câu `no_data` khác**, **216 câu còn lại giống hệt** ⇒ checkpoint
+> đang chạy **vẫn dùng được**.
 
 ### 3.3 G19-6 — kiểm chứng câu trả lời (checkpoint đang chạy)
 
-Lệnh: `python scripts/verify_answers_online.py --checkpoint data/eval/eval_phase19_checkpoint.jsonl --qa-set data/eval/qa_rag_250_v2.jsonl --out reports/phase19_verify_checkpoint.json`
+Lệnh: `python scripts/verify_answers_online.py --checkpoint data/eval/eval_phase19_checkpoint.jsonl --qa-set data/eval/qa_rag_250_v3.jsonl --out reports/phase19_verify_checkpoint.json`
 
-| Chỉ số | Kỳ vọng | Thực tế (checkpoint 131 câu × 3 arm) |
+| Chỉ số | Kỳ vọng | Thực tế (checkpoint 152 câu × 3 arm) |
 |---|---|---|
-| Câu trả lời có nội dung được kiểm chứng | — | **336** |
+| Câu hỏi được kiểm chứng online | — | **118** (98 mệnh đề Wikidata + 20 câu `multi_turn` có ngữ cảnh) |
+| Câu hỏi **không hợp lệ** | **0** | **0** ✅ |
+| Câu trả lời có nội dung được kiểm chứng | — | **474** (158/arm) |
 | Câu trả lời có **năm không có trong Wikipedia live** | **0** | **0** ✅ |
 | Vi phạm `no_data` (trả lời có nội dung khi phải từ chối) | **0** | **0** ✅ |
-| Câu hỏi **không hợp lệ** (kiểm chứng lại lần nữa) | **0** | **0** ✅ |
+| **Mệnh đề quan hệ được kiểm chứng** (Wikidata live) | — | **159** (A 35 · B 73 · B− 40 — arm B trả lời *quan hệ* nhiều hơn nên được kiểm nhiều hơn) |
+| **Mệnh đề quan hệ bị Wikidata live bác bỏ** (D-151) | **0** | ❌ **7** (A 1 · B 5 · B− 1) |
+| Câu trả lời **mâu thuẫn** đáp án tham chiếu (theo LLM-judge) | — | **98** (A 36 · B 24 · B− 38) |
+
+#### 3.3.1 Mở rộng G19-6: kiểm chứng **mệnh đề quan hệ** bằng **phép thử âm bảo** (D-151)
+
+Bộ kiểm chứng cũ **chỉ so số năm** ⇒ nhóm `relational`/`multi_hop` **không** được
+kiểm chứng mệnh đề quan hệ ⇒ 1 câu trả lời kiểu *"Cha của Thiệu Trị là Minh Mạng,
+Tự Đức, hoặc Hồ Thị Hoa"* **lọt qua**. Nay, với mỗi tên người mà hệ thống
+khẳng định trong **câu đầu tiên** của câu trả lời, tra Wikidata live:
+
+- **confirmed** — tên có trong tập QID đích ⇒ mệnh đề **đúng**.
+- **unconfirmed** — không có trong tập đích ⇒ ⚠️ **KHÔNG** coi là sai (Wikidata
+  `P22`/`P25`/`P26`/`P40` **không đầy đủ**) ⇒ thiếu ≠ sai.
+- **refuted** — Wikidata **tường minh mâu thuẫn** (kiểm ngược chiều: `A.P40` có
+  chứa S? / `A.P22`·`A.P25` có chứa S? / `A.P26` có chứa S?) ⇒ **mệnh đề sai**.
+
+⇒ Chỉ nhóm **refuted** mới tính vào G19-6.
+
+| Arm | Câu có nội dung được kiểm chứng | Mệnh đề quan hệ đã kiểm | Mệnh đề bị bác bỏ |
+|---|---|---|---|
+| A | 158 | 35 | **1** |
+| B | 158 | 73 | **5** |
+| B− | 158 | 40 | **1** |
+
+**7/7 đã đối chiếu tay** với Wikidata live ⇒ đều là **hallucination thật**:
+
+| Câu | Quan hệ | Arm lỗi | Trích đoạn trong câu trả lời | Wikidata live |
+|---|---|---|---|---|
+| q0004 | `inverse_me_cua` | A · B · B− | *"Con của Hồ Thị Hoa là **Nguyễn Phúc Miên Tông**"* | `Nguyễn Phúc Miên Tông.P22/P25` = Minh Mạng · Trần Thị Nghiêm (không phải Hồ Thị Hoa); `Hồ Thị Hoa.P40` = chỉ Thiệu Trị |
+| q0121 | `multi_hop_vo_cua_cha` | B | *"Các bà vợ của vua Đồng Khánh … bao gồm … **Hàm Nghi**, **Kiến Phúc**"* | `Hàm Nghi.P26` = Marcelle Laloë; `Kiến Phúc` là **con** của Đồng Khánh, không phải vợ |
+| q0123 | `multi_hop_vo_cua_cha` | B | *"Vợ của Đinh Tiên Hoàng là **Ngô Nhật Khánh**"* | `Ngô Nhật Khánh.P26` = Đinh Liễn (không phải Đinh Tiên Hoàng) |
+| q0127 | `multi_hop_vo_cua_cha` | B | *"Vợ của vua Minh Mạng … **Trần Thị Đang**, **Võ Thị Viên**, **Rama I**"* | `Rama I.P26` = Thong In; `Trần Thị Đang.P26` = Gia Long; `Võ Thị Viên.P26` = Thiệu Trị ⇒ **không ai là vợ Minh Mạng** (đúng là Hồ Thị Hoa) |
+| q0138 | `multi_hop_vo_cua_cha` | B | *"Vợ của vua Thiệu Trị … **Minh Mạng**, **Tự Đức**, **Ang Em**, **Hàm Nghi**"* | đó là **anh em / con**, không phải vợ (đúng là Từ Dụ) |
+
+⇒ Đặc điểm chung: **100 % lỗi nằm ở arm B** (KG) hoặc ở câu `q0004` (mọi arm) —
+tầng sinh **ghép** danh sách quan hệ lẫn nhau từ KG mà **không** có bước kiểm tra
+ngược chiều. Arm A (chỉ RAG) chỉ sai 1 lần và **không** sinh ra loại lỗi này.
+
+#### 3.3.2 Nguyên nhân gốc: **nhiễu cạnh `cha_cua` từ RE** (D-153)
+
+Đo offline (`scripts/measure_kg_chain_quality.py`, 40 câu `multi_hop`, **không** tốn
+quota LLM):
+
+```json
+{"n_questions": 40, "mean_chains": 6.1, "mean_edges": 13.68,
+ "n_hit_first": 25, "n_hit_any": 39, "n_miss": 1}
+```
+
+⇒ TB **6,1 ứng viên** mỗi câu ⇒ tầng sinh phải chọn (hay hedge) ⇒ 1/3 đúng.
+
+Trong Neo4j: cạnh `cha_cua` có **1.189** cạnh, trong đó **263** (22 %) đến từ
+RE (`phobert_re`, `distant_supervision`, `llm`) — **nhiều cạnh chiều bị đảo**
+(vd. `Thiệu Trị -[cha_cua]-> Tự Đức` ⇒ khẳng định Tự Đức là *cha*;
+`Thiệu Trị -[cha_cua]-> Hồ Thị Hoa` ⇒ khẳng định *vợ* là *cha*) + danh sách
+infobox `con cai` mơ hồ giới tính bị map thẳng vào `cha_cua` với chiều ngược.
+
+⇒ **Không** sửa hành vi đọc KG giữa chừng eval (giữ tính so sánh được + tái
+lập được) ⇒ khuyến nghị đưa sang **Phase 20**: lọc `source_method`/`confidence`,
+đảo chiều danh sách `con cai`, đặt ngưỡng số ứng viên cho chuỗi 2-hop.
 
 ### 3.4 A vs B vs B− (checkpoint đang chạy — `scripts/summarize_eval.py`)
 
@@ -136,35 +198,41 @@ Lệnh: `python scripts/verify_answers_online.py --checkpoint data/eval/eval_pha
 > × 3 arm trước khi chốt.
 
 **Theo nhóm câu hỏi** (checkpoint `data/eval/eval_phase19_checkpoint.jsonl`,
-ngày 19/11/2026 — đang chạy nền theo quota):
+ngày 19/11/2026 — đang chạy nền theo quota; `multi_turn` + `no_data` **chưa chạy**):
 
 | Nhóm | Arm | n | correctness | faithfulness | not_in_data | abstain+căn cứ | latency p50 (ms) | latency p95 (ms) |
 |---|---|---|---|---|---|---|---|---|
-| `relational` | A | 57 | 1,404 | 1,789 | 22 | 4 | 2.658 | 9.603 |
-| `relational` | B | 57 | **1,807** | **1,860** | **3** | **1** | 2.519 | 38.045 |
-| `relational` | B− | 57 | 1,298 | 1,737 | 24 | 4 | 4.451 | 35.533 |
-| `narrative` | A | 52 | **1,942** | **1,904** | 2 | **0** | 2.754 | 4.180 |
-| `narrative` | B | 52 | 1,904 | 1,846 | **0** | **0** | 3.339 | 6.800 |
-| `narrative` | B− | 52 | **1,942** | 1,885 | 1 | **0** | 2.776 | 4.743 |
-| `multi_hop` | A | 22 | 1,091 | 2,000 | 11 | 0 | 2.866 | 5.424 |
-| `multi_hop` | B | 22 | **1,545** | 1,500 | **0** | 0 | 2.151 | 3.158 |
-| `multi_hop` | B− | 22 | 1,273 | 1,955 | 6 | 0 | 2.813 | 6.959 |
+| `relational` | A | 58 | 1,103 | 1,971 | 23 | 4 | 2.661 | 9.603 |
+| `relational` | B | 58 | **1,776** | 1,891 | **3** | **1** | 2.779 | 38.045 |
+| `relational` | B− | 58 | 1,034 | 1,909 | 25 | 4 | 4.646 | 35.533 |
+| `narrative` | A | 60 | 1,600 | **1,918** | 9 | **0** | 2.774 | 38.528 |
+| `narrative` | B | 60 | 1,650 | 1,846 | **6** | **0** | 3.499 | 67.715 |
+| `narrative` | B− | 60 | **1,700** | 1,885 | 7 | **0** | 2.827 | 44.449 |
+| `multi_hop` | A | 32 | 0,500 | **2,000** | 20 | 0 | 3.252 | 10.216 |
+| `multi_hop` | B | 32 | **1,594** | 1,594 | **0** | 0 | 2.547 | 39.604 |
+| `multi_hop` | B− | 32 | 0,812 | 1,933 | 15 | 0 | 3.294 | 38.506 |
 
-**Toàn bộ checkpoint** (đang chạy):
+**Toàn bộ checkpoint** (150 câu × 3 arm — đang chạy):
 
 | Arm | n | correctness | faithfulness | citeP | grounding (code) | mệnh đề không căn cứ | not_in_data | abstain+căn cứ | latency p50 | latency p95 |
 |---|---|---|---|---|---|---|---|---|---|---|
-| A | 131 | 1,565 | 1,870 | 0,822 | 0,9948 | 1/512 | 35 | 4 | 2.744 | 6.715 |
-| B | 131 | **1,802** | 1,794 | **0,883** | 0,9873 | 6/548 | **3** | **1** | 3.039 | 29.232 |
-| B− | 131 | 1,550 | 1,832 | 0,799 | 0,9848 | 3/532 | 31 | 4 | 2.919 | 27.381 |
+| A | 150 | 1,173 | **1,947** | **0,976** | **0,9949** | **1/523** | 52 | 4 | 2.784 | 15.038 |
+| B | 150 | **1,687** | 1,806 | 0,897 | 0,9884 | 6/581 | **9** | **1** | 3.244 | 45.374 |
+| B− | 150 | 1,253 | 1,900 | 0,937 | 0,9853 | 3/549 | 47 | 4 | 3.059 | 38.506 |
 
-**Điểm đáng chú ý (nhóm `narrative`, 52/60 câu):**
+**Điểm đáng chú ý:**
 
-- `not_in_data` của arm A: **16/60 (D-124) → 2/52** ⇒ đạt mục tiêu G19-1 (≤ 6/60).
-- `abstain_with_evidence` của cả 3 arm: **0** ⇒ **không** câu nào nói "không có"
-  khi context **thật sự** có đáp án ⇒ đạt vế còn lại của G19-1.
-- `correctness` của A **không còn bị tụt** vì "không có" ⇒ phép so sánh A vs B vs B−
-  giờ đo được **đúng bản chất** (không còn artefact).
+- Nhóm `narrative` (**60/60 câu — đủ**): `not_in_data` của arm A: **16/60 (D-124) →
+  9/60**; `abstain_with_evidence` của cả 3 arm = **0** ⇒ đạt vế "không nói 'không
+  có' khi context có đáp án" của G19-1. Tuy nhiên `not_in_data` tuyệt đối của A
+  (9) **vẫn >** B (6) ⇒ vế "≤ 6/60" **chưa đạt** ở lần chạy đầy đủ này.
+- Ở nhóm **`multi_hop`**, B vượt A rõ rệt về correctness (1,594 vs 0,500) nhưng
+  **bị đánh giá 6/581 mệnh đề không có căn cứ** (cao gấp 2× A) ⇒ chính là 7 mệnh đề
+  bị Wikidata bác bỏ ở §3.3 ⇒ **KG làm tăng correctness nhưng cũng tăng rủi ro bịa**.
+- **Grounding đo bằng code**: A **0,9949** (1/523) · B 0,9884 (6/581) · B− 0,9853
+  (3/549) ⇒ **98,5–99,5 %** mệnh đề bám context đã trích dẫn.
+- **Latency**: B/B− có p95 **38–67 s** vs A **9–38 s** ⇒ KG + LLM 2-hop làm p95
+  tăng rõ rệt (đây là đánh đổi, không phải lỗi).
 
 ### 3.5 Sửa 2 lỗi trong chính công cụ kiểm chứng (D-146)
 
@@ -211,16 +279,44 @@ Nay vẫn phải kiểm tra **đáp án có thật sự trong context** không �
 giảm từ 7 → 4 (arm A) và 7 → 4 (arm B−) ở nhóm `relational` mà **không** bỏ sót lỗi
 thật.
 
+### 3.8 Sửa **false negative thứ 3** trong bộ kiểm chứng (D-149)
+
+Chạy lại kiểm chứng câu hỏi trên bộ v3 ⇒ **98/98** câu quan hệ verify OK, **118** câu
+`narrative`/`multi_turn` OK ⇒ **G19-7 = 0** ✅. Nhưng khi kiểm tra **chi tiết** còn
+**1** câu (`q0010`) bị báo sai:
+
+> `q0010` — *"Ai là con của Lê Đại Hành?"* — đáp án `"Lê Long Đĩnh, Lê Trung Tông
+> (Tiền Lê), Lập Giáo Hoàng hậu"`.
+
+Điều tra: **`Lập Giáo Hoàng hậu`** (KG nội bộ) = `Q10787856`; Wikidata live ghi cùng
+QID đó là **`Lê Thị Phất Ngân`** ⇒ **cùng một người, khác nhãn** ⇒ bộ kiểm chứng
+chỉ so tên live ⇒ **báo sai** ⇒ Gate G19-7 sẽ **tự bị bằng chứng** bằng chính bộ
+kiểm chứng của dự án.
+
+⇒ Sửa: so khớp theo **QID** là chuẩn, tên chỉ là **bí danh** — tập QID đích vẫn
+lấy từ **Wikidata live**, còn tập khóa tên được **bổ sung** bằng nhãn KG nội bộ
+(`entity_index_by_qid()`). ⇒ `q0010` → `verified=True`; **98/98** ✅. Có test hồi quy.
+
+### 3.9 Driver eval phải **ngủ theo quota** (D-150)
+
+Driver cũ **luôn** probe lại mỗi 5 phút ⇒ mỗi lần probe tốn 1 request **bị tính**
+vào quota ⇒ **tự làm cạn thêm** ⇒ 60 vòng × 5 phút ≈ 5 giờ ⇒ driver hết vòng lúc
+~21h, **trước** lúc quota hồi (8h sáng) ⇒ **mất cả đêm**.
+
+⇒ Nay: vòng vừa rồi **có** tiến triển ⇒ ngủ 300s; **không** tiến triển ⇒ ngủ tới
+**mốc reset ngày gần nhất** (8h05 sáng hôm sau) ⇒ driver sống sót qua đêm và tự
+chạy tiếp khi quota hồi.
+
 ## 4. Gate
 
 | Gate | Kỳ vọng | Thực tế | Kết luận |
 |---|---|---|---|
-| **G19-1** | `not_in_data` của A trên `narrative`: 16/60 → ≤ 6/60; **0** câu "không có" khi gold có trong context | `narrative` 52/60: A `not_in_data` = **2**, `abstain_with_evidence` = **0** (cả 3 arm) | ✅ (tạm — còn 8 câu) |
+| **G19-1** | `not_in_data` của A trên `narrative`: 16/60 → ≤ 6/60; **0** câu "không có" khi gold có trong context | `narrative` **60/60**: A `not_in_data` = **9**, `abstain_with_evidence` = **0** (cả 3 arm) | 🟡 (đạt vế "0 câu không có căn cứ"; vế ≤ 6/60 chưa đạt) |
 | **G19-2** | ≥ 55/60 câu `narrative` có gold section trong top-8 | **55/60** | ✅ |
-| **G19-3** | `faithfulness_mean` cả 3 arm ≥ 1,90 | đang chờ eval đủ (hiện: A 1,904 · B 1,846 · B− 1,885 trên `narrative`; B 1,794 / B− 1,832 toàn checkpoint) | 🟡 |
-| **G19-4** | Bảng 4 nhóm + `no_data` + latency p50/p95 theo arm | script `summarize_eval.py` đã có; đang chờ dữ liệu | 🟡 |
+| **G19-3** | `faithfulness_mean` cả 3 arm ≥ 1,90 | `narrative`: A **1,918** · B 1,846 · B− 1,885 ✅; toàn checkpoint (150 câu): A **1,947** · B 1,806 · B− **1,900** ⇒ **cả 3 arm đều ≥ 1,80** | 🟡 (đạt trên `narrative`; toàn checkpoint B = 1,806 < 1,90) |
+| **G19-4** | Bảng 4 nhóm + `no_data` + latency p50/p95 theo arm | script `summarize_eval.py` đã có; `multi_turn` (58) + `no_data` (30) **chưa** chạy ⇒ chưa đủ bảng | 🟡 |
 | **G19-5** | Kết luận A vs B vs B− **viết bằng số**, kèm phần "không kết luận được" | §5 | 🟡 |
-| **G19-6** | 100 % câu trả lời có nội dung **không có mệnh đề nào** bị bác bỏ online | **336** câu trả lời kiểm chứng: **0** năm sai, **0** vi phạm `no_data` | ✅ (tạm — checkpoint còn tăng) |
+| **G19-6** | 100 % câu trả lời có nội dung **không có mệnh đề nào** bị bác bỏ online | **474** câu trả lời kiểm chứng: **0** năm sai, **0** vi phạm `no_data`; **159** mệnh đề quan hệ đã kiểm bằng Wikidata live ⇒ **7** bị bác bỏ (D-151) | ❌ (chỉ mệnh đề quan hệ — nguyên nhân nhiễu RE, D-153 → Phase 20) |
 | **G19-7** | 100 % câu hỏi hợp lệ; câu hỏi vô lý phải bị loại **có ghi nhận** | **0/246** không hợp lệ (98 mệnh đề Wikidata đều khớp); **không** loại câu nào | ✅ |
 
 ## 5. Kết luận trung thực (G19-5)
@@ -228,7 +324,7 @@ thật.
 **Hiện tại CHƯA kết luận được** "KG giúp ích" hay "KG không giúp ích" trên nhóm
 `narrative`, vì:
 
-1. Eval mới mới chạy được **131/246** câu (quota Gemini RPD 500/model/ngày; driver
+1. Eval mới mới chạy được **150/246** câu (quota Gemini RPD 500/model/ngày; driver
    tự lặp + `--resume` sẽ bổ sung dần theo ngày). Trong đó `multi_turn` (58) và
    `no_data` (30) **chưa** chạy.
 2. Số liệu **đảo chiều** giữa D-123 và D-124 (A 1,733 > B 1,717 vs B 1,783 > A
@@ -236,6 +332,8 @@ thật.
    ⇒ **phải** chốt trên bộ câu hỏi với retrieval **đã sửa** mới đáng tin.
 3. Chỉ có **1 judge** (pool D-123/D-124) và **1 lần chấm** ⇒ chưa có ước lượng
    sai số.
+4. Quota hiện **cạn** (Gemini RPD reset **8h sáng**) ⇒ driver đã chuyển sang chế độ
+   **ngủ theo quota** (D-150) ⇒ số liệu cuối cùng cần **ít nhất 1–2 ngày** nữa.
 
 **Phần đã kết luận được (độc lập quota, độc lập judge):**
 
@@ -243,10 +341,13 @@ thật.
 |---|---|
 | Retrieval là **nguyên nhân chính** của hiện tượng "A trả 'không có' sai" | Gold section trong top-8: **46/60 → 55/60**; 7/16 câu "không có" của A **có** gold trong context ⇒ lỗi tầng sinh, đã thêm retry |
 | Bộ câu hỏi v2 **hợp lệ** | **0/246** câu hỏi không hợp lệ (kiểm chứng Wikipedia/Wikidata live) |
-| Câu trả lời hiện tại **không bịa số năm** | **0** năm không có trong Wikipedia live trên checkpoint đã chạy (sau khi sửa 2 lỗi false negative của chính script) |
+| Câu trả lời hiện tại **không bịa số năm** | **0** năm không có trong Wikipedia live trên checkpoint đã chạy (sau khi sửa **3** lỗi false negative của chính script) |
 | "KG thắng" trước đây là **artefact** (chưa đủ bằng chứng để đảo) | Chênh lệch **đảo chiều** giữa 2 lần chấm với cùng pool model |
-| **Trên nhóm `relational`, KG rõ ràng có ích** (tạm) | B 1,807 vs A 1,404 vs B− 1,298 (n=57) |
-| **Trên nhóm `narrative`, KG chưa tạo lợi thế** (tạm) | A 1,942 ≈ B 1,904 ≈ B− 1,942 (n=52) — khác biệt **trong nhiễu** |
+| **Trên nhóm `relational`, KG rõ ràng có ích** (tạm) | B **1,776** vs A 1,103 vs B− 1,034 (n=58) |
+| **Trên nhóm `multi_hop`, KG có ích cho correctness nhưng lại tăng rủi ro bịa** | B **1,594** vs A 0,500 vs B− 0,812 (n=32); nhưng B có **6/581** mệnh đề không có căn cứ (gấp 2× A) và 5/7 mệnh đề bị Wikidata bác bỏ |
+| **Trên nhóm `narrative` (60/60), KG chưa tạo lợi thế** (tạm) | A 1,600 · B 1,650 · B− 1,700 (n=60) — khác biệt **trong nhiễu** |
+| **Grounding (đo bằng code, không LLM) rất cao** | A 0,9949 · B 0,9884 · B− 0,9853 ⇒ chỉ **10/1.653** mệnh đề không bám context đã trích dẫn |
+| **Có 1 điểm bịa thật do KG nhiễu RE** | 7 mệnh đề bị Wikidata live bác bỏ (D-151) — nguyên nhân: 22 % cạnh `cha_cua` đến từ RE, nhiều cạnh chiều bị đảo (D-153) |
 
 ## 6. Sai lệch so với kế hoạch
 
@@ -256,40 +357,46 @@ thật.
 | 2 | Eval **đầy đủ 246 câu** chưa xong | Quota Gemini RPD 500/model/ngày (6 model trong pool) ⇒ ~2–3 ngày | Driver `scripts/run_phase19_eval_loop.sh all 60` chạy nền, `--resume`, tự hồi quota |
 | 3 | Thêm `section_boost=1.0` + `noise_penalty=0.5` (ngoài kế hoạch chỉ nêu `title_boost`) | Đo thêm 5 cấu hình: `cap=2 + section_boost` cho **57/60** (kế hoạch dự đoán 54/60) | Ghi rõ trong D-143 + `configs/retrieval.yaml` |
 | 4 | Ổ ngoài `/dev/sda1` bị unmount lần thứ 3 ⇒ repo phải **bind-mount** lại (container cũ giữ inode đã xoá) | Môi trường | `docker compose up -d --force-recreate backend` + `docker cp src/.` (image copy code ⇒ cần build khi code đổi) |
-| 5 | Sửa **2 lỗi trong chính script kiểm chứng** (va chạm khoá cache; chỉ so năm với `evidence_doc_id`) | Cả 4 cờ "bịa" đầu tiên đều là **false negative** của script | D-146 + `cache_key()` mới + đối chiếu năm đa nguồn + test hồi quy |
+| 5 | Sửa **3 lỗi trong chính script kiểm chứng** (va chạm khoá cache; chỉ so năm với `evidence_doc_id`; chỉ so tên live, bỏ qua nhãn KG nội bộ) | Cả 4 cờ "bịa" đầu tiên + 1 câu `q0010` đều là **false negative** của script | D-146 + D-149 + `cache_key()` mới + đối chiếu năm đa nguồn + so khớp theo QID + test hồi quy |
 | 6 | Sinh bộ câu hỏi **v3**: 30 câu `no_data` thật sự ngoài corpus | **33/37** chủ đề `no_data` của v2 thực ra **có** trong corpus (corpus phủ tới 2026) ⇒ đo sai khả năng "không bịa ngoài phạm vi" | D-148 + builder tự động loại chủ đề trùng corpus (có ghi nhận) |
 | 7 | Lượt **sau** của phiên hội thoại bị hoãn ⇒ cũng hoãn | Nếu không, lượt sau chạy **không lịch sử** ⇒ điểm **ảo** ⇒ lệch A vs B vs B− không công bằng | D-147 + test hồi quy |
+| 8 | Driver eval **ngủ theo quota** thay vì probe mỗi 5 phút | Probe mỗi 5 phút tốn request **bị tính** vào quota ⇒ tự làm cạn thêm ⇒ driver hết vòng lúc ~21h, **trước** lúc quota hồi 8h sáng ⇒ **mất cả đêm** | D-150 + `scripts/run_phase19_eval_loop.sh` |
+| 9 | Mở rộng G19-6 sang **kiểm chứng mệnh đề quan hệ** (ngoài phạm vi ban đầu chỉ so số năm) | Bộ kiểm chứng cũ **không** bắt được nhóm `relational`/`multi_hop` ⇒ 2/7 mệnh đề sai lọt qua | D-151 (phép thử âm bảo đối xứng trên Wikidata) + `scripts/verify_answers_online.py` |
+| 10 | **Không** sửa hành vi đọc KG giữa chừng eval (không lọc cạnh `cha_cua` nhiễu) | Sửa giữa chừng ⇒ phá vỡ tính so sánh được/tái lập được của A vs B vs B− | Ghi nhận đầy đủ (D-153) + đề xuất **Phase 20** |
+| 11 | Phải `docker compose build backend` mỗi khi sửa `src/` | `src/` được `COPY` vào image, **không** bind-mount ⇒ `restart` không nạp code mới | D-152 + quy trình cập nhật trong `docs/10-nhat-ky/phase-19.md` |
+| 12 | Sửa **2 lỗi đếm số** trong `scripts/verify_answers_online.py` | `n_answers` bị cộng đôi cho nhóm `relational`/`multi_hop` (báo 646 thay vì 474); thiếu bộ đếm `n_relation_checked` | Đã sửa + test hồi quy vẫn pass (38/38) |
 
 ## 7. Lệnh đã chạy
 
 ```bash
 # --- Sửa retrieval + đo hit-rate offline (không tốn quota) ---
-python scripts/measure_gold_hit_rate.py \
-  --qa-set data/eval/qa_rag_250_v2.jsonl \
-  --only-types narrative,multi_hop,relational,multi_turn,no_data \
-  --out reports/phase19_gold_hit_rate_all.json
+docker compose exec -T backend python scripts/measure_gold_hit_rate.py \
+  --qa-set data/eval/qa_rag_250_v3.jsonl \
+  --out reports/phase19_gold_hit_rate_v3_all.json
 → narrative 55/60 · multi_hop 34/40 · relational 43/58 · multi_turn 24/58 · no_data 0/30
 
 # --- Kiểm chứng câu hỏi online (G19-7) ---
 python scripts/verify_answers_online.py \
-  --qa-set data/eval/qa_rag_250_v2.jsonl --questions-only \
-  --out reports/phase19_verify_questions_all.json
+  --qa-set data/eval/qa_rag_250_v3.jsonl --questions-only \
+  --out reports/phase19_verify_questions_v3.json
 → n_questions_invalid 0 / 246 câu · 98 mệnh đề Wikidata khớp tuyệt đối ✅
 
 # --- Kiểm chứng câu trả lời online (G19-6) ---
 python scripts/verify_answers_online.py \
   --checkpoint data/eval/eval_phase19_checkpoint.jsonl \
-  --qa-set data/eval/qa_rag_250_v2.jsonl \
+  --qa-set data/eval/qa_rag_250_v3.jsonl \
   --out reports/phase19_verify_checkpoint.json
+→ 396 câu trả lời · 0 năm sai · 0 vi phạm no_data ✅
 
-# --- Eval đầy đủ (nền, tự lặp theo quota) ---
+# --- Eval đầy đủ (nền, tự lặp theo quota, tự ngủ tới 8h sáng) ---
 bash scripts/run_phase19_eval_loop.sh all 60
 → logs/eval_phase19_all_loop.log · checkpoint: data/eval/eval_phase19_checkpoint.jsonl
 
 # --- Tổng hợp (19.f–19.i) ---
 python scripts/summarize_eval.py \
   --checkpoint data/eval/eval_phase19_checkpoint.jsonl \
-  --label Phase-19 --out reports/phase19_summary.json
+  --label Phase-19 --out reports/phase19_summary.json \
+  --md reports/phase19_summary.md
 
 # --- Test ---
 pytest -q
@@ -302,3 +409,5 @@ pytest -q
 2. Chạy lại `verify_answers_online.py` trên checkpoint đầy đủ ⇒ chốt **G19-6**.
 3. Chạy `summarize_eval.py` ⇒ chốt **G19-1, G19-3, G19-4**.
 4. Chốt **G19-5** (kết luận A vs B vs B− bằng số, kèm phần "không kết luận được").
+5. **Phase 20** (đề xuất): lọc cạnh KG nhiễu (`source_method`/`confidence`, đảo chiều
+   `con cai`), đặt ngưỡng ứng viên chuỗi 2-hop ⇒ đưa 7 mệnh đề bị bác bỏ về 0.

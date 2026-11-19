@@ -904,6 +904,62 @@ def test_split_expected_names_keeps_comma_in_label() -> None:
     assert _split_expected_names("Chỉ một tên") == ["Chỉ một tên"]
 
 
+def test_entity_index_by_qid_maps_internal_aliases() -> None:
+    """⚠️ D-149 — index QID phải giữ **nhãn nội bộ** của KG.
+
+    Vì sao? Wikidata và KG nội bộ thường ghi **cùng một người** bằng **hai
+    nhãn khác nhau**: Wikidata vi "Lê Thị Phất Ngân" (Q10787856) còn KG nội
+    bộ vi "Lập Giáo Hoàng hậu" ⇒ nếu bộ kiểm chứng chỉ so tên **live** ⇒
+    đáp án **hợp lệ** bị báo sai ⇒ Gate G19-7 tự bị bằng chứng (false
+    negative).
+    """
+    from scripts.verify_answers_online import entity_index_by_qid
+
+    entities = {
+        "ent_a": {"entity_id": "ent_a", "name": "Lập Giáo Hoàng hậu", "wikidata_qid": "Q10787856"},
+        "ent_b": {"entity_id": "ent_b", "name": "Không rõ", "wikidata_qid": ""},
+    }
+    index = entity_index_by_qid(entities)
+    assert [e["entity_id"] for e in index["Q10787856"]] == ["ent_a"]
+    assert "Q10787856" not in index or len(index.get("Q10787856", [])) == 1
+
+
+def test_verify_relational_accepts_internal_alias_of_same_qid() -> None:
+    """⚠️ D-149 — đáp án dùng **nhãn nội bộ** vẫn phải verify được.
+
+    Vì sao? q0010 ("Ai là con của Lê Đại Hành?") có đáp án
+    "Lập Giáo Hoàng hậu" — đó là **nhãn KG nội bộ**, còn Wikidata ghi
+    "Lê Thị Phất Ngân" ⇒ bộ kiểm chứng phải khớp theo **QID** (cùng một
+    người) chứ không chỉ so tên live.
+    """
+    from scripts.verify_answers_online import (
+        entity_index_by_name,
+        entity_index_by_qid,
+        verify_relational_online,
+    )
+
+    entities = {
+        "ent_lap": {
+            "entity_id": "ent_lap",
+            "name": "Lập Giáo Hoàng hậu",
+            "wikidata_qid": "Q10787856",
+        },
+    }
+    by_name = entity_index_by_name(entities)
+    by_qid = entity_index_by_qid(entities)
+    row = {
+        "qid": "qXXXX",
+        "relation": "inverse_cha_cua",
+        "subject_name": "Lê Đại Hành",
+        "expected_answer": "Lập Giáo Hoàng hậu",
+    }
+    result = verify_relational_online(row, entities, by_name, by_qid)
+    # Không mạng ⇒ `verified` là None (skipped) ⇒ chỉ kiểm tra không lỗi.
+    assert result["method"] in {"wikidata_live", "skipped"}
+    if result["method"] == "wikidata_live" and result["verified"] is not None:
+        assert result["verified"] is True, result["detail"]
+
+
 def test_evaluate_rag_filters_type_before_limit() -> None:
     """⚠️ `--only-types` phải lọc **trước** `--limit`.
 
@@ -1084,3 +1140,156 @@ def test_verify_answer_years_checks_all_cited_sources() -> None:
     )
     assert with_cited["unsupported_years"] == []
     assert with_cited["ok"] is True
+
+
+# ----------------------------------------------------------------------
+# 6. Kiểm chứng online **mệnh đề quan hệ** (G19-6 — nhóm relational/multi_hop)
+# ----------------------------------------------------------------------
+
+
+def test_relation_check_detects_refuted_proposition() -> None:
+    """Phải **bắt** được mệnh đề bị Wikidata live **bác bỏ**.
+
+    Vì sao? q0127 arm B trả *"Vợ của vua Minh Mạng … bao gồm … **Rama I**"* ⇒
+    Wikidata live: `Rama I.P26 = Q455102` (vợ là Thong In), **không** phải
+    Minh Mạng ⇒ mệnh đề bị bác bỏ ⇒ phải báo đỏ.
+    """
+    from scripts import verify_answers_online as vao
+
+    entities = {
+        "ent_minh_mang": {
+            "entity_id": "ent_minh_mang",
+            "name": "Minh Mạng",
+            "type": "person",
+            "wikidata_qid": "Q434419",
+        },
+        "ent_rama": {
+            "entity_id": "ent_rama",
+            "name": "Rama I",
+            "type": "person",
+            "wikidata_qid": "Q310992",
+        },
+        "ent_ho_thi_hoa": {
+            "entity_id": "ent_ho_thi_hoa",
+            "name": "Hồ Thị Hoa",
+            "type": "person",
+            "wikidata_qid": "Q6854648",
+        },
+        "ent_tung_thien": {
+            "entity_id": "ent_tung_thien",
+            "name": "Tùng Thiện vương",
+            "type": "person",
+            "wikidata_qid": "Q1234567",
+        },
+    }
+    by_name = {vao._norm(e["name"]): [e] for e in entities.values()}
+    by_qid: dict[str, list[dict]] = {}
+    for entity in entities.values():
+        by_qid.setdefault(str(entity["wikidata_qid"]), []).append(entity)
+
+    row = {
+        "relation": "multi_hop_vo_cua_cha",
+        "subject_name": "Tùng Thiện vương",
+    }
+
+    # Stub Wikidata live: Minh Mạng (cha) → vợ = Hồ Thị Hoa; Rama I → vợ khác.
+    def _targets(qid: str, prop: str) -> list[str]:
+        if qid == "Q1234567" and prop == "P22":
+            return ["Q434419"]
+        if qid == "Q434419" and prop == "P26":
+            return ["Q6854648"]
+        if qid == "Q310992" and prop == "P26":
+            return ["Q455102"]
+        return []
+
+    vao.wikidata_property_targets = _targets  # type: ignore[assignment]
+    vao.wikidata_name_keys = lambda qid: {  # type: ignore[assignment]
+        "Q434419": {"Minh Mạng"},
+        "Q6854648": {"Hồ Thị Hoa"},
+        "Q310992": {"Rama I"},
+        "Q455102": {"Thong In"},
+        "Q1234567": {"Tùng Thiện vương"},
+    }.get(qid, set())
+    vao.wikidata_labels = lambda qids: {  # type: ignore[assignment]
+        q: q for q in qids
+    }
+
+    # Câu trả lời **đúng**: chỉ nêu Hồ Thị Hoa ⇒ không có mệnh đề bị bác bỏ.
+    good = vao.verify_answer_relation_online(
+        "Vợ của vua Minh Mạng, cha của Tùng Thiện vương, là Hồ Thị Hoa.",
+        row,
+        entities,
+        by_name,
+        by_qid,
+    )
+    assert good["checked"] is True
+    assert good["refuted_names"] == []
+    assert good["ok"] is True
+
+    # Câu trả lời **sai**: nêu thêm Rama I ⇒ mệnh đề bị bác bỏ.
+    bad = vao.verify_answer_relation_online(
+        "Vợ của vua Minh Mạng, cha của Tùng Thiện vương, là Hồ Thị Hoa và Rama I.",
+        row,
+        entities,
+        by_name,
+        by_qid,
+    )
+    assert bad["refuted_names"] == ["Rama I"]
+    assert bad["ok"] is False
+
+
+def test_relation_check_ignores_generic_and_partial_names() -> None:
+    """Tên rác / tên **con** trong tên dài hơn **không** được coi là mệnh đề.
+
+    Vì sao? KG có node tên "ông", "Nguyễn Phúc" (từ coref) ⇒ nếu không lọc
+    ⇒ báo sai. Và "Lê Hy" nằm trong "Lê Hy Tông" ⇒ phải ưu tiên span dài.
+    """
+    from scripts import verify_answers_online as vao
+
+    entities = {
+        "ent_ong": {
+            "entity_id": "ent_ong",
+            "name": "ông",
+            "type": "person",
+            "wikidata_qid": "Q7391",
+        },
+        "ent_le_hy": {
+            "entity_id": "ent_le_hy",
+            "name": "Lê Hy",
+            "type": "person",
+            "wikidata_qid": "Q999999",
+        },
+        "ent_le_hy_tong": {
+            "entity_id": "ent_le_hy_tong",
+            "name": "Lê Hy Tông",
+            "type": "person",
+            "wikidata_qid": "Q4517182",
+        },
+    }
+    by_name = {vao._norm(e["name"]): [e] for e in entities.values()}
+    by_qid: dict[str, list[dict]] = {}
+    for entity in entities.values():
+        by_qid.setdefault(str(entity["wikidata_qid"]), []).append(entity)
+
+    row = {"relation": "cha_cua", "subject_name": "Lê Hy Tông"}
+
+    vao.wikidata_property_targets = lambda qid, prop: (  # type: ignore[assignment]
+        ["Q434419"] if qid == "Q4517182" and prop == "P22" else []
+    )
+    vao.wikidata_name_keys = lambda qid: {  # type: ignore[assignment]
+        "Q4517182": {"Lê Hy Tông"},
+        "Q434419": {"Lê Thần Tông"},
+    }.get(qid, set())
+    vao.wikidata_labels = lambda qids: {q: q for q in qids}  # type: ignore[assignment]
+
+    result = vao.verify_answer_relation_online(
+        "Cha của Lê Hy Tông là Lê Thần Tông, người được kể là ông trong sử sách.",
+        row,
+        entities,
+        by_name,
+        by_qid,
+    )
+    assert result["checked"] is True
+    assert "ông" not in result["unconfirmed_names"]
+    assert "Lê Hy" not in result["unconfirmed_names"]
+    assert result["ok"] is True

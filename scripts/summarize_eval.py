@@ -251,6 +251,65 @@ def _percentile(values: list[int], pct: float) -> int:
     return int(ordered[index])
 
 
+def _calibrated_scores(row: dict, arm: str) -> dict | None:
+    """Trả về điểm của arm **đã hiệu chỉnh** (không tốn quota LLM).
+
+    ⚠️ **Vì sao cần hiệu chỉnh?** (D-151)
+    --------------------------------------
+    LLM-judge đôi khi cho điểm **2/2** cho một câu trả lời chỉ nói *"Không có
+    trong dữ liệu"*, với lý do *"thông tin không có trong ngữ cảnh được cung
+    cấp"* — **kể cả khi `expected_answer` có nội dung** (vd. q0125 "Cha của cha
+    Hiệp Hòa là ai?" ⇒ đáp án tham chiếu "Minh Mạng", nhưng A trả "Không có
+    trong dữ liệu" ⇒ judge vẫn cho 2 điểm).
+
+    ⇒ Đây là **điểm ảo** cho arm từ chối ⇒ làm **lệch** phép so sánh A vs B vs B−
+    ⇒ phải hiệu chỉnh **bằng code** (quy tắc xác định, không phụ thuộc LLM).
+
+    Quy tắc hiệu chỉnh (áp dụng cho **mọi** arm, **mọi** checkpoint):
+    - Câu hỏi `no_data` (`expected_answer` = "Không có trong dữ liệu.") ⇒ giữ
+      nguyên điểm của judge (từ chối là **đúng**).
+    - Câu hỏi **có** đáp án tham chiếu **nhưng** arm trả lời chỉ là "không có
+      dữ liệu" ⇒ `correctness` = 0, `faithfulness` = 0, `citation_precision` = 0
+      (không có mệnh đề nào để hỗ trợ ⇒ không thể "trung thực" 2 điểm).
+
+    Args:
+        row: Bản ghi checkpoint.
+        arm: Tên arm.
+
+    Returns:
+        Dict điểm đã hiệu chỉnh, hoặc ``None`` nếu arm không có điểm.
+    """
+    arm_data = row.get(arm)
+    if not isinstance(arm_data, dict):
+        return None
+    judge = arm_data.get("judge")
+    if not isinstance(judge, dict) or "correctness" not in judge:
+        return None
+    answer = str((arm_data.get("arm") or {}).get("answer") or "")
+    expected = str(arm_data.get("expected_answer") or "")
+    scores = {
+        "correctness": judge.get("correctness"),
+        "faithfulness": judge.get("faithfulness"),
+        "citation_precision": judge.get("citation_precision"),
+        "contradicts_reference": judge.get("contradicts_reference"),
+    }
+    if str(row.get("type") or "") == "no_data":
+        return scores
+    reference_has_content = bool(expected.strip()) and not _is_not_in_data(expected)
+    is_abstain = bool(NOT_IN_DATA_PATTERN.search(answer)) or (
+        "không có" in answer.lower()
+    )
+    if reference_has_content and is_abstain:
+        return {
+            "correctness": 0,
+            "faithfulness": judge.get("faithfulness"),
+            "citation_precision": judge.get("citation_precision"),
+            "contradicts_reference": scores["contradicts_reference"],
+            "is_abstain": True,
+        }
+    return {**scores, "is_abstain": is_abstain}
+
+
 def summarize(path: Path) -> dict:
     """Tổng hợp 1 checkpoint.
 
@@ -279,11 +338,15 @@ def summarize(path: Path) -> dict:
             and not ((row[arm].get("arm") or {}).get("infrastructure_error"))
         ]
         scores = [
-            row[arm]["judge"]
-            for row in usable
-            if isinstance(row[arm].get("judge"), dict)
-            and "correctness" in (row[arm].get("judge") or {})
+            s
+            for s in (_calibrated_scores(row, arm) for row in usable)
+            if s is not None
         ]
+        # ⚠️ D-151 — `faithfulness` đo "**có bịa** hay không" ⇒ chỉ tính trên các
+        # câu **có nội dung** (câu từ chối thì không có mệnh đề nào để bịa).
+        # `correctness` thì tính trên **mọi** câu (câu từ chối khi đáp án tham
+        # chiếu có nội dung ⇒ điểm 0).
+        scores_answered = [s for s in scores if not s.get("is_abstain")]
         latencies = [
             int((row[arm].get("arm") or {}).get("elapsed_ms") or 0)
             for row in usable
@@ -319,18 +382,38 @@ def summarize(path: Path) -> dict:
             "correctness": round(mean([s["correctness"] for s in scores]), 3)
             if scores
             else None,
-            "faithfulness": round(mean([s["faithfulness"] for s in scores]), 3)
-            if scores
+            "faithfulness": round(mean([s["faithfulness"] for s in scores_answered]), 3)
+            if scores_answered
             else None,
             "citation_precision": round(
-                mean([float(s.get("citation_precision", 0.0)) for s in scores]), 3
+                mean(
+                    [
+                        float(s.get("citation_precision", 0.0))
+                        for s in scores_answered
+                    ]
+                ),
+                3,
             )
-            if scores
+            if scores_answered
             else None,
             "not_in_data": not_in_data,
             "no_data_retried": no_data_retried,
             # --- Phase 19 — G19-1: "không có" **dù context có bằng chứng** ---
             "abstain_with_evidence": _count_abstain_with_evidence(rows, arm),
+            # --- D-151: số câu "từ chối" bị judge cho điểm ảo (đã hiệu chỉnh) ---
+            "abstain_scored_zero": sum(
+                1
+                for row in usable
+                if (s := _calibrated_scores(row, arm)) is not None
+                and s["correctness"] == 0
+                and (
+                    NOT_IN_DATA_PATTERN.search(
+                        str((row[arm].get("arm") or {}).get("answer") or "")
+                    )
+                    or "không có"
+                    in str((row[arm].get("arm") or {}).get("answer") or "").lower()
+                )
+            ),
             "contradicts_reference": contradict,
             "latency_p50": int(median(latencies)) if latencies else 0,
             "latency_p95": _percentile(latencies, 0.95),
@@ -363,18 +446,20 @@ def summarize(path: Path) -> dict:
                 and not ((row[arm].get("arm") or {}).get("infrastructure_error"))
             ]
             scores_g = [
-                row[arm]["judge"]
-                for row in rows_g
-                if isinstance(row[arm].get("judge"), dict)
-                and "correctness" in (row[arm].get("judge") or {})
+                s
+                for s in (_calibrated_scores(row, arm) for row in rows_g)
+                if s is not None
             ]
+            scores_g_answered = [s for s in scores_g if not s.get("is_abstain")]
             bucket[arm] = {
                 "n": len(rows_g),
                 "correctness": round(mean([s["correctness"] for s in scores_g]), 3)
                 if scores_g
                 else None,
-                "faithfulness": round(mean([s["faithfulness"] for s in scores_g]), 3)
-                if scores_g
+                "faithfulness": round(
+                    mean([s["faithfulness"] for s in scores_g_answered]), 3
+                )
+                if scores_g_answered
                 else None,
                 "not_in_data": sum(
                     1
@@ -384,6 +469,19 @@ def summarize(path: Path) -> dict:
                     )
                 ),
                 "abstain_with_evidence": _count_abstain_with_evidence(rows_g, arm),
+                "abstain_scored_zero": sum(
+                    1
+                    for row in rows_g
+                    if (s := _calibrated_scores(row, arm)) is not None
+                    and s["correctness"] == 0
+                    and (
+                        NOT_IN_DATA_PATTERN.search(
+                            str((row[arm].get("arm") or {}).get("answer") or "")
+                        )
+                        or "không có"
+                        in str((row[arm].get("arm") or {}).get("answer") or "").lower()
+                    )
+                ),
                 "latency_p50": int(
                     median(
                         [

@@ -51,8 +51,40 @@ for round in $(seq 1 "$MAX_ROUNDS"); do
     # quota cho câu đã chạy).
     ONLY_TYPES_ARG_THIS_ROUND="$ONLY_TYPES_ARG"
     if [ "$GROUP" = "all" ] && [ "$round" -eq 1 ]; then
-        ONLY_TYPES_ARG_THIS_ROUND="--only-types narrative"
-        echo "    ⇒ vòng 1 chỉ chạy nhóm 'narrative' (chốt G19-1/G19-3 sớm)" >> "$LOG"
+        # ⚠️ Phase 19 (D-155) — chỉ chạy `narrative` trước **nếu** nhóm đó
+        # **chưa** đủ 60 câu trong checkpoint.
+        #
+        # Vì sao cần? Nếu `narrative` đã đủ (đã chạy xong) mà vẫn ép vòng 1
+        # chỉ chạy `narrative` ⇒ vòng đó **không thêm câu nào** ⇒ driver tưởng
+        # là hết quota ⇒ ngủ tới 8h sáng ⇒ **mất cả đêm** trong khi các nhóm
+        # khác vẫn chạy được.
+        narrative_done=$(python3 - "$CHECKPOINT" "$QA_SET" <<'PY'
+import json, sys
+checkpoint, qa_set = sys.argv[1], sys.argv[2]
+types = {}
+try:
+    for line in open(qa_set, encoding="utf-8"):
+        if line.strip():
+            row = json.loads(line)
+            types[str(row.get("qid"))] = str(row.get("type"))
+except OSError:
+    types = {}
+done = set()
+try:
+    for line in open(checkpoint, encoding="utf-8"):
+        if line.strip():
+            done.add(str(json.loads(line).get("qid")))
+except OSError:
+    pass
+print(sum(1 for qid in done if types.get(qid) == "narrative"))
+PY
+)
+        if [ "$narrative_done" -lt 60 ]; then
+            ONLY_TYPES_ARG_THIS_ROUND="--only-types narrative"
+            echo "    ⇒ vòng 1 chỉ chạy nhóm 'narrative' (đã có ${narrative_done}/60)" >> "$LOG"
+        else
+            echo "    ⇒ vòng 1 bỏ qua 'narrative' (đã đủ ${narrative_done}/60)" >> "$LOG"
+        fi
     fi
 
     done_count=$(wc -l < "$CHECKPOINT" 2>/dev/null || echo 0)
@@ -93,9 +125,40 @@ for round in $(seq 1 "$MAX_ROUNDS"); do
         break
     fi
 
-    # Chờ 5 phút cho quota hồi rồi thử lại.
-    echo "    ⇒ chờ 300s cho quota hồi" >> "$LOG"
-    sleep 300
+    # ⚠️ Phase 19 (D-149) — chờ **thích ứng**, không phải cứ 5 phút.
+    #
+    # Vì sao? Hạn mức free tier reset **theo ngày** (Gemini 8h sáng) ⇒ mỗi
+    # vòng thử lại trong lúc quota cạn chỉ tốn request **bị tính** vào quota
+    # ⇒ tự làm cạn thêm. ⇒ Nếu vòng vừa rồi **không tiến triển** (không thêm
+    # câu nào) ⇒ ngủ tới **mốc reset quota gần nhất** (8h sáng theo giờ
+    # VN) rồi mới thử lại. Nếu vòng vừa rồi **có** tiến triển ⇒ quota còn
+    # dư ⇒ chờ ngắn (300s) để chạy tiếp.
+    if [ "$new_count" -le "$done_count" ]; then
+        # Ngủ tới **8h05 sáng** kế tiếp (giờ VN) ⇒ tối đa ~24h, tối thiểu 10 phút.
+        sleep_s=$(( 10*60 ))
+        now=$(date +%s)
+        target=$(date -d "today 08:05" +%s 2>/dev/null || echo "")
+        if [ -z "$target" ]; then
+            target=$(date -d "tomorrow 08:05" +%s 2>/dev/null || echo "")
+        else
+            diff=$(( target - now ))
+            # Đã qua mốc hôm nay ⇒ lùi sang ngày mai.
+            if [ "$diff" -le 0 ]; then
+                target=$(date -d "tomorrow 08:05" +%s 2>/dev/null || echo "")
+            fi
+        fi
+        if [ -n "$target" ]; then
+            diff=$(( target - now ))
+            if [ "$diff" -gt "$sleep_s" ]; then
+                sleep_s=$diff
+            fi
+        fi
+        echo "    ⇒ vòng này KHÔNG tiến triển (${done_count} → ${new_count}) ⇒ ngủ ${sleep_s}s (chờ quota ngày hồi)" >> "$LOG"
+    else
+        sleep_s=300
+        echo "    ⇒ chờ 300s cho quota hồi" >> "$LOG"
+    fi
+    sleep "$sleep_s"
 done
 
 final_count=$(wc -l < "$CHECKPOINT" 2>/dev/null || echo 0)

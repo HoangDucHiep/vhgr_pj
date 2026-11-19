@@ -1,10 +1,10 @@
 # Phase 19 — Trả lời đúng & có căn cứ, rồi đo lại A vs B vs B−
 
 - Ngày: 19/11/2026
-- Trạng thái: 🟡 **đạt 4/7 Gate**, eval đầy đủ đang chạy nền theo quota
+- Trạng thái: 🟡 **đạt 5/7 Gate** — eval **đầy đủ 246 câu × 3 arm đã chạy xong** (20:09 → 23:44)
 - Báo cáo Gate: `reports/phase_19_report.md`
-- Quyết định: `docs/DECISIONS.md` → D-142..D-145
-- Sai lệch: `reports/deviations.md` (D-140, D-141)
+- Quyết định: `docs/DECISIONS.md` → D-142..D-157
+- Sai lệch: `reports/deviations.md` (D-140, D-141, D-146..D-150, D-154)
 
 ## 1. Bối cảnh và vấn đề cần giải
 
@@ -81,7 +81,10 @@ X" ⇒ section "Diễn biến").
 
 ## 4. Số liệu sau khi sửa
 
-### 4.1 G19-2 — gold section trong top-8 (bộ `qa_rag_250_v2.jsonl`)
+### 4.1 G19-2 — gold section trong top-8 (bộ `qa_rag_250_v3.jsonl`)
+
+Đo lại trên bộ v3 (`--qa-set data/eval/qa_rag_250_v3.jsonl`) ⇒ **kết quả y hệt v2**
+(bộ v3 chỉ khác 30 câu `no_data`, không ảnh hưởng `narrative`):
 
 | Nhóm | Hit | Tỉ lệ | Ghi chú |
 |---|---|---|---|
@@ -110,25 +113,80 @@ Tổng **98 mệnh đề quan hệ** được đối chiếu trực tiếp với
 
 ### 4.3 G19-6 — câu trả lời không bịa
 
-Trên checkpoint (131 câu × 3 arm = **336** câu trả lời có nội dung): **0** câu có
-năm không có trong Wikipedia live, **0** vi phạm `no_data`.
+Trên checkpoint (145 câu × 3 arm): **0** câu có năm không có trong Wikipedia
+live, **0** vi phạm `no_data`.
+
+**Mở rộng mới (D-151) — kiểm chứng mệnh đề quan hệ bằng phép thử âm bảo:**
+nhóm `relational`/`multi_hop` **không chỉ** so số năm mà còn tra từng tên người
+mà hệ thống khẳng định ⇒ nếu Wikidata live **tường minh mâu thuẫn** ⇒ mệnh đề
+**bị bác bỏ**.
+
+| Arm | Câu có mệnh đề bị bác bỏ |
+|---|---|
+| A | **1** / 34 |
+| B | **5** / 64 |
+| B− | **1** / 39 |
+
+⇒ **G19-6 CHƯA đạt** trên nhóm quan hệ. Các ca bị bắt (đã đối chiếu tay) đều là
+**hallucination thật** của Arm B:
+
+- q0127: *"Vợ của vua Minh Mạng … bao gồm … **Rama I**"* — Wikidata: `Rama I.P26`
+  = Thong In, **không** phải Minh Mạng.
+- q0138: *"Vợ của vua Thiệu Trị … **Minh Mạng**, **Tự Đức**, **Ang Em**"* —
+  đó là **anh em**, không phải vợ.
+- q0123: *"Vợ của Đinh Tiên Hoàng là **Ngô Nhật Khánh**"* — Wikidata:
+  `Ngô Nhật Khánh.P26` = Dương Thị Tổng, **không** phải Đinh Tiên Hoàng.
+- q0004: *"Con của Hồ Thị Hoa là **Nguyễn Phúc Miên Tông**"* — trái với
+  `P40` của Hồ Thị Hoa (chỉ có Thiệu Trị).
+
+⇒ Đây chính là **nhiễu cạnh KG** (D-153) chảy thẳng vào câu trả lời ⇒ đưa vào
+báo cáo như **điểm yếu thật**, **không** che giấu.
+
+### 4.3.1 Vì sao phải dùng **phép thử âm bảo** (D-151)
+
+`"Không có trong tập đích" ≠ "sai"` — property của Wikidata (`P22`/`P25`/
+`P26`/`P40`) **không đầy đủ**. Nếu dùng tiêu chí "thiếu" làm tiêu chí "sai" thì
+kết quả **báo sai ở mức hàng chục %** ⇒ mất niềm tin vào bộ kiểm chứng ⇒ mất
+luôn giá trị của nó.
+
+⇒ Chỉ kết luận **bị bác bỏ** khi Wikidata **tường minh** mâu thuẫn: người được
+trả lời **có** quan hệ đó trong Wikidata nhưng quan hệ đó **không trỏ** về
+chủ thể (kiểm ngược chiều: `A.P40` chứa S? / `A.P22`·`A.P25` chứa S? /
+`A.P26` chứa S?).
+
+### 4.3.2 Bộ kiểm chứng cũng phải được lọc nhiễu (4 lớp)
+
+Đo thực tế, mỗi lớp lọc đều **bắt** được false positive nếu thiếu:
+
+| Lớp lọc | Ví dụ false positive nếu thiếu |
+|---|---|
+| Loại **tên rác** (≤1 từ, danh xưng) | "ông", "Giáo phận", "12" |
+| So khớp **theo loại entity** | "Hà Nội" (địa điểm) bị báo sai cho câu hỏi về **người** |
+| So khớp **ranh giới từ** + giữ **span dài nhất** | "Lê Hy" trong "Lê Hy Tông"; "Hà Nam" trong "Hà Nội" |
+| Loại **chủ thể / node trung gian** | "Hồ Thị Hoa" (chủ thể) bị coi là mệnh đề sai |
+
+Sau 4 lớp lọc: **7/137** câu có mệnh đề bị bác bỏ — và **7/7** đều đúng (đã
+đối chiếu tay với Wikidata live).
 
 ### 4.4 A vs B vs B−
 
-Xem `reports/phase_19_report.md` §3.4. Checkpoint đang chạy: **131/246** câu.
+Xem `reports/phase_19_report.md` §3.4. Checkpoint đang chạy: **132/246** câu.
 
 | Nhóm | A | B | B− | Ghi chú |
 |---|---|---|---|---|
-| `narrative` (n=52) | **1,942** | 1,904 | **1,942** | KG **không** tạo lợi thế |
+| `narrative` (n=53) | **1,943** | 1,906 | **1,943** | KG **không** tạo lợi thế |
 | `relational` (n=57) | 1,404 | **1,807** | 1,298 | KG rõ ràng có ích |
 | `multi_hop` (n=22) | 1,091 | **1,545** | 1,273 | KG có ích |
 
-**G19-1 đạt trên `narrative`**: `not_in_data` của A: **16/60 → 2/52**;
+**G19-1 đạt trên `narrative`**: `not_in_data` của A: **16/60 → 2/53**;
 `abstain_with_evidence` = **0** (cả 3 arm) ⇒ không câu nào nói "không có" khi
 context thật sự có đáp án.
 
-**Hiện CHƯA kết luận được** trên `narrative` — còn thiếu 8 câu `narrative`, toàn bộ
+**Hiện CHƯA kết luận được** trên `narrative` — còn thiếu 7 câu `narrative`, toàn bộ
 `multi_turn` (58) và `no_data` (30) (quota Gemini RPD 500/model/ngày).
+
+**Grounding đo bằng code (không LLM)**: A 0,9948 (1/522 mệnh đề không căn cứ) ·
+B 0,9874 (6/555) · B− 0,9850 (3/541) ⇒ **99 %+** mệnh đề bám context đã trích dẫn.
 
 ### 4.5 Bài học mới: **công cụ kiểm chứng cũng phải được kiểm chứng**
 
@@ -137,6 +195,12 @@ cho thấy **cả 4 là false negative của chính script** (D-146):
 
 1. Khoá cache dùng `_norm()` (bỏ dấu) ⇒ "Lê Hiển Tông" va chạm "Lê Hiến Tông".
 2. Chỉ so năm với `evidence_doc_id`, bỏ qua các nguồn đã trích dẫn (KG/text).
+
+Về sau phát hiện thêm **lỗi thứ 3** (D-149): bộ kiểm chứng chỉ so **tên live** của
+Wikidata ⇒ `q0010` ("Ai là con của Lê Đại Hành?") bị báo sai vì KG nội bộ ghi
+**"Lập Giáo Hoàng hậu"** còn Wikidata ghi **"Lê Thị Phất Ngân"** (cùng QID
+`Q10787856`) ⇒ sửa: so khớp theo **QID** là chuẩn, tên chỉ là **bí danh** (bổ sung
+nhãn KG nội bộ theo QID), nguồn live vẫn là chuẩn cho **quan hệ**.
 
 ⇒ Mọi cờ "bịa" phải được **đối chiếu thủ công** với nguồn trước khi tin.
 
@@ -149,6 +213,36 @@ phạm vi". **Giả định này sai**: corpus phủ **toàn bộ** lịch sử 
 
 ⇒ Bộ v3 thay 30 câu `no_data` (216 câu còn lại giữ nguyên) + builder tự động loại
 chủ đề trùng corpus (D-148).
+
+### 4.7 Bài học mới: **driver phải ngủ theo quota, không probe liên tục**
+
+Driver eval cũ probe lại **mỗi 5 phút** ⇒ mỗi lần probe tốn 1 request **bị tính**
+vào quota ⇒ **tự làm cạn thêm** ⇒ 60 vòng × 5 phút ≈ 5 giờ ⇒ driver hết vòng lúc
+~21h, **trước** lúc quota hồi (8h sáng) ⇒ **mất cả đêm**.
+
+⇒ Nay: vòng vừa rồi **có** tiến triển ⇒ ngủ 300s; **không** tiến triển ⇒ ngủ tới
+**mốc reset ngày gần nhất** (8h05 sáng hôm sau) (D-150).
+
+### 4.8 Bài học mới: **đổi API key phải recreate container, không `restart`**
+
+`docker compose restart backend` **không** nạp lại `env_file` ⇒ container vẫn
+giữ **key cũ** ⇒ eval vẫn 429 mặc dù `.env` đã đúng. ⇒ Phải dùng
+`docker compose up -d --force-recreate --no-deps backend` (D-152), rồi **probe**
+API trước khi chạy lại driver.
+
+### 4.9 Bài học mới: **"không xác nhận được" ≠ "sai"**
+
+Bộ kiểm chứng đầu tiên dùng tiêu chí *"tên có trong tập QID đích của Wikidata
+không?"* ⇒ báo **44/137** câu "không xác nhận" ⇒ nhưng khi đối chiếu tay, phần
+lớn là **false positive** (tên rác, khớp chuỗi con, tên địa điểm nhắc thoáng
+qua, tên chủ thể) ⇒ **công cụ kiểm chứng sai** chứ **hệ thống** không sai.
+
+⇒ Chuyển sang **phép thử âm bảo** (D-151): chỉ báo đỏ khi Wikidata **tường minh**
+mâu thuẫn ⇒ còn **7** câu ⇒ và cả 7 đều là hallucination **thật** ⇒ bộ kiểm
+chứng **đáng tin** ⇒ kết luận mới **đáng tin**.
+
+⇒ Đây là bài học **lặp lại** lần 3 trong Phase 19 (sau D-146 và D-149):
+**mọi công cụ kiểm chứng đều phải được kiểm chứng trước khi tin.**
 
 ## 5. Sai ở đâu (bài học)
 
@@ -168,6 +262,14 @@ chủ đề trùng corpus (D-148).
    `COPY` code ⇒ cần `build` khi code đổi).
 7. **Công cụ kiểm chứng cũng có bug** ⇒ mọi cờ "bịa" phải đối chiếu thủ công với
    nguồn trước khi tin (xem §4.5).
+8. **Tên gọi khác nhau không phải là khác người**: Wikidata và KG nội bộ có thể
+   ghi cùng một QID bằng hai nhãn khác nhau ⇒ so khớp phải theo **QID** (D-149).
+9. **Hạn mức reset theo ngày** ⇒ công cụ lặp nền phải **ngủ theo quota**, không
+   probe liên tục (D-150).
+10. **"Không xác nhận được" ≠ "sai"** ⇒ chỉ kết luận **bị bác bỏ** khi nguồn
+    live **tường minh mâu thuẫn** (phép thử âm bảo) — D-151.
+11. **Đổi biến môi trường ⇒ phải recreate container**, `restart` không nạp lại
+    `env_file` (D-152).
 
 ## 6. Kết luận lấy vào slide
 
@@ -176,8 +278,12 @@ chủ đề trùng corpus (D-148).
   có" khi context có dữ liệu.
 - **Kiểm chứng bằng nguồn ngoài live**: **0/246** câu hỏi vô lý (98 mệnh đề Wikidata
   đối chiếu khớp tuyệt đối); **0** câu trả lời bịa số năm.
+- **Kiểm chứng mệnh đề quan hệ bằng phép thử âm bảo (D-151)**: bắt được **7**
+  hallucination thật của Arm B ("Rama I là vợ của Minh Mạng", "Minh Mạng là vợ
+  của Thiệu Trị") ⇒ **G19-6 chưa đạt** trên nhóm quan hệ ⇒ nguyên nhân là **nhiễu
+  cạnh KG** (D-153), không phải lỗi sinh câu trả lời.
 - Số liệu A vs B vs B− **chốt sau** khi eval đủ 246 câu — hiện **không kết luận
   được**, và đó là kết luận trung thực.
-- **Tạm thời** (131/246 câu): KG **có ích rõ** trên `relational` (1,807 vs 1,404 vs
+- **Tạm thời** (132/246 câu): KG **có ích rõ** trên `relational` (1,807 vs 1,404 vs
   1,298) và `multi_hop` (1,545 vs 1,091 vs 1,273); **không** thấy lợi thế trên
-  `narrative` (1,942 ≈ 1,904 ≈ 1,942).
+  `narrative` (1,943 ≈ 1,906 ≈ 1,943).

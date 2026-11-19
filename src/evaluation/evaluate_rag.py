@@ -112,6 +112,13 @@ Với **mỗi** phương án, chấm:
    - 0 = sai hoặc không trả lời được câu hỏi
    Nếu `expected_answer` là "Không có trong dữ liệu." thì chấm 2 khi câu trả lời
    nói không có dữ liệu, 0 nếu câu trả lời bịa.
+   ⚠️ **D-151 — NGƯỜI ĐỐI CHIẾU KHÔNG ĐƯỢC THƯỞNG ĐIỂM CAO CHO CÂU TỪ CHỐI.**
+   Nếu `expected_answer` **CÓ NỘI DUNG** (không phải "Không có trong dữ liệu.")
+   mà phương án chỉ trả lời rằng **không có / không tìm thấy dữ liệu** ⇒ đây là
+   câu trả lời **sai** (hệ thống không trả lời được câu hỏi có đáp án) ⇒
+   `correctness` = **0**, `faithfulness` = **0** (không có mệnh đề nào để hỗ trợ),
+   `citation_precision` = 0. **TUYỆT ĐỐI KHÔNG** cho điểm 2 chỉ vì CONTEXT không
+   có dữ liệu — đó là lỗi của **hệ thống**, không phải của câu hỏi.
    Nếu loại câu hỏi là `narrative` (expected_answer là một đoạn văn tham chiếu
    trích từ Wikipedia) ⇒ chấm theo **mức độ bao phủ các mốc sự kiện chính**
    có trong đoạn tham chiếu, không đòi hỏi trùng văn bản.

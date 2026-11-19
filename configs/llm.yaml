@@ -61,24 +61,43 @@ pools:
   # Sinh câu trả lời (3 arm × 247 câu = 741 lời gọi).
   generation:
     # Định dạng: `provider:model1,model2;provider2:model3`
+    #
+    # ⚠️ Phase 19 (D-154) — thêm `gemini-3.5-flash-lite` và `gemini-flash-lite-latest`.
+    #
+    # Vì sao? Quota Gemini free tier tính **riêng theo model** ⇒ khi
+    # `gemini-3.1-flash-lite` cạn RPD thì `gemini-3.5-flash-lite` **vẫn còn**.
+    # Đo thực tế 19/11/2026: `gemini-3.1-flash-lite` ⇒ 429 cạn, còn
+    # `gemini-3.5-flash-lite` ⇒ 200 OK.
+    #
+    # ⚠️ **Tính so sánh được**: `gemini-3.5-flash-lite` **đã nằm trong** bộ
+    # gen của D-123/D-124 (xem D-136) ⇒ thêm vào là **khôi phục đúng baseline**
+    # (không phải đổi hệ đo) ⇒ không phá tính so sánh được của Phase 19.
     spec: >-
-      gemini:gemini-3.1-flash-lite,gemini-3.1-flash-lite-preview,gemini-3-flash-preview;
+      gemini:gemini-3.1-flash-lite,gemini-3.1-flash-lite-preview,gemini-3-flash-preview,gemini-3.5-flash-lite,gemini-flash-lite-latest;
       groq:openai/gpt-oss-120b,qwen/qwen3.8-27b,openai/gpt-oss-20b
     provider: gemini
     models:
       - gemini-3.1-flash-lite
       - gemini-3.1-flash-lite-preview
       - gemini-3-flash-preview
+      - gemini-3.5-flash-lite
+      - gemini-flash-lite-latest
   # LLM-judge (247 lời gọi, gộp 3 arm/câu).
   judge:
+    #
+    # ⚠️ Phase 19 (D-154) — thêm `gemini-3.5-flash-lite` với lý do **như trên**
+    # (quota RPD tính riêng theo model). ⚠️ `gemini-flash-lite-latest` **không**
+    # thêm vào judge: đây là model **alias đổi theo thời gian** ⇒ không
+    # ghim được ⇒ dễ gây lệch model giữa các vòng.
     spec: >-
-      gemini:gemini-3.1-flash-lite,gemini-3.1-flash-lite-preview,gemini-3-flash-preview;
+      gemini:gemini-3.1-flash-lite,gemini-3.1-flash-lite-preview,gemini-3-flash-preview,gemini-3.5-flash-lite;
       groq:openai/gpt-oss-120b,qwen/qwen3.8-27b
     provider: gemini
     models:
       - gemini-3.1-flash-lite
       - gemini-3.1-flash-lite-preview
       - gemini-3-flash-preview
+      - gemini-3.5-flash-lite
 
 # Đường bulk: không tốn quota API, chạy trên Kaggle GPU.
 bulk:

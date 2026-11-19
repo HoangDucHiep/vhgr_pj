@@ -2851,3 +2851,57 @@ Trường Sa 1988…) với giả định corpus chỉ phủ 9 triều đại. *
    được**.
 
 **Cập nhật file:** `src/evaluation/build_qa_set.py`, `data/eval/qa_rag_250_v3.jsonl`.
+
+## D-149 — Bộ kiểm chứng phải so **theo QID** (bổ sung nhãn KG nội bộ), không chỉ so tên live
+
+**Ngày:** 19/11/2026 · **Phase:** 19
+
+**Bối cảnh.** Sau D-148, chạy lại `scripts/verify_answers_online.py --questions-only`
+trên bộ v3 ⇒ **98/98** câu `relational`/`multi_hop` verify OK, **118** câu
+`narrative`/`multi_turn` OK ⇒ **G19-7 = 0 câu hỏi không hợp lệ** ✅.
+
+Nhưng khi kiểm tra **chi tiết**, còn **1** câu (`q0010`) bị báo `verified=False`:
+
+> `q0010` — *"Ai là con của Lê Đại Hành?"* — đáp án tham chiếu
+> `"Lê Long Đĩnh, Lê Trung Tông (Tiền Lê), Lập Giáo Hoàng hậu"`.
+
+Điều tra: **`Lập Giáo Hoàng hậu`** trong KG nội bộ = `Q10787856`; Wikidata live ghi
+cùng QID đó là **`Lê Thị Phất Ngân`** (nhãn `vi`), bí danh `vi` = *"Công chúa Phất
+Ngân"* ⇒ **cùng một người**, **khác nhãn**. Bộ kiểm chứng chỉ so **tên live**
+⇒ báo sai ⇒ **false negative** ⇒ Gate G19-7 sẽ tự bị bằng chứng bằng chính bộ
+kiểm chứng của dự án.
+
+**Quyết định.**
+
+1. Bộ kiểm chứng so khớp **theo QID** là chuẩn, tên chỉ là **bí danh**:
+   - Tập đích vẫn lấy từ **Wikidata live** (`target_qids`).
+   - Tập **khóa tên** được **bổ sung** bằng **nhãn KG nội bộ** của các QID đích
+     (`entity_index_by_qid()`) ⇒ *"Lập Giáo Hoàng hậu"* khớp `Q10787856` ⇒ verify ✅.
+   - Nguồn live **không bị thay thế** ⇒ vẫn là kiểm chứng **độc lập** với KG nội bộ
+     về **mặt quan hệ** (`P40`/`P22`/… lấy từ Wikidata live).
+2. Thêm test: `test_entity_index_by_qid_maps_internal_aliases` +
+   `test_verify_relational_accepts_internal_alias_of_same_qid`.
+
+**Kết quả sau khi sửa:** `q0010` → `verified=True`; tổng **98/98** câu quan hệ
+verify OK ⇒ **G19-7 = 0/246 câu hỏi không hợp lệ**.
+
+**Cập nhật file:** `scripts/verify_answers_online.py`, `tests/test_phase19_grounded.py`.
+
+## D-150 — Driver eval phải **ngủ theo quota**, không probe mỗi 5 phút
+
+**Ngày:** 19/11/2026 · **Phase:** 19
+
+**Bối cảnh.** Hạn mức free tier (Gemini RPD ~500/ngày/model, Groq TPD 200k token)
+**reset theo ngày** (Gemini reset **8h sáng** giờ VN). Driver cũ (`scripts/run_phase19_eval_loop.sh`)
+**luôn** ngủ 300s rồi thử lại ⇒ mỗi vòng "probe" lại **tốn 1 request bị tính** vào
+quota ⇒ **tự làm cạn thêm** ⇒ 60 vòng × 5 phút ≈ **5 giờ** ⇒ driver **hết vòng lúc
+~21h**, **trước** lúc quota hồi (8h sáng) ⇒ **mất cả đêm**.
+
+**Quyết định.** Driver so sánh `new_count` với `done_count` của vòng vừa rồi:
+
+- **Có** tiến triển ⇒ quota còn dư ⇒ ngủ **300s** rồi chạy tiếp.
+- **Không** tiến triển ⇒ quota đã cạn ⇒ ngủ tới **mốc reset ngày gần nhất**
+  (8h05 sáng hôm sau, tối thiểu 10 phút) ⇒ không probe vô ích, driver **sống sót**
+  qua đêm và tự chạy tiếp khi quota hồi.
+
+**Cập nhật file:** `scripts/run_phase19_eval_loop.sh`.

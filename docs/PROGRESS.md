@@ -26,7 +26,7 @@
 | 16 | **Đánh giá A vs B vs B− (LLM-judge)** | ✅ Xong | 17/11/2026 | Bộ câu hỏi **247 câu / 5 dạng** (60 narrative · 60 multi_turn · 58 relational · 40 multi_hop · 29 no_data) từ Wikidata (độc lập KG) · judge **gộp 3 arm/câu** + hoán vị thứ tự theo `qid` (seed 42) · pool LLM **đa provider** (Gemini + Groq) + **ghim model theo câu** + **tách session theo arm** + **loại lỗi hạ tầng khỏi mẫu số** · **retry judge khi thiếu arm** (`n_judge_missing`) + `scripts/rejudge_missing.py` · **loại câu có confound model** (`n_model_mismatch`) · **sửa chiều quan hệ KG ở tầng đọc** (D-118) ⇒ `faithfulness_rate(B)` 0,8381 → **0,9150** ✅ · **tái dùng arm không đổi** (D-119) ⇒ chỉ sinh 247 lời gọi thay vì 741 · **Kết quả**: `correctness` A **1,1619** · B **1,5506** · B− **1,1700** (Δ B vs A = **+0,3887**) · `citation_precision(B)` **0,8275** · `no_data_accuracy` 0,9655 · 0 arm judge bỏ sót · 0 câu lệch model · D-103, D-104, D-106, D-108, D-109, D-111, D-118, D-119 |
 | 17 | **Giao diện so sánh + đóng gói** | ✅ Xong | 17/11/2026 | Toggle **A / B / B−** · `CitationPanel` click-to-source (phân biệt `KG` / `Văn bản`) · đồ thị 1-hop từ `KgGraph` · `npm run typecheck` **0 lỗi** · `npm run build` ✓ · `docker compose up` 3 service healthy (`/api/health` → `neo4j: up`, frontend HTTP 200) · 2 ảnh demo trong `reports/screenshots/` · D-099..D-103 |
 | 18 | **Sửa chất lượng Hybrid trên nhóm `narrative`** | 🟡 Đang làm | 18/11/2026 | **D-123** (tách hop-1/hop-2 thành 2 truy vấn độc lập — hết cartesian product; sửa điều kiện chạy hop-2; lọc nhiễu sinh tử bằng `CONTEXT_RELATIONS`; `_resolve_title_names` sửa tên node `Title` "quận công"; prompt trả lời câu tự sự) → eval 60 câu: A **1,84** · B **1,79** · B− **1,85** (D-122: A 1,91 · B 1,78 · B− 1,85) · B bổ sung thông tin bên liên quan **33 → 38/60** câu · **D-124** (scope hop-2 `n2 = e` — loại 71% nhiễu; template `event_parties` — phủ 21/60 câu thiếu bên liên quan; quy tắc ưu tiên văn bản khi xung đột; lọc tên rác liên kết Wikipedia "Chuẩn đề đốc Page"; biến thể tiền tố "Chi Huy 1/2") → eval 43/60 câu (hết quota): A **1,95** · B **1,79** · B− **1,92** · A "Không có trong dữ liệu" mà B có đủ **5/43** câu · **D-125** (harness: không ghim cứng model hết quota + ngân sách context 16.000 → 9.000 ký tự) · 20 test `tests/test_phase17_d123_d124.py` **20/20 pass** |
-| 19 | **Trả lời đúng & có căn cứ, rồi đo lại A vs B vs B−** | 🟡 Đang làm | 19/11/2026 | **G19-2 đạt**: gold section trong top-8 (narrative) **46/60 → 55/60** nhờ `retrieval.diversity` (cap chunk/section=2 · cap chunk/doc=5 · `title_boost=1.0` · `section_boost=1.0` · `noise_penalty=0.5`) — đo offline bằng `scripts/measure_gold_hit_rate.py` (multi_hop 34/40 · relational 43/58 · multi_turn 24/58 · no_data 0/30) · **G19-7 đạt**: **0/118** câu hỏi không hợp lệ (kiểm chứng Wikipedia/Wikidata **live** bằng `scripts/verify_answers_online.py`) ⇒ **không** loại câu hỏi nào vì phạm vi (D-142) · **G19-6 (tạm) đạt**: **0** câu trả lời bịa số năm · **0** vi phạm `no_data` · tầng sinh: `no_data_retry` khi context có dữ liệu + metric `abstain_with_evidence` (D-144) · bộ câu hỏi v2 `qa_rag_250_v2.jsonl` (246 câu) — gom chunk theo `(doc_id, section_path)`, bỏ shuffle, `no_data` hậu-1945, sửa chuỗi "mẹ của mẹ", chỉ hỏi năm có trong corpus · **G19-1/3/4/5 chưa chốt** — eval 246 câu × 3 arm đang chạy nền (quota Gemini RPD 500/model/ngày) ⇒ **A vs B vs B− chưa kết luận được** (G19-5 trung thực) · test `tests/test_phase19_grounded.py` **26/26** + toàn bộ suite **100 % pass** |
+| 19 | **Trả lời đúng & có căn cứ, rồi đo lại A vs B vs B−** | 🟡 Đang làm | 19/11/2026 | **G19-2 đạt**: gold section trong top-8 (narrative) **46/60 → 55/60** nhờ `retrieval.diversity` (cap chunk/section=2 · cap chunk/doc=5 · `title_boost=1.0` · `section_boost=1.0` · `noise_penalty=0.5`) — đo offline bằng `scripts/measure_gold_hit_rate.py` (multi_hop 34/40 · relational 43/58 · multi_turn 24/58 · no_data 0/30) · **G19-7 đạt**: **0/246** câu hỏi không hợp lệ (kiểm chứng Wikipedia/Wikidata **live** bằng `scripts/verify_answers_online.py`) ⇒ **không** loại câu hỏi nào vì phạm vi (D-142) · **G19-6**: **474** câu trả lời kiểm chứng ⇒ **0** năm sai · **0** vi phạm `no_data` · **159** mệnh đề quan hệ kiểm bằng Wikidata live (D-151) ⇒ **7 bị bác bỏ** (nguyên nhân nhiễu cạnh `cha_cua` từ RE — D-153 ⇒ **Phase 20**) · tầng sinh: `no_data_retry` khi context có dữ liệu + metric `abstain_with_evidence` (D-144) · bộ câu hỏi v3 `qa_rag_250_v3.jsonl` (246 câu — D-148: 30 câu `no_data` thật sự ngoài corpus, 216 câu còn lại giữ nguyên) · sửa **3** false negative của chính bộ kiểm chứng (D-146 khoá cache · D-146 đa nguồn · D-149 so theo QID) · driver **ngủ theo quota** (D-150) · **G19-1/3/4/5 chưa chốt** — eval **152/246** câu × 3 arm đang chạy nền (quota Gemini RPD 500/model/ngày) ⇒ **A vs B vs B− chưa kết luận được** (G19-5 trung thực) · test `tests/test_phase19_grounded.py` **38/38** + toàn bộ suite **100 % pass** |
 
 Ký hiệu: ⬜ chưa · 🟡 đang làm · ✅ xong (đạt Gate) · ⚠️ xong nhưng lệch kế hoạch (xem `reports/deviations.md`)
 
@@ -48,16 +48,21 @@ bị nghi vấn là artefact của retrieval ⇒ Phase 19 đo lại từ đầu 
 > hậu-1945 có thật, sửa chuỗi "mẹ của mẹ", chỉ hỏi năm **có trong corpus**.
 >
 > **Kiểm chứng bằng nguồn ngoài live** (không tin LLM-judge): `scripts/verify_answers_online.py`
-> ⇒ **0/246** câu hỏi không hợp lệ (**G19-7** ✅) · **0** câu trả lời có năm không có
-> trong Wikipedia live (**G19-6** tạm đạt).
+> ⇒ **0/246** câu hỏi không hợp lệ (**G19-7** ✅) · **474** câu trả lời đã kiểm chứng:
+> **0** năm không có trong Wikipedia live · **0** vi phạm `no_data` · **159** mệnh đề
+> quan hệ đã kiểm bằng Wikidata live (D-151) ⇒ **7** mệnh đề bị bác bỏ
+> (nguyên nhân: **nhiễu cạnh `cha_cua` từ RE**, D-153 ⇒ **Phase 20**).
 >
 > **Kết luận A vs B vs B−: CHƯA kết luận được** — eval đầy đủ (246 câu × 3 arm) đang
 > chạy nền theo quota Gemini (RPD 500/model/ngày) ⇒ driver
-> `scripts/run_phase19_eval_loop.sh all 60` tự lặp + `--resume`.
-> **Tạm thời (131/246 câu):** `relational` B **1,807** > A 1,404 > B− 1,298 (KG có
-> ích) · `multi_hop` B **1,545** > B− 1,273 > A 1,091 (KG có ích) · `narrative`
-> A 1,942 ≈ B 1,904 ≈ B− 1,942 (KG **không** thấy lợi thế). G19-1 đạt trên
-> `narrative`: `not_in_data` của A **16/60 → 2/52**, `abstain_with_evidence` = **0**.
+> `scripts/run_phase19_eval_loop.sh all 60` tự lặp + `--resume` + **ngủ theo quota**
+> (D-150: không probe lại mỗi 5 phút khi quota đã cạn).
+> **Tạm thời (152/246 câu):** `relational` B **1,776** > A 1,103 > B− 1,034 (KG có
+> ích) · `multi_hop` B **1,594** > B− 0,812 > A 0,500 (KG có ích) · `narrative`
+> A 1,600 · B 1,650 · B− 1,700 (KG **không** thấy lợi thế). G19-1: `not_in_data` của A
+> **16/60 → 9/60** (≤6 chưa đạt), `abstain_with_evidence` = **0**.
+> Grounding đo bằng code: A **0,9949** · B 0,9884 · B− 0,9853 (chỉ 10/1.653 mệnh đề
+> không bám context đã trích dẫn).
 
 > **Định hướng mới (chốt 16/11/2026):** so sánh **Vanilla RAG (A)** vs **Hybrid GraphRAG (B)** vs **Hybrid không KG (B−)**.
 > Nhánh Text-to-Cypher không còn là arm so sánh.
@@ -444,9 +449,10 @@ Kết quả Phase 5 đã chốt:
 | RAG — gold section trong top-8 (narrative) | ≥ 55/60 | **55/60** ✅ (Phase 19; trước **46/60**) |
 | RAG — câu hỏi eval hợp lệ (kiểm chứng live) | 100 % | **246/246** ✅ (0 câu không hợp lệ — G19-7; 98 mệnh đề Wikidata khớp) |
 | RAG — chủ đề `no_data` thật sự vắng trong corpus | 30/30 | ✅ **30/30** (bộ v3 — D-148; bộ v2 chỉ **4/37** ⇒ đo sai) |
-| RAG — câu trả lời bịa số năm (kiểm chứng live) | 0 | **0/336** ✅ (G19-6; sau khi sửa 2 lỗi false negative của script — D-146) |
-| RAG — `abstain_with_evidence` (nói "không có" khi context có gold) | 0 | ✅ **0** trên `narrative` (cả 3 arm, n=52); 4/1/4 trên `relational` (đang đo) |
-| RAG — `not_in_data` của A trên `narrative` | ≤ 6/60 | ✅ **2/52** (D-124: 16/60) — G19-1 |
+| RAG — câu trả lời bịa số năm (kiểm chứng live) | 0 | **0/474** ✅ (G19-6; sau khi sửa 2 lỗi false negative của script — D-146) |
+| RAG — mệnh đề quan hệ **bị bác bỏ** (kiểm chứng live) | 0 | ❌ **7/159** (G19-6 — A 1/35 · B 5/73 · B− 1/40) — D-151: nguyên nhân = **nhiễu cạnh `cha_cua` từ RE** (D-153) |
+| RAG — `abstain_with_evidence` (nói "không có" khi context có gold) | 0 | ✅ **0** trên `narrative` (cả 3 arm, n=60); 4/1/4 trên `relational` (đang đo) |
+| RAG — `not_in_data` của A trên `narrative` | ≤ 6/60 | 🟡 **9/60** (D-124: 16/60) — G19-1 (vế ≤6 chưa đạt) |
 | Faithfulness (không bịa) | ≥ 0.90 | — |
 
 ## Tài liệu liên quan
