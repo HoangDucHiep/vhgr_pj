@@ -944,3 +944,54 @@ def test_context_has_gold_requires_answer_in_context() -> None:
     ) is True
     # Không có `evidence_doc_id` ⇒ coi như có dữ liệu (thiên về phát hiện lỗi).
     assert context_has_gold(blocks, [], "", "bất kỳ", "bất kỳ") is True
+
+
+def test_verify_cache_key_does_not_collapse_distinct_titles() -> None:
+    """⚠️ Khoá cache kiểm chứng **không được bỏ dấu** (D-146).
+
+    Vì sao? "Lê Hiển Tông" và "Lê Hiến Tông" là **hai vua Lê khác nhau**;
+    `_norm()` (bỏ dấu) gộp chúng về cùng một khoá ⇒ cache trả **nhầm bài**
+    ⇒ năm 1786 (Lê Hiển Tông) bị báo "không có trong Wikipedia" ⇒ G19-6 báo
+    sai (false negative).
+    """
+    from scripts import verify_answers_online as vao
+
+    key_hien = vao.cache_key("wiki_extract::", "Lê Hiển Tông")
+    key_hiep = vao.cache_key("wiki_extract::", "Lê Hiến Tông")
+    assert key_hien != key_hiep, "Hai bài khác nhau phải có khoá cache khác nhau"
+    # Đồng thời `_norm()` vẫn gộp ⇒ chứng minh đây là lỗi **do bỏ dấu**.
+    assert vao._norm("Lê Hiển Tông") == vao._norm("Lê Hiến Tông")
+    # Khoá phải ổn định (không phụ thuộc khoảng trắng thừa).
+    assert vao.cache_key("wiki_extract::", "  Lê Hiển Tông ") == key_hien
+
+
+def test_verify_answer_years_checks_all_cited_sources() -> None:
+    """⚠️ Năm trong đáp án phải được đối chiếu với **mọi nguồn đã trích dẫn** (D-146).
+
+    Vì sao? q0031 arm B trả "Nguyễn Huy Tự **sinh năm 1743** … [9][19]" ⇒ năm
+    1743 nằm ở bài **Nguyễn Huy Tự** (trích dẫn KG), không phải bài bằng
+    chứng ⇒ nếu chỉ so `evidence_doc_id` ⇒ báo "bịa" **sai**.
+    """
+    from scripts import verify_answers_online as vao
+
+    extracts = {
+        "Nguyễn Huy Hổ": "Cha của ông là Nguyễn Huy Tự, qua đời năm 1790.",
+        "Nguyễn Huy Tự": "Nguyễn Huy Tự (sinh năm 1743), hiện thượng, mất 1790.",
+    }
+    vao.wikipedia_extract = lambda title: extracts.get(title, "")  # type: ignore[assignment]
+
+    doc_titles = {"doc_655297": "Nguyễn Huy Hổ"}
+    answer = "Nguyễn Huy Tự sinh năm 1743 và qua đời năm 1790 [9][19]."
+
+    # Chỉ có bài bằng chứng ⇒ năm 1743 **không** có ⇒ báo sai (đúng theo logic cũ).
+    only_evidence = vao.verify_answer_against_wikipedia(
+        answer, ["doc_655297"], doc_titles
+    )
+    assert only_evidence["unsupported_years"] == [1743]
+
+    # Có thêm nguồn đã trích dẫn ⇒ năm 1743 được chứng minh ⇒ hợp lệ.
+    with_cited = vao.verify_answer_against_wikipedia(
+        answer, ["doc_655297"], doc_titles, ["Nguyễn Huy Tự"]
+    )
+    assert with_cited["unsupported_years"] == []
+    assert with_cited["ok"] is True
