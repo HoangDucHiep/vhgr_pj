@@ -48,12 +48,16 @@ bị nghi vấn là artefact của retrieval ⇒ Phase 19 đo lại từ đầu 
 > hậu-1945 có thật, sửa chuỗi "mẹ của mẹ", chỉ hỏi năm **có trong corpus**.
 >
 > **Kiểm chứng bằng nguồn ngoài live** (không tin LLM-judge): `scripts/verify_answers_online.py`
-> ⇒ **0/118** câu hỏi không hợp lệ (**G19-7** ✅) · **0** câu trả lời có năm không có
+> ⇒ **0/246** câu hỏi không hợp lệ (**G19-7** ✅) · **0** câu trả lời có năm không có
 > trong Wikipedia live (**G19-6** tạm đạt).
 >
 > **Kết luận A vs B vs B−: CHƯA kết luận được** — eval đầy đủ (246 câu × 3 arm) đang
 > chạy nền theo quota Gemini (RPD 500/model/ngày) ⇒ driver
 > `scripts/run_phase19_eval_loop.sh all 60` tự lặp + `--resume`.
+> **Tạm thời (131/246 câu):** `relational` B **1,807** > A 1,404 > B− 1,298 (KG có
+> ích) · `multi_hop` B **1,545** > B− 1,273 > A 1,091 (KG có ích) · `narrative`
+> A 1,942 ≈ B 1,904 ≈ B− 1,942 (KG **không** thấy lợi thế). G19-1 đạt trên
+> `narrative`: `not_in_data` của A **16/60 → 2/52**, `abstain_with_evidence` = **0**.
 
 > **Định hướng mới (chốt 16/11/2026):** so sánh **Vanilla RAG (A)** vs **Hybrid GraphRAG (B)** vs **Hybrid không KG (B−)**.
 > Nhánh Text-to-Cypher không còn là arm so sánh.
@@ -439,8 +443,9 @@ Kết quả Phase 5 đã chốt:
 | RAG — câu lỗi hạ tầng | 0 | **0** (cả 3 arm) |
 | RAG — gold section trong top-8 (narrative) | ≥ 55/60 | **55/60** ✅ (Phase 19; trước **46/60**) |
 | RAG — câu hỏi eval hợp lệ (kiểm chứng live) | 100 % | **246/246** ✅ (0 câu không hợp lệ — G19-7; 98 mệnh đề Wikidata khớp) |
-| RAG — câu trả lời bịa số năm (kiểm chứng live) | 0 | **0** ✅ (G19-6, checkpoint đang chạy) |
-| RAG — `abstain_with_evidence` (nói "không có" khi context có gold) | 0 | 🟡 đang chờ eval đủ (metric đã có trong `evaluate_rag.py`) |
+| RAG — câu trả lời bịa số năm (kiểm chứng live) | 0 | **0** ✅ (G19-6, checkpoint đang chạy; sau khi sửa 2 lỗi false negative của script — D-146) |
+| RAG — `abstain_with_evidence` (nói "không có" khi context có gold) | 0 | ✅ **0** trên `narrative` (cả 3 arm, n=52); 4/1/4 trên `relational` (đang đo) |
+| RAG — `not_in_data` của A trên `narrative` | ≤ 6/60 | ✅ **2/52** (D-124: 16/60) — G19-1 |
 | Faithfulness (không bịa) | ≥ 0.90 | — |
 
 ## Tài liệu liên quan
