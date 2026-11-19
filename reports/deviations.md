@@ -2393,3 +2393,17 @@ nhau** không, (2) phần context bị **cắt mất** không, (3) judge có **�
 - Xử lý: (1) mount ổ qua container privileged → `nsenter -t 1 -m -- mount /dev/sda1 <path>`; (2) `mount --bind` thư mục repo thật về đường dẫn workspace; (3) `docker compose up -d --force-recreate backend` để container mount lại đúng inode; (4) `docker cp src/. scripts/. tests vhgr_backend:/app/...` (image `COPY` code ⇒ **phải** copy lại, xem D-137).
 - Bài học: Sau khi repo di chuyển, **luôn** kiểm tra inode khớp giữa host và container (`stat -c %i`) trước khi tin rằng bind-mount còn hiệu lực.
 - Cập nhật file: `docs/DECISIONS.md` (D-145), `reports/phase_19_report.md` §6.
+
+---
+
+## D-143 — Sửa **2 lỗi trong chính công cụ kiểm chứng** + giữ thứ tự lượt `multi_turn` (ngoài kế hoạch)
+
+- Ngày: 2026-11-19
+- Phase: 19
+- Loại: kỹ thuật
+- Kế hoạch: §7 nói "kiểm chứng bằng Wikipedia/Wikidata live" ⇒ **0** mệnh đề bị bác bỏ ⇒ G19-6.
+- Thực tế: (1) Lần kiểm chứng đầu báo **4** câu trả lời "bịa số năm" — điều tra cho thấy **cả 4 là false negative của chính script**: khoá cache dùng `_norm()` (bỏ dấu) ⇒ "Lê Hiển Tông" va chạm "Lê Hiến Tông"; và chỉ so năm với `evidence_doc_id` mà bỏ qua nguồn đã trích dẫn. (2) Phát hiện lỗi công bằng trong nhóm `multi_turn`: khi một lượt bị hoãn (hết quota), các **lượt sau** của cùng phiên vẫn chạy ⇒ thiếu lịch sử hội thoại ⇒ điểm **ảo** ⇒ lệch so sánh A vs B vs B− không công bằng.
+- Lý do: (1) Công cụ kiểm chứng cũng **có bug** ⇒ mọi cờ "bịa" phải được đối chiếu thủ công với nguồn trước khi tin. (2) Kết quả eval phải phản ánh **chất lượng hệ thống**, không phải **thứ tự chạy** ⇒ phải giữ thứ tự lượt hội thoại.
+- Ảnh hưởng: G19-6 đạt **0/336** câu trả lời bịa (thay vì 4/336 do lỗi script); nhóm `multi_turn` đo được công bằng giữa 3 arm.
+- Xử lý: Ghi **D-146** (khoá cache + đối chiếu đa nguồn) và **D-147** (giữ thứ tự lượt) trong `docs/DECISIONS.md`; thêm test hồi quy trong `tests/test_phase19_grounded.py`.
+- Cập nhật file: `scripts/verify_answers_online.py`, `src/evaluation/evaluate_rag.py`, `tests/test_phase19_grounded.py`, `docs/DECISIONS.md`.

@@ -2793,3 +2793,26 @@ kiểm chứng, không phải lỗi của hệ thống:
    mọi bài `evidence_doc_id` ⇒ không còn false negative do bỏ sót nguồn.
 
 **Cập nhật file:** `scripts/verify_answers_online.py`.
+
+---
+
+## D-147 — Lượt **sau** của một phiên hội thoại bị hoãn ⇒ **cũng phải hoãn**
+
+**Ngày:** 19/11/2026 · **Phase:** 19
+
+**Bối cảnh.** Nhóm `multi_turn` (58 câu) là **hội thoại nhiều lượt**: lượt 2 hỏi
+*"Ông ấy sinh năm nào?"* ⇒ cần lịch sử lượt 1 trong `SessionStore` để viết lại câu
+hỏi (query rewriting). Khi quota cạn, `evaluate_rag.py` **hoãn** (deferred) câu đang
+chạy và `continue` ⇒ **các lượt sau của cùng phiên vẫn chạy tiếp**, dù lượt trước
+chưa có kết quả.
+
+⇒ Lượt sau chạy **không có lịch sử hội thoại** ⇒ trả sai ⇒ điểm của lượt đó **ảo**
+⇒ lệch so sánh A vs B vs B− **không công bằng** (và khác nhau giữa các arm, tuỳ
+lúc nào quota cạn — tức là phụ thuộc **thứ tự chạy**, không phải chất lượng hệ
+thống).
+
+**Quyết định.** Khi một lượt của phiên bị hoãn ⇒ **ghi nhớ `session_id`** vào
+`deferred_sessions` ⇒ mọi lượt **sau** của phiên đó cũng bị hoãn ⇒ giữ **thứ tự
+lượt** ⇒ mọi arm đều có cùng lịch sử hội thoại.
+
+**Cập nhật file:** `src/evaluation/evaluate_rag.py`, `tests/test_phase19_grounded.py`.
