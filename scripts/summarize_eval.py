@@ -30,12 +30,15 @@ from __future__ import annotations
 import argparse
 import json
 import re
+import sys
 import unicodedata
 from collections import Counter
 from pathlib import Path
 from statistics import mean, median
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
+if str(REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(REPO_ROOT))
 
 #: Các arm trong mọi checkpoint.
 ARMS = ("A", "B", "B-")
@@ -187,6 +190,50 @@ def grounding_ratio(answer: str, context: str) -> tuple[float, int, int]:
     return (n_grounded / n_sentences if n_sentences else 0.0, n_sentences, n_unsupported)
 
 
+def _count_abstain_with_evidence(rows: list[dict], arm: str) -> int:
+    """Đếm số câu arm **nói "không có"** dù context **có bằng chứng thật**.
+
+    Vì sao cần?
+    ----------
+    Đây chính là lỗi của Gate **G19-1**: arm A trả "Không có trong dữ liệu"
+    **16/60** câu narrative, trong đó **7/16** câu gold section **vẫn có** trong
+    top-8 context ⇒ lỗi ở **tầng sinh**, không phải tầng truy xuất.
+
+    ⚠️ Với câu hỏi **quan hệ/năm**, chỉ so `doc_id` là **chưa đủ** ⇒ phải kiểm
+    tra **đáp án có thật sự nằm trong context** không (xem
+    `src.evaluation.evaluate_rag.context_has_gold`).
+
+    Args:
+        rows: Các bản ghi checkpoint.
+        arm: Tên arm ("A"/"B"/"B−").
+
+    Returns:
+        Số câu bị đếm là lỗi.
+    """
+    from src.evaluation.evaluate_rag import context_has_gold  # noqa: PLC0415 — import động
+
+    count = 0
+    for row in rows:
+        arm_data = row.get(arm)
+        if not isinstance(arm_data, dict):
+            continue
+        if str(row.get("type") or "") == "no_data":
+            continue
+        arm_result = arm_data.get("arm") or {}
+        answer = str(arm_result.get("answer") or "")
+        if not (NOT_IN_DATA_PATTERN.search(answer) or "không có" in answer.lower()):
+            continue
+        if context_has_gold(
+            arm_result.get("context_blocks"),
+            arm_data.get("evidence_doc_id"),
+            arm_data.get("evidence_section"),
+            arm_result.get("context"),
+            arm_data.get("expected_answer"),
+        ):
+            count += 1
+    return count
+
+
 def _percentile(values: list[int], pct: float) -> int:
     """Tính phân vị (gần nhất).
 
@@ -282,6 +329,8 @@ def summarize(path: Path) -> dict:
             else None,
             "not_in_data": not_in_data,
             "no_data_retried": no_data_retried,
+            # --- Phase 19 — G19-1: "không có" **dù context có bằng chứng** ---
+            "abstain_with_evidence": _count_abstain_with_evidence(rows, arm),
             "contradicts_reference": contradict,
             "latency_p50": int(median(latencies)) if latencies else 0,
             "latency_p95": _percentile(latencies, 0.95),
@@ -334,6 +383,7 @@ def summarize(path: Path) -> dict:
                         str((row[arm].get("arm") or {}).get("answer") or "")
                     )
                 ),
+                "abstain_with_evidence": _count_abstain_with_evidence(rows_g, arm),
                 "latency_p50": int(
                     median(
                         [
@@ -371,9 +421,9 @@ def render_markdown(summary: dict, label: str) -> str:
     lines.append("")
     lines.append(
         "| Nhóm | Arm | n | correctness | faithfulness | not_in_data | "
-        "latency p50 (ms) | latency p95 (ms) |"
+        "abstain+căn cứ | latency p50 (ms) | latency p95 (ms) |"
     )
-    lines.append("|---|---|---|---|---|---|---|---|")
+    lines.append("|---|---|---|---|---|---|---|---|---|")
     for group in GROUPS:
         bucket = summary.get("by_group", {}).get(group, {})
         for arm in ARMS:
@@ -381,15 +431,17 @@ def render_markdown(summary: dict, label: str) -> str:
             lines.append(
                 f"| {group} | {arm} | {data.get('n', 0)} | "
                 f"{data.get('correctness', '—')} | {data.get('faithfulness', '—')} | "
-                f"{data.get('not_in_data', 0)} | {data.get('latency_p50', 0)} | "
+                f"{data.get('not_in_data', 0)} | "
+                f"{data.get('abstain_with_evidence', 0)} | "
+                f"{data.get('latency_p50', 0)} | "
                 f"{data.get('latency_p95', 0)} |"
             )
     lines.append("")
     lines.append(
         "| Arm | n | correctness | faithfulness | citeP | grounding (code) | "
-        "mệnh đề không căn cứ | latency p50 | latency p95 |"
+        "mệnh đề không căn cứ | not_in_data | abstain+căn cứ | latency p50 | latency p95 |"
     )
-    lines.append("|---|---|---|---|---|---|---|---|---|")
+    lines.append("|---|---|---|---|---|---|---|---|---|---|---|")
     for arm in ARMS:
         data = summary.get("arms", {}).get(arm, {})
         lines.append(
@@ -397,7 +449,9 @@ def render_markdown(summary: dict, label: str) -> str:
             f"{data.get('faithfulness', '—')} | {data.get('citation_precision', '—')} | "
             f"{data.get('grounding_mean', '—')} | "
             f"{data.get('n_sentences_unsupported', 0)}/"
-            f"{data.get('n_sentences', 0)} | {data.get('latency_p50', 0)} | "
+            f"{data.get('n_sentences', 0)} | {data.get('not_in_data', 0)} | "
+            f"{data.get('abstain_with_evidence', 0)} | "
+            f"{data.get('latency_p50', 0)} | "
             f"{data.get('latency_p95', 0)} |"
         )
     return "\n".join(lines)
