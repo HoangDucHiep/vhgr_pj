@@ -855,6 +855,28 @@ def test_evaluate_rag_filters_type_before_limit() -> None:
 
 
 
+def test_deferred_session_defers_following_turns() -> None:
+    """⚠️ Lượt **sau** của một phiên bị hoãn ⇒ cũng phải hoãn (giữ thứ tự lượt).
+
+    Vì sao? Nhóm `multi_turn` (58 câu) là hội thoại nhiều lượt: lượt 2 hỏi
+    "Ông ấy sinh năm nào?" ⇒ cần lịch sử lượt 1 để viết lại câu hỏi. Nếu lượt 1
+    bị hoãn (hết quota) mà lượt 2 vẫn chạy ⇒ lượt 2 chạy **không lịch sử** ⇒
+    điểm **ảo** ⇒ lệch so sánh A vs B vs B− không công bằng.
+    """
+    import inspect
+
+    from src.evaluation import evaluate_rag
+
+    source = inspect.getsource(evaluate_rag.main)
+    # Vòng lặp phải có nhánh "lượt sau của phiên đã hoãn ⇒ hoãn theo".
+    assert "deferred_sessions" in source
+    assert "lượt sau của phiên" in source
+    # Và nhánh này phải **đứng trước** khi gọi LLM (để không tốn token).
+    check_pos = source.index("deferred_sessions")
+    call_pos = source.index("_run_question_arms")
+    assert check_pos < call_pos, "Phải kiểm tra phiên bị hoãn TRƯỚC khi gọi LLM"
+
+
 def test_http_get_json_retries_on_429(monkeypatch, tmp_path) -> None:
     """⚠️ HTTP 429 (bị giới hạn tần suất) phải **retry**, không được bỏ câu hỏi.
 

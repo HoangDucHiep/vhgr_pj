@@ -2713,6 +2713,20 @@ def main() -> int:
     #: Danh sách qid bị **hoãn** (mọi model hết quota) ⇒ không ghi checkpoint
     #: ⇒ vòng `--resume` sau chạy lại.
     deferred_qids: list[str] = []
+    #: **Phiên hội thoại** có ít nhất một lượt bị hoãn ⇒ các lượt **sau** của
+    #: phiên đó cũng phải hoãn (giữ thứ tự lượt) — xem vòng lặp chính.
+    deferred_sessions: set[str] = set()
+
+    def _mark_deferred(qid: str, session_id: str | None) -> None:
+        """Ghi nhận câu bị hoãn (và phiên của nó nếu có).
+
+        Args:
+            qid: Id câu hỏi.
+            session_id: Id phiên hội thoại (None ⇒ không có).
+        """
+        deferred_qids.append(qid)
+        if session_id:
+            deferred_sessions.add(str(session_id))
     #: **Deadline tổng** cho thời gian chờ quota trong lượt chạy này.
     #: Vì sao: nếu mỗi câu chờ tối đa `--quota-wait-s` (900s) và có 163 câu
     #: đều hết quota ⇒ 163 × 900s = **40 giờ** chờ vô ích. ⇒ Giới hạn
@@ -2735,6 +2749,31 @@ def main() -> int:
                 all_results[arm].append(done[qid][arm])
             if index % 10 == 0:
                 logger.info("đã chạy %d/%d câu (resume)", index, len(questions))
+            continue
+
+        # --- Phase 19 — **lượt sau** của một phiên bị hoãn ⇒ cũng phải hoãn -
+        # Vì sao cần?
+        # ----------
+        # Nhóm `multi_turn` (58 câu) là **hội thoại nhiều lượt**: lượt 2 hỏi
+        # "Ông ấy sinh năm nào?" ⇒ cần lịch sử lượt 1 trong `SessionStore` để
+        # viết lại câu hỏi (query rewriting).
+        #
+        # ⇒ Nếu lượt 1 bị **hoãn** (hết quota) mà lượt 2 vẫn chạy ⇒ lượt 2
+        # chạy **không có lịch sử** ⇒ trả sai ⇒ điểm của lượt 2 là **ảo**
+        # ⇒ lệch so sánh A vs B vs B− một cách **không công bằng** (và khác
+        # nhau giữa các arm, tuỳ vào lúc nào quota cạn).
+        #
+        # ⇒ Vì vậy: **lượt sau** của một phiên mà lượt trước bị hoãn ⇒ cũng
+        # hoãn ⇒ giữ **thứ tự lượt** ⇒ mọi arm đều có cùng lịch sử.
+        if session_id and session_id in deferred_sessions:
+            logger.info(
+                "Câu %s — lượt sau của phiên %s đã bị hoãn ⇒ hoãn theo "
+                "(giữ thứ tự lượt hội thoại)",
+                qid,
+                session_id,
+            )
+            deferred = True
+            _mark_deferred(qid, session_id)
             continue
 
         outcomes: dict[str, dict[str, Any]] = {}
@@ -2827,7 +2866,7 @@ def main() -> int:
                 qid,
             )
             deferred = True
-            deferred_qids.append(qid)
+            _mark_deferred(qid, session_id)
             continue
 
         # --- Ghim model cho cả 3 arm của câu này -----------------------
@@ -2916,7 +2955,7 @@ def main() -> int:
                         "Câu %s — hết thời gian chờ ⇒ HOÃN câu", qid,
                     )
                     deferred = True
-                    deferred_qids.append(qid)
+                    _mark_deferred(qid, session_id)
                     continue
                 available = gen_client.healthy_keys()
                 pinned_model = available[
@@ -3015,7 +3054,7 @@ def main() -> int:
                 break
 
         if deferred:
-            deferred_qids.append(qid)
+            _mark_deferred(qid, session_id)
             continue
 
         # --- Retry câu bị LỆCH MODEL ----------------------------------
@@ -3131,7 +3170,7 @@ def main() -> int:
                 "ở vòng sau)",
                 qid,
             )
-            deferred_qids.append(qid)
+            _mark_deferred(qid, session_id)
             continue
 
         checkpoint_record: dict[str, Any] = {"qid": qid}
