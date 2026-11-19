@@ -2756,3 +2756,35 @@ hợp lệ ⇒ G19-7 đạt. Kiểm chứng **câu trả lời** (checkpoint đa
 
 **Cập nhật file:** `scripts/verify_answers_online.py`, `scripts/summarize_eval.py`,
 `src/evaluation/evaluate_rag.py`.
+
+---
+
+## D-146 — Khoá cache kiểm chứng **không được bỏ dấu**; đối chiếu năm với **mọi nguồn đã trích dẫn**
+
+**Ngày:** 19/11/2026 · **Phase:** 19
+
+**Bối cảnh.** Chạy `verify_answers_online.py` lên checkpoint Phase 19 báo **4 câu
+trả lời có năm không có trong Wikipedia live** (q0025 × 3 arm, q0031 arm B).
+Điều tra từng câu cho thấy **cả 4 đều là false negative** của chính script
+kiểm chứng, không phải lỗi của hệ thống:
+
+1. **Va chạm khoá cache.** Khoá cache dùng `_norm()` (bỏ dấu) ⇒ "Lê Hiển Tông"
+   và "Lê Hiến Tông" (hai vua Lê khác nhau) cho cùng một khoá ⇒ cache trả **nhầm
+   bài Lê Hiến Tông (1461–1504)** thay cho bài Lê Hiển Tông (mất 1786) ⇒ năm
+   **1786** bị báo "không có trong Wikipedia".
+2. **Chỉ so năm với `evidence_doc_id`.** q0031 arm B trả "Nguyễn Huy Tự **sinh
+   năm 1743** … [9][19]" ⇒ năm 1743 nằm ở bài **Nguyễn Huy Tự** (trích dẫn KG),
+   không phải bài bằng chứng (Nguyễn Huy Hổ) ⇒ bị báo "bịa" **sai**.
+
+⇒ Nguyên tắc: **công cụ kiểm chứng phải được kiểm chứng ngược lại** — mọi cờ
+"bịa" phải được đối chiếu thủ công với nguồn trước khi tin.
+
+**Quyết định.**
+
+1. Khoá cache dùng **tên bài gốc** (chỉ gộp khoảng trắng), **không** bỏ dấu ⇒
+   `cache_key()` mới; `_norm()` giữ nguyên cho **so khớp tên** (khác mục đích).
+   Xoá toàn bộ cache `wiki_extract::*`/`wiki_pageprops::*` cũ (đã nhiễm).
+2. Đối chiếu năm với **hợp của mọi nguồn đã trích dẫn** (KG + text) **cộng**
+   mọi bài `evidence_doc_id` ⇒ không còn false negative do bỏ sót nguồn.
+
+**Cập nhật file:** `scripts/verify_answers_online.py`.

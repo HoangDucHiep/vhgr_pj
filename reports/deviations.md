@@ -2359,10 +2359,10 @@ nhau** không, (2) phần context bị **cắt mất** không, (3) judge có **�
 - Phase: 19
 - Loại: phạm vi
 - Kế hoạch: G19-7 nói câu hỏi vô lý (vd. q0073 hỏi "Xô Viết Nghệ Tĩnh" — bài không nằm trong 9 triều đại) ⇒ **loại khỏi thống kê** và ghi vào báo cáo.
-- Thực tế: **không** lọc câu hỏi nào. Thay vào đó kiểm chứng **online** (Wikipedia/Wikidata live) từng câu: **0/118** câu hỏi (`narrative` 60 + `multi_turn` 58) không hợp lệ ⇒ toàn bộ câu hỏi trong bộ `qa_rag_250_v2.jsonl` **có thật** và **trả lời được từ corpus**.
+- Thực tế: **không** lọc câu hỏi nào. Thay vào đó kiểm chứng **online** (Wikipedia/Wikidata live) từng câu: **0/246** câu hỏi không hợp lệ (98 mệnh đề quan hệ đối chiếu Wikidata live, 0 sai) ⇒ toàn bộ câu hỏi trong bộ `qa_rag_250_v2.jsonl` **có thật** và **trả lời được từ corpus**.
 - Lý do: Chỉ đạo mới — *"bây giờ bạn cứ đảm bảo cho tôi nó trả lời đúng, hợp lý với câu hỏi và đúng sự thật, và cái nó trả lời thực sự có trong corpus chứ không phải bịa ra là được, chứ không cần quá chuẩn về việc có nằm tỏng khoảng không đâu, sau này ta cũng sẽ mở rộng thêm dữ liệu"*.
 - Ảnh hưởng: Bộ eval **rộng hơn** ⇒ phép so sánh A vs B vs B− phản ánh đúng hành vi thực tế; đồng thời **không** loại được câu hỏi vô lý nào (vì không có câu nào vô lý).
-- Xử lý: Ghi D-142 trong `docs/DECISIONS.md`; báo cáo `reports/phase19_verify_questions_v2.json`.
+- Xử lý: Ghi D-142 trong `docs/DECISIONS.md`; báo cáo `reports/phase19_verify_questions_all.json`.
 - Cập nhật file: `src/evaluation/build_qa_set.py`, `scripts/verify_answers_online.py`, `docs/DECISIONS.md`.
 
 ---

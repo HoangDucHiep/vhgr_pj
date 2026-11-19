@@ -134,6 +134,29 @@ def _norm(text: str) -> str:
     return " ".join(stripped.lower().split())
 
 
+def cache_key(prefix: str, value: str) -> str:
+    """Khoá cache **không va chạm** cho tên bài Wikipedia.
+
+    Vì sao cần?
+    ----------
+    `_norm()` bỏ dấu ⇒ "Lê Hiển Tông" và "Lê Hiến Tông" cho cùng một khoá
+    ⇒ cache trả **nhầm bài** (bài Lê Hiến Tông, 1461–1504, thay cho bài
+    Lê Hiển Tông, mất 1786) ⇒ câu trả lời **đúng** bị báo "năm không có
+    trong Wikipedia" ⇒ **false negative** cho Gate G19-6.
+
+    ⇒ Khoá cache phải dùng **tên gốc** (bỏ khoảng trắng thừa), **không** bỏ
+    dấu. Vẫn giữ `_norm()` cho việc **so khớp tên** (khác mục đích).
+
+    Args:
+        prefix: Tiền tố (vd. "wiki_extract::").
+        value: Tên bài gốc.
+
+    Returns:
+        Khoá cache.
+    """
+    return f"{prefix}{' '.join((value or '').split())}"
+
+
 def _years_in(text: str) -> list[int]:
     """Trích mọi **số năm** có trong văn bản.
 
@@ -261,7 +284,7 @@ def wikipedia_extract(title: str) -> str:
         }
     )
     url = f"https://vi.wikipedia.org/w/api.php?{params}"
-    payload = http_get_json(url, cache_key=f"wiki_extract::{_norm(title)}")
+    payload = http_get_json(url, cache_key=cache_key("wiki_extract::", title))
     if not isinstance(payload, dict):
         return ""
     pages = ((payload.get("query") or {}).get("pages") or {})
@@ -295,7 +318,7 @@ def wikipedia_search_ids(title: str) -> str:
         }
     )
     url = f"https://vi.wikipedia.org/w/api.php?{params}"
-    payload = http_get_json(url, cache_key=f"wiki_pageprops::{_norm(title)}")
+    payload = http_get_json(url, cache_key=cache_key("wiki_pageprops::", title))
     if not isinstance(payload, dict):
         return ""
     for page in ((payload.get("query") or {}).get("pages") or {}).values():
@@ -820,16 +843,25 @@ def verify_answer_against_wikipedia(
     answer: str,
     doc_ids: list[str],
     doc_titles: dict[str, str],
+    extra_titles: Iterable[str] | None = None,
 ) -> dict[str, Any]:
     """Kiểm chứng **số năm** trong câu trả lời bằng Wikipedia live.
 
     Mọi năm trong câu trả lời phải xuất hiện trong bài Wikipedia live của
     `evidence_doc_id` ⇒ năm không tìm thấy ⇒ câu trả lời **bịa** ⇒ đánh dấu đỏ.
 
+    ⚠️ Phase 19 — sửa **false negative**: chỉ so với `evidence_doc_id` là
+    **thiếu**. Ví dụ q0031 (arm B) trả "Nguyễn Huy Tự **sinh năm 1743** …
+    [9][19]" ⇒ năm 1743 nằm ở bài **Nguyễn Huy Tự** (trích dẫn KG), không
+    phải bài `evidence_doc_id` (Nguyễn Huy Hổ) ⇒ bị báo "bịa" **sai**.
+    ⇒ Nay so với **mọi nguồn được trích dẫn** (KG + text) **và** mọi bài
+    `evidence_doc_id`.
+
     Args:
         answer: Câu trả lời của hệ thống.
         doc_ids: Danh sách `doc_id` bằng chứng.
         doc_titles: Map `doc_id` → tên bài.
+        extra_titles: Tên bài bổ sung (từ trích dẫn KG/text).
 
     Returns:
         Dict kết quả.
@@ -837,11 +869,16 @@ def verify_answer_against_wikipedia(
     years = _years_in(answer)
     if not years:
         return {"n_years": 0, "unsupported_years": [], "ok": True}
-    haystack = ""
+    titles: list[str] = []
     for doc_id in doc_ids:
         title = doc_titles.get(doc_id, "")
-        if not title:
-            continue
+        if title and title not in titles:
+            titles.append(title)
+    for title in extra_titles or []:
+        if title and title not in titles:
+            titles.append(title)
+    haystack = ""
+    for title in titles:
         extract = wikipedia_extract(title)
         if extract:
             haystack += "\n" + extract
@@ -965,7 +1002,17 @@ def main() -> int:
                 entry["abstain"] = True
                 n_answers += 1
             else:
-                verdict = verify_answer_against_wikipedia(answer, doc_ids, doc_titles)
+                # ⚠️ Phase 19 — so năm với **mọi nguồn được trích dẫn**
+                # (KG + text), không chỉ `evidence_doc_id` (xem
+                # `verify_answer_against_wikipedia`).
+                extra_titles = [
+                    str(citation.get("title") or "")
+                    for citation in (arm_data.get("arm") or {}).get("citations") or []
+                    if str(citation.get("title") or "")
+                ]
+                verdict = verify_answer_against_wikipedia(
+                    answer, doc_ids, doc_titles, extra_titles
+                )
                 entry.update(verdict)
                 n_answers += 1
                 if verdict.get("ok") is False:
